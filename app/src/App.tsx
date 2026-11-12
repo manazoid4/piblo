@@ -15,6 +15,7 @@ import { Onboarding } from './pages/Onboarding';
 import { PibloDev, type DevTab } from './pages/PibloDev';
 import { Settings } from './pages/Settings';
 import { StoreProvider, usePoll, useStore } from './lib/store';
+import { useUpdate } from './lib/useUpdate';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -105,6 +106,7 @@ function Shell() {
   const running = core?.phase === 'running';
   // Pending pairing requests, polled every 2 s while this window is open.
   const pairing = usePairing({ active: running });
+  const update = useUpdate();
   const [notice, setNotice] = useState<string | null>(null);
   const showPairing = !welcome && pairing.requests.length > 0;
 
@@ -199,6 +201,15 @@ function Shell() {
         <div className="rail-foot meta">{running ? (core?.managed ? 'Piblo on this PC: running' : 'Piblo on this PC: already running') : ''}</div>
       </nav>
       <main className="content">
+        {update.status?.state === 'ready' && !welcome && (
+          <div className="banner ok" role="status" style={{ marginBottom: 'var(--s-4)' }}>
+            <div className="grow">
+              <strong>Piblo {update.status.version} is ready.</strong>
+              <span>Downloaded in the background. Restart to finish — nothing is lost.</span>
+            </div>
+            <button className="btn sm" onClick={() => void update.install()}>Restart to update</button>
+          </div>
+        )}
         {welcome === null ? null : welcome ? (
           <Onboarding onDone={() => { setWelcome(false); location.hash = ''; setSection('live'); }} />
         ) : needsCore ? (
