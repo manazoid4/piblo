@@ -107,9 +107,12 @@ export class CoreSidecar extends EventEmitter {
       if (this.child !== child) return; // an older Core exiting late says nothing about this one
       this.exited = true;
       this.child = null;
-      if (this.state.phase === 'running' || this.state.phase === 'starting') {
+      const wasHealthy = this.state.phase === 'running';
+      if (wasHealthy || this.state.phase === 'starting') {
         this.set(this.make('failed', 'Piblo on this PC stopped unexpectedly.', `Exit code ${code ?? 'unknown'}. ${this.deps.logTail?.() ?? ''}`.trim()));
       }
+      // A Core that was healthy and then died is restarted; one that dies while starting is left for the owner (no crash loop).
+      if (wasHealthy) void this.deps.sleep(1000).then(() => this.ensure());
     });
     const deadline = this.deps.startTimeoutMs ?? 30_000;
     for (let waited = 0; waited < deadline; waited += 500) {

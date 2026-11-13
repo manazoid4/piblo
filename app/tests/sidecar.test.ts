@@ -89,6 +89,22 @@ describe('CoreSidecar', () => {
     expect(sc.isManaged).toBe(true);
   });
 
+  it('restarts a Core it launched that crashes after being healthy', async () => {
+    let up = false;
+    const exits: ((c: number | null) => void)[] = [];
+    const spawn = vi.fn(() => {
+      up = true; // Core answers once launched
+      return { pid: 1, kill: () => true, once: (_e: 'exit', cb: (c: number | null) => void) => exits.push(cb) } as ChildLike;
+    });
+    const { sc } = make({ probe: async () => up, spawn: spawn as unknown as SidecarDeps['spawn'] });
+    expect((await sc.ensure()).phase).toBe('running');
+    up = false;
+    exits[0](1); // killed mid-session
+    for (let i = 0; i < 20 && sc.state.phase !== 'running'; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(spawn).toHaveBeenCalledTimes(2);
+    expect(sc.state.phase).toBe('running');
+  });
+
   it('recheck() leaves non-running states for the owner to retry', async () => {
     const { sc, spawn } = make({ hasToken: () => false });
     expect((await sc.ensure()).phase).toBe('needs-setup');
