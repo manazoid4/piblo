@@ -57,6 +57,27 @@ describe('CoreSidecar', () => {
     expect(opts.env.PYTHONPATH).toBe('BUNDLED');
   });
 
+  it('recheck() starts Core again when a Core it did not launch disappears', async () => {
+    let up = true;
+    const { sc, spawn } = make({ probe: async () => up, sleep: async () => { up = true; } });
+    expect((await sc.ensure()).managed).toBe(false);
+    await sc.recheck(); // still answering: nothing to do
+    expect(spawn).not.toHaveBeenCalled();
+    up = false; // the external Core was killed
+    await sc.recheck();
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(sc.state.phase).toBe('running');
+    expect(sc.state.managed).toBe(true);
+  });
+
+  it('recheck() leaves non-running states for the owner to retry', async () => {
+    const { sc, spawn } = make({ hasToken: () => false });
+    expect((await sc.ensure()).phase).toBe('needs-setup');
+    await sc.recheck();
+    expect(spawn).not.toHaveBeenCalled();
+    expect(sc.state.phase).toBe('needs-setup');
+  });
+
   it('shares one attempt between concurrent ensure() calls', async () => {
     let up = false;
     const { sc, spawn } = make({

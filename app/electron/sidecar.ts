@@ -119,6 +119,12 @@ export class CoreSidecar extends EventEmitter {
     return this.set(this.make('failed', 'Piblo on this PC did not start.', tail || 'No answer on the local port. Open the log for details.'));
   }
 
+  /** Timer hook: a Core we reported running (ours or someone else's) that stopped answering gets started again. */
+  async recheck(): Promise<void> {
+    if (this.inflight || this.state.phase !== 'running') return;
+    if (!(await this.deps.probe())) await this.ensure();
+  }
+
   /** Stops only a Core this app launched. A Core someone else started is left alone. */
   stop(): void {
     const c = this.child;

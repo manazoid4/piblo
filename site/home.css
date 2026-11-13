@@ -106,6 +106,12 @@ p { text-wrap: pretty; }
 .grid details[open] summary::after { transform: rotate(-135deg) translate(-3px, -3px); }
 .grid h3 { font-size: 16.5px; letter-spacing: -.015em; line-height: 1.25; }
 .grid p { padding: 0 20px 14px 0; color: var(--ink-2); font-size: 15.5px; line-height: 1.5; }
+.buddy-show { text-align: center; }
+.buddy-stage { margin: 28px auto 0; max-width: 960px; padding: clamp(12px, 2.5vw, 28px); border-radius: 28px; background: #fdf3dc; box-shadow: 0 30px 60px -40px rgba(60, 40, 20, .35); }
+.buddy-stage img { display: block; width: 100%; height: auto; border-radius: 18px; }
+.buddy-forms { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 14px 0 4px; padding: 0; list-style: none; }
+.buddy-forms li { display: flex; flex-direction: column; gap: 2px; font-size: 14px; color: var(--ink-2); }
+.buddy-forms b { font-size: 16px; color: var(--ink); }
 .buddy-note { display: flex; align-items: flex-start; justify-content: center; gap: 10px; margin: 20px auto 0; max-width: 44em; font-size: 14.5px; color: var(--ink-2); }
 .own { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }
 .own li { padding: 14px; border-radius: 18px; background: var(--tint); }

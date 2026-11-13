@@ -11,6 +11,7 @@ import { isSafeTaskName, planInstall } from './install-plan';
 import { CoreSidecar } from './sidecar';
 import { autoUpdater } from 'electron-updater';
 import { createAppUpdater, type UpdaterLike } from './updater';
+import { WindowReveal } from './window-reveal';
 
 const realFs: FsLike = {
   exists: (p) => fs.existsSync(p),
@@ -128,9 +129,9 @@ function createWindow(): BrowserWindow {
     },
   });
   w.setMenuBarVisibility(false);
-  w.once('ready-to-show', () => {
-    if (!startHidden) w.show();
-  });
+  // First paint is not guaranteed: if the renderer never becomes ready the window would stay
+  // invisible, so the gate also reveals on did-finish-load and after a failsafe timeout.
+  new WindowReveal(w, { startHidden });
   w.on('close', (e) => {
     if (!quitting && settings.closeToTray) {
       e.preventDefault();
@@ -386,7 +387,11 @@ async function pollPairing() {
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on('second-instance', showWindow);
+  // Opening Piblo again is the owner's natural "try again", so retry Core if it is not up.
+  app.on('second-instance', () => {
+    showWindow();
+    void (sidecar.state.phase === 'running' ? sidecar.recheck() : sidecar.ensure());
+  });
   app.setAppUserModelId('uk.piblo.app');
   void app.whenReady().then(() => {
       settings = loadSettings();
@@ -398,7 +403,10 @@ if (!app.requestSingleInstanceLock()) {
       createTray();
       applyLoginItem();
       void sidecar.ensure();
-      setInterval(() => void pollPairing(), 5000);
+      setInterval(() => {
+        void sidecar.recheck();
+        void pollPairing();
+      }, 5000);
       appUpdater.start();
     });
   app.on('before-quit', () => {
