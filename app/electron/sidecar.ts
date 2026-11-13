@@ -95,13 +95,16 @@ export class CoreSidecar extends EventEmitter {
     const env: Record<string, string> = {};
     for (const [k, v] of Object.entries(this.deps.baseEnv ?? {})) if (v !== undefined) env[k] = v;
     if (loc.sourceDir && loc.sourceDir !== loc.installDir) env.PYTHONPATH = loc.sourceDir;
+    this.stop(); // a hung Core we launched must not be orphaned by the new one
     this.exited = false;
+    let child: ChildLike;
     try {
-      this.child = this.deps.spawn(loc.python!, ['-m', 'mazhost'], { cwd: loc.installDir, env });
+      child = this.child = this.deps.spawn(loc.python!, ['-m', 'mazhost'], { cwd: loc.installDir, env });
     } catch (e) {
       return this.set(this.make('failed', 'Piblo on this PC could not be launched.', String((e as Error).message)));
     }
-    this.child.once('exit', (code) => {
+    child.once('exit', (code) => {
+      if (this.child !== child) return; // an older Core exiting late says nothing about this one
       this.exited = true;
       this.child = null;
       if (this.state.phase === 'running' || this.state.phase === 'starting') {

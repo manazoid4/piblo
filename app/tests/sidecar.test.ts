@@ -70,6 +70,25 @@ describe('CoreSidecar', () => {
     expect(sc.state.managed).toBe(true);
   });
 
+  it('recheck() kills a hung Core it launched, and its late exit does not clobber the new one', async () => {
+    const kids: { kill: ReturnType<typeof vi.fn>; exitCb: null | ((c: number | null) => void) }[] = [];
+    const spawn = vi.fn(() => {
+      const k = { pid: kids.length + 1, kill: vi.fn(() => true), exitCb: null as null | ((c: number | null) => void), once(_e: 'exit', cb: (c: number | null) => void) { k.exitCb = cb; } };
+      kids.push(k);
+      return k as ChildLike;
+    });
+    let up = false;
+    const { sc } = make({ probe: async () => up, sleep: async () => { up = true; }, spawn: spawn as unknown as SidecarDeps['spawn'] });
+    expect((await sc.ensure()).managed).toBe(true);
+    up = false; // first Core hangs: alive but silent
+    await sc.recheck();
+    expect(spawn).toHaveBeenCalledTimes(2);
+    expect(kids[0].kill).toHaveBeenCalled();
+    kids[0].exitCb?.(1); // the hung one finally exits
+    expect(sc.state.phase).toBe('running');
+    expect(sc.isManaged).toBe(true);
+  });
+
   it('recheck() leaves non-running states for the owner to retry', async () => {
     const { sc, spawn } = make({ hasToken: () => false });
     expect((await sc.ensure()).phase).toBe('needs-setup');
