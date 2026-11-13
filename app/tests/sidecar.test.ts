@@ -82,6 +82,10 @@ describe('CoreSidecar', () => {
     expect((await sc.ensure()).managed).toBe(true);
     up = false; // first Core hangs: alive but silent
     await sc.recheck();
+    await sc.recheck(); // two misses = maybe just busy: leave it alone
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(kids[0].kill).not.toHaveBeenCalled();
+    await sc.recheck(); // third miss in a row = hung
     expect(spawn).toHaveBeenCalledTimes(2);
     expect(kids[0].kill).toHaveBeenCalled();
     kids[0].exitCb?.(1); // the hung one finally exits

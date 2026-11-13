@@ -28,6 +28,7 @@ export interface SidecarDeps {
 export class CoreSidecar extends EventEmitter {
   private child: ChildLike | null = null;
   private exited = false;
+  private misses = 0;
   private inflight: Promise<CoreState> | null = null;
   state: CoreState;
 
@@ -128,7 +129,15 @@ export class CoreSidecar extends EventEmitter {
   /** Timer hook: a Core we reported running (ours or someone else's) that stopped answering gets started again. */
   async recheck(): Promise<void> {
     if (this.inflight || this.state.phase !== 'running') return;
-    if (!(await this.deps.probe())) await this.ensure();
+    if (await this.deps.probe()) {
+      this.misses = 0;
+      return;
+    }
+    // A Core we launched that is still alive is probably just busy (a slow request blocks /health):
+    // only treat it as hung after 3 silent checks in a row (~15 s at the 5 s timer).
+    if (this.child && !this.exited && ++this.misses < 3) return;
+    this.misses = 0;
+    await this.ensure();
   }
 
   /** Stops only a Core this app launched. A Core someone else started is left alone. */
