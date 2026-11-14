@@ -8,12 +8,11 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import uk.mazworks.piblo.data.MAX_SHARE_QUEUE
 import uk.mazworks.piblo.data.Prefs
-import uk.mazworks.piblo.data.SecretBox
-import uk.mazworks.piblo.proto.CoreClient
+import uk.mazworks.piblo.data.ShareEntry
 
-/** Android's text share target uses the same paired Core client as the app. */
+/** Android's text share target: queues locally, sends when Core link reconnects. */
 class ShareActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,22 +24,35 @@ class ShareActivity : ComponentActivity() {
             finish()
             return
         }
+        val url = Regex("""https?://\S+""").find(text)?.value.orEmpty()
         lifecycleScope.launch {
-            val saved = withContext(Dispatchers.IO) {
-                try {
-                    val prefs = (application as PibloApp).settings.now()
-                    check(prefs.mode == Prefs.Mode.COMPUTER && prefs.hasComputer)
-                    val token = SecretBox.decrypt(prefs.tokenBlob) ?: error("pairing_required")
-                    val url = Regex("https?://[^\\s]+").find(text)?.value.orEmpty()
-                    val body = JSONObject().put("text", text).put("title", title).put("url", url)
-                    CoreClient(prefs.coreUrl, token, BuildConfig.VERSION_NAME).share(body.toString())
-                    true
-                } catch (_: Exception) { false }
+            val app = application as PibloApp
+            val prefs = withContext(Dispatchers.IO) { app.settings.now() }
+            // Only queue when paired to a computer; otherwise tell the user to open Piblo and pair first.
+            if (prefs.mode != Prefs.Mode.COMPUTER || !prefs.hasComputer) {
+                Toast.makeText(this@ShareActivity, "Open Piblo and connect to your computer first.", Toast.LENGTH_LONG).show()
+                finish()
+                return@launch
             }
-            Toast.makeText(this@ShareActivity,
-                if (saved) "Saved to Piblo." else "Couldn't save. Open Piblo and check your computer connection.",
-                Toast.LENGTH_LONG).show()
+            // Room work on IO; toasts only on the main thread (a Toast off the main thread crashes).
+            val message = withContext(Dispatchers.IO) {
+                try {
+                    val dao = app.db.dao()
+                    if (dao.shareQueueCount() >= MAX_SHARE_QUEUE) {
+                        "Share queue full. Wait for queued shares to send."
+                    } else {
+                        dao.enqueueShare(
+                            ShareEntry(text = text, title = title, url = url,
+                                createdAt = System.currentTimeMillis(),
+                                idempotencyId = java.util.UUID.randomUUID().toString())
+                        )
+                        "Saved to Piblo. It will be sent when your computer is connected."
+                    }
+                } catch (_: Exception) { "Couldn't save. Open Piblo and check your computer connection." }
+            }
+            Toast.makeText(this@ShareActivity, message, Toast.LENGTH_LONG).show()
             finish()
         }
     }
 }
+

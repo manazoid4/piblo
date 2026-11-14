@@ -36,11 +36,13 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uk.mazworks.piblo.PibloApp
+import uk.mazworks.piblo.hub.LinkState
 
 private fun app(ctx: Context) = ctx.applicationContext as PibloApp
 
@@ -49,6 +51,7 @@ private val Yellow = Color(0xFFFFD23F)
 private val Cream = Color(0xFFFFF6E9)
 
 private const val UNREACHABLE = "Piblo isn't reachable. Check it's on and on the same Wi-Fi."
+private const val RECONNECTING = "Reconnecting…"
 
 private val keys = listOf(
     "Esc" to "esc",
@@ -65,6 +68,7 @@ private val keys = listOf(
 fun LiveScreen() {
     val a = app(LocalContext.current)
     val scope = rememberCoroutineScope()
+    val state by a.hub.state.collectAsStateWithLifecycle()
     var frame by remember { mutableStateOf<ImageBitmap?>(null) }
     var unreachable by remember { mutableStateOf(false) }
 
@@ -90,8 +94,11 @@ fun LiveScreen() {
                 Image(it, null, Modifier.fillMaxSize().testTag("live_screen"), contentScale = ContentScale.FillBounds, filterQuality = FilterQuality.None)
             }
             if (unreachable) {
-                Box(Modifier.fillMaxSize().background(Navy), contentAlignment = Alignment.Center) {
-                    Text(UNREACHABLE, Modifier.testTag("live_unreachable"), color = Cream)
+                val isReconnecting = state.link != LinkState.ONLINE && frame != null
+                val msg = if (isReconnecting) RECONNECTING else UNREACHABLE
+                val overlay = if (isReconnecting) Navy.copy(alpha = 0.7f) else Navy
+                Box(Modifier.fillMaxSize().background(overlay), contentAlignment = Alignment.Center) {
+                    Text(msg, Modifier.testTag(if (isReconnecting) "live_reconnecting" else "live_unreachable"), color = Cream)
                 }
             }
         }
