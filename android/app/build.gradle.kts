@@ -18,7 +18,19 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    // CI signs debug APKs with one stable key (repo secret) so updates install in place; local builds keep the default debug key.
+    val stableKeystore = System.getenv("PIBLO_KEYSTORE")?.takeIf { it.isNotBlank() }
+    signingConfigs {
+        if (stableKeystore != null) create("piblo") {
+            storeFile = file(stableKeystore)
+            storePassword = System.getenv("PIBLO_KEYSTORE_PASSWORD")
+            keyAlias = "piblo"
+            keyPassword = System.getenv("PIBLO_KEYSTORE_PASSWORD")
+        }
+    }
+
     buildTypes {
+        debug { signingConfigs.findByName("piblo")?.let { signingConfig = it } }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
