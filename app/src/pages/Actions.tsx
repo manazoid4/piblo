@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Empty, PageHead } from '../components/ui';
 import { ago } from '../lib/logic';
 import { useAct, usePoll, useStore } from '../lib/store';
+import { VoiceShortcuts } from '../components/VoiceShortcuts';
 
 interface Pending {
   id: string;
@@ -227,6 +228,7 @@ export function Actions() {
         <Needs />
       </div>
       <TodayCard />
+      <VoiceShortcuts />
       <div className="grid-2">
         <FocusCard />
         <Quick />
