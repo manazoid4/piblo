@@ -106,3 +106,37 @@ src_bootstrap/piblo_portal.*  HTTP portal + authenticated OTA
 src_bootstrap/piblo_screen.*  LCD test-pattern endpoint
 scripts/piblo_tool.py      piblo-flash / piblo-ota / setup / cmd
 ```
+
+## Hardware test log (14 Nov 2026)
+
+Verified on the connected board (COM4, USB-Serial/JTAG, MAC 80:45:6b:35:d7:90):
+
+| Check | Result |
+|---|---|
+| Chip probe (esptool flash-id) | ESP32-S3 QFN56 rev v0.2, Wi-Fi + BT5 LE, 40 MHz XTAL |
+| Flash / PSRAM | 16 MB quad, 8 MB OPI PSRAM enabled |
+| Factory backup | 1 MB read over USB before flashing (kept off-repo) |
+| USB flash | factory.bin written at 0x0, hash verified |
+| Boot | `piblo: bootstrap 1.1.0 starting`, PSRAM enabled |
+| LCD | ST7789 drives: boot self-test fields + status screen (user confirmed) |
+| Wi-Fi scan | 8 real 2.4 GHz networks, incl. `YouFibre-45FDB7` ch6 |
+| Setup AP | `Piblo-Setup` up at 192.168.4.1 |
+| Portal | HTTP up, OTA token generated |
+| Serial control | TOKEN / STATUS / SCAN / NET answered over USB |
+
+Not verified yet, and why:
+
+- **Joining a real network** — the PC's only visible SSID is 5 GHz. The board's
+  own scan sees `YouFibre-45FDB7` on ch6 (2.4 GHz), so a 2.4 GHz network is
+  available; credentials still need to be supplied over USB.
+- **End-to-end OTA** — needs the board and the PC on one network (the PC cannot
+  join the board's AP while already on its own Wi-Fi).
+- **ESP-NOW handshake** — the Cardputer ADV was not connected to USB during the
+  session.
+
+## Recovery
+
+If the board's COM port vanishes and Device Manager shows problem code 28
+(`CM_PROB_FAILED_INSTALL`), that was caused by a build that enabled a second USB
+CDC port. The current firmware does not do this. Unplug and re-plug the board to
+recover; then re-flash `factory.bin` over USB.
