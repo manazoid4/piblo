@@ -215,8 +215,8 @@ def insert_text(text: str, enter: bool = False, flow=None) -> str:
         return "type"
     from .flow import paste as paste_text
 
-    paste_text(text, enter)
-    return "paste"
+    status = paste_text(text, enter)
+    return status if isinstance(status, str) else "paste"
 
 
 # Windows INPUT layout, spelled with fixed-width ctypes so the size is identical

@@ -64,7 +64,9 @@ def send(client: httpx.Client, wav: bytes, released_at: float, paste_fn=None) ->
     j = r.json()
     intent, text = j["intent"], j["text"]
     if text and intent in ("paste", "claude"):
-        paste_fn(text, enter=intent == "claude")
+        status = paste_fn(text, enter=intent == "claude")
+        if status != "pasted":
+            log(f"paste_status={status} text_len={len(text)}")
     elapsed = round((time.perf_counter() - released_at) * 1000)
     log(f"release_to_done_ms={elapsed} core_ms={j['ms']} intent={intent} chars={len(text)}")
     print(f"{elapsed} ms  [{intent}] {text}")
