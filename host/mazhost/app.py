@@ -1011,7 +1011,12 @@ def create_app(
         try:
             security.validate_upload(path, size)
             armed = flow_foreground() if target == "pc-paste" else 0  # focus when the audio landed
-            result = await run_in_threadpool(flow_service.dictate, path)
+            try:
+                result = await asyncio.wait_for(
+                    run_in_threadpool(flow_service.dictate, path), timeout=60)
+            except asyncio.TimeoutError:
+                path.unlink(missing_ok=True)
+                raise HTTPException(504, "stt_timeout")
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
                 prefs = read_settings(flow_service)
                 enter = result["intent"] == "claude" or bool(prefs["press_enter"])

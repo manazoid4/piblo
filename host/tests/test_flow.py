@@ -306,5 +306,121 @@ def test_safe_paste_admin_window_goes_to_clipboard():
     from mazhost.flow import safe_paste
     got = []
     out = safe_paste("hi.", False, 42, paste_fn=lambda t, enter=False: got.append("PASTED"),
-                     fg_fn=lambda: 42, copy_fn=lambda t: got.append("copy"), typable_fn=lambda h: False)
+                         fg_fn=lambda: 42, copy_fn=lambda t: got.append("copy"), typable_fn=lambda h: False)
     assert out == "clipboard" and got == ["copy"]
+
+
+import threading
+
+
+class _SlowStt:
+    """STT that blocks until released, for concurrency & timeout tests."""
+    ready: threading.Event
+    released: threading.Event
+
+    def available(self):
+        return True
+
+    def transcribe(self, p):
+        self.ready.set()
+        self.released.wait()
+        return "hello world"
+
+    def transcribe_local(self, p):
+        return self.transcribe(p), "whisper"
+
+    def transcribe_prompted(self, path, prompt):
+        return self.transcribe(path)
+
+
+class _NoopModels:
+    def chat(self, msgs, route):
+        return "hello world", "fake"
+
+
+def test_slow_stt_does_not_block_health_check(tmp_path, monkeypatch):
+    """(a) A slow STT call on /dictate must not block /health."""
+    slow = _SlowStt()
+    slow.ready = threading.Event()
+    slow.released = threading.Event()
+
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path),
+                   groq_api_key="", flow_cleanup_llm=False, stt_provider="whisper", flow_cloud=False)
+    client = TestClient(create_app(cfg, stt=slow, models=_NoopModels()))
+
+    responses = []
+
+    def fire_dictate():
+        try:
+            r = client.post("/dictate?target=text", content=_wav(),
+                            headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
+            responses.append(r)
+        except Exception as e:
+            responses.append(e)
+
+    t = threading.Thread(target=fire_dictate, daemon=True)
+    t.start()
+    assert slow.ready.wait(timeout=5), "STT never called"
+    h = client.get("/health")
+    assert h.status_code == 200, f"/health blocked: {h.status_code}"
+    slow.released.set()
+    t.join(timeout=10)
+    assert len(responses) == 1
+    if isinstance(responses[0], Exception):
+        raise responses[0]
+    assert responses[0].status_code == 200
+
+
+def test_stt_timeout_returns_error_not_hang(tmp_path, monkeypatch):
+    """(b) If STT exceeds the 60s timeout, /dictate returns 504 stt_timeout."""
+    slow = _SlowStt()
+    slow.ready = threading.Event()
+    slow.released = threading.Event()  # never set -> will timeout
+
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path),
+                   groq_api_key="", flow_cleanup_llm=False, stt_provider="whisper", flow_cloud=False)
+    client = TestClient(create_app(cfg, stt=slow, models=_NoopModels()))
+
+    responses = []
+
+    def fire_dictate():
+        try:
+            r = client.post("/dictate?target=text", content=_wav(),
+                            headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
+            responses.append(r)
+        except Exception as e:
+            responses.append(e)
+
+    t = threading.Thread(target=fire_dictate, daemon=True)
+    t.start()
+    assert slow.ready.wait(timeout=5), "STT never called"
+    t.join(timeout=65)
+    assert len(responses) == 1, f"expected 1 response, got {len(responses)}"
+    resp = responses[0]
+    if isinstance(resp, Exception):
+        raise resp
+    assert resp.status_code == 504, f"expected 504, got {resp.status_code}: {resp.text}"
+    assert resp.json()["detail"] == "stt_timeout", resp.text
+    slow.released.set()
+
+
+def test_paste_restores_clipboard(monkeypatch):
+    """(c) paste() saves old clipboard and restores it after Ctrl+V."""
+    import pyperclip
+    from mazhost.flow import paste
+
+    calls = []
+    monkeypatch.setattr(pyperclip, "paste", lambda: "original text")
+    monkeypatch.setattr(pyperclip, "copy", lambda t: calls.append(t))
+
+    import ctypes
+    def noop(*a):
+        pass
+    monkeypatch.setattr(ctypes.windll.user32, "keybd_event", noop)
+    monkeypatch.setattr(ctypes.windll.user32, "GetForegroundWindow", noop)
+    monkeypatch.setattr(ctypes.windll.user32, "GetAncestor", lambda *a: 0)
+
+    result = paste("new text")
+    assert "new text" in calls, f"expected 'new text' in {calls}"
+    assert "original text" in calls, f"expected 'original text' restoration in {calls}"
+    assert result == "pasted", f"expected 'pasted', got {result!r}"

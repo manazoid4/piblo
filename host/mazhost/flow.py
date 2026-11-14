@@ -208,8 +208,8 @@ def safe_paste(text: str, enter: bool, armed_hwnd: int, paste_fn=None, fg_fn=for
     if not armed_hwnd or now != armed_hwnd or not typable_fn(now):
         (copy_fn or _copy)(text)
         return "clipboard"
-    (paste_fn or paste)(text, enter=enter)
-    return "pasted"
+    result = (paste_fn or paste)(text, enter=enter)
+    return result if isinstance(result, str) else "pasted"
 
 
 def _copy(text: str) -> None:
@@ -218,8 +218,11 @@ def _copy(text: str) -> None:
     pyperclip.copy(text)
 
 
-def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> None:
-    """Save clipboard, set text, Ctrl+V, restore clipboard (Windows)."""
+def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> str:
+    """Save clipboard, set text, Ctrl+V, restore clipboard (Windows).
+    Returns "pasted", "clipboard_busy" (text pasted but old clipboard lost),
+    or "restore_failed" (pasted, old survived but not restored).
+    """
     import ctypes
     import pyperclip
 
@@ -230,7 +233,10 @@ def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> None:
         old = pyperclip.paste()
     except Exception:  # noqa: BLE001
         old = None
-    pyperclip.copy(text)
+    try:
+        pyperclip.copy(text)
+    except Exception:  # noqa: BLE001
+        return "clipboard_busy"
 
     def tap(*vks: int) -> None:
         for vk in vks:
@@ -246,7 +252,11 @@ def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> None:
         tap(0x0D)
     time.sleep(0.4)  # slow targets (RDP, heavy Electron) read the clipboard late
     if old:  # an image/files clipboard cannot be restored: leave the dictated text rather than blank it
-        pyperclip.copy(old)
+        try:
+            pyperclip.copy(old)
+        except Exception:  # noqa: BLE001
+            return "restore_failed"
+    return "pasted"
 
 
 

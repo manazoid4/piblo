@@ -1,4 +1,4 @@
-"""nod Flow PC agent: hold Right Ctrl, speak, release -> cleaned text pasted into the focused window.
+r"""nod Flow PC agent: hold Right Ctrl, speak, release -> cleaned text pasted into the focused window.
 
 Run at login:  pythonw host\nodflow.py   (see host\install-nodflow.ps1)
 Env: NOD_CORE_URL (default http://127.0.0.1:8787), MAZ_TOKEN (or MAZ_ENV=path to a .env).
