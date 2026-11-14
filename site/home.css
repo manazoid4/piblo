@@ -222,3 +222,11 @@ p { text-wrap: pretty; }
 .tile-stage .scr-label--ok { color: #0d6e4f; }
 .tile-stage .scr-keys b { border-color: rgba(29,27,24,.25); }
 .tile-stage .scr-list--lined dt, .tile-stage .scr-list--lined dd { border-top-color: rgba(29,27,24,.12); }
+
+/* Private by design cards */
+.priv-grid { display: grid; gap: 14px; }
+.priv-card { padding: 22px 24px; background: var(--card); border-radius: 22px; border: 1px solid var(--line); box-shadow: var(--shadow); }
+.priv-card h3 { font-size: 17px; margin-bottom: 8px; letter-spacing: -.02em; }
+.priv-card p { color: var(--ink-2); font-size: 15px; line-height: 1.5; }
+@media (min-width: 720px) { .priv-grid { grid-template-columns: 1fr 1fr; column-gap: 28px; } }
+@media (min-width: 980px) { .priv-grid { grid-template-columns: repeat(4, 1fr); } }
