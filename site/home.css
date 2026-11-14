@@ -89,7 +89,7 @@ p { text-wrap: pretty; }
 .tile { display: flex; flex-direction: column; padding: 20px 20px 18px; background: var(--card); border-radius: 22px; box-shadow: var(--shadow); }
 .tile h3 { font-size: 18px; letter-spacing: -.02em; line-height: 1.2; margin-bottom: 8px; }
 .tile > p { color: var(--ink-2); font-size: 15.5px; line-height: 1.45; }
-.tile-status { margin-top: 14px; }
+.tile-status { margin-top: auto; padding-top: 14px; align-self: flex-start; }
 .legend { margin: 0 auto 24px; max-width: 34em; text-align: center; font-size: 14.5px; color: var(--ink-2); }
 @media (max-width: 359px) { .tiles { grid-template-columns: 1fr; } }
 
