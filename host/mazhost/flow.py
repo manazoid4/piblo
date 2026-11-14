@@ -12,7 +12,7 @@ from . import private_mode
 
 log = logging.getLogger("mazhost.flow")
 
-DEFAULT_WORDS = ["Piblo", "nod", "Maz Works", "Cardputer", "Claude", "MAZos", "FlowLens", "Groq", "Fish"]
+DEFAULT_WORDS = ["Piblo", "Piblo Flow", "nod", "Cardputer", "Claude", "MAZos", "FlowLens", "Groq", "Fish"]
 GROQ_URL = "https://api.groq.com/openai/v1"
 CLEAN_MODEL = "openai/gpt-oss-20b"
 
@@ -32,9 +32,9 @@ _INTENT = {"note": "note", "remind me": "remind", "claude": "claude"}
 # What local STT actually hears for our own names (measured with Parakeet, 14 Nov).
 # Always applied, so installs whose dictionary.txt predates this still benefit.
 BUILTIN_ALIASES = {
-    "Piblo Flow": ["Pebloflow", "Peblo flow", "Pibloflow"],
-    "Piblo": ["Peblo", "Pibblo", "Pebblo", "Piblow"],
-    "Cardputer": ["card puter", "card pewter", "card computer"],
+    "Piblo Flow": ["Pebloflow", "Peblo flow", "Pibloflow", "Peblo Flow", "Paper blue flow"],
+    "Piblo": ["Peblo", "Pibblo", "Pebblo", "Piblow", "Paper blue", "Peb low", "Peb Lowe"],
+    "Cardputer": ["card puter", "card pewter", "card computer", "Card putter"],
 }
 
 
