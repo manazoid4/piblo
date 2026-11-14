@@ -75,6 +75,7 @@ from .sessions import SessionStore
 from .skill_vault import SkillVault
 from starlette.concurrency import run_in_threadpool
 from .flow import Flow, foreground as flow_foreground, safe_paste as flow_safe_paste
+from .flow_routes import build_flow_router, insert_text, read_settings
 from .stt import SpeechToText
 from .subtitle_routes import install_subtitle_routes
 from .subtitles import SubtitleJobs, WhisperTranscriber
@@ -252,7 +253,7 @@ def create_app(
         CORSMiddleware,
         allow_origins=cfg.web_origin_list,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["Authorization", "Content-Type", "X-MAZ-Token", "X-MAZ-Context"],
         expose_headers=["X-MAZ-Width", "X-MAZ-Height", "X-MAZ-Format"],
     )
@@ -1012,9 +1013,16 @@ def create_app(
             armed = flow_foreground() if target == "pc-paste" else 0  # focus when the audio landed
             result = await run_in_threadpool(flow_service.dictate, path)
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
+                prefs = read_settings(flow_service)
+                enter = result["intent"] == "claude" or bool(prefs["press_enter"])
+
+                def type_and_enter(text, enter=False):
+                    insert_text(text, enter, flow_service)
+
+                typer = type_and_enter if prefs["input_mode"] == "type" else None
                 try:
                     result["pc"] = await run_in_threadpool(
-                        flow_safe_paste, result["text"], result["intent"] == "claude", armed)
+                        flow_safe_paste, result["text"], enter, armed, typer)
                 except Exception:  # noqa: BLE001 - clipboard busy/locked: still return the text
                     result["pc"] = "failed"
                 result["reply"] = result["pc"]  # firmware decodeReply reads `reply` as the outcome
@@ -1211,6 +1219,7 @@ def create_app(
 
     api.include_router(build_dev_router(resolve_data_dir(cfg), Path(cfg.repo_dir) if cfg.repo_dir else Path(__file__).resolve().parents[2]))
     api.include_router(build_features_router(resolve_data_dir(cfg)))
+    api.include_router(build_flow_router(flow_service))
     api.include_router(build_dump_router(cfg, model_router))
     api.include_router(webui_router)
     api.include_router(build_library_router(cfg, model_router))

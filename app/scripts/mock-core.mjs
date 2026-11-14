@@ -83,6 +83,7 @@ export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline
   fs.writeFileSync(path.join(dir, '.env'), `MAZ_TOKEN=${token}\nMAZ_PORT=${port}\nMAZ_DEFAULT_ROUTE=local\nMAZ_GROQ_API_KEY=x\n`);
   const now = () => Math.floor(Date.now() / 1000);
   const frame = drawScreen();
+  const flow = { settings: { input_mode: 'paste', press_enter: false, cleanup: 'auto', stt: 'auto', effective_cleanup: 'rules', has_groq_key: false }, lines: ['Piblo', 'Cardputer', 'Piblo Flow', 'Groq', 'Rampage: ram page, ram payge'], get words() { return this.lines.map((l) => l.split(':')[0].trim()); } };
   const db = {
     beam: [{ id: 'b1', text: 'https://example.com/read-later', direction: 'to_pocket', created: now() - 4000, kind: 'link' }],
     dumps: [
@@ -283,6 +284,42 @@ export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline
     }
     if (p === '/library/search') return json(res, 200, { results: [{ id: 'l1', kind: 'web', url: 'https://example.com/a', author: 'example', snippet: 'A [saved] article about calm software', project: null }] });
     if (p === '/models') return json(res, 200, { local: true, local_engine: 'ollama', local_model: 'qwen3.5:4b', local_model_installed: true, backup_model: 'lfm2.5-8b', default_route: 'local', last_route: { provider: 'ollama' } });
+    // Flow dictation settings (/flow/*)
+    if (p === '/flow/settings') {
+      if (req.method === 'GET' || req.method === 'PATCH' || req.method === 'POST') {
+        if (req.method !== 'GET' && data) Object.assign(flow.settings, data);
+        flow.settings.effective_cleanup = flow.settings.cleanup === 'auto' ? 'rules' : flow.settings.cleanup;
+        flow.settings.has_groq_key = false;
+      }
+      return json(res, 200, flow.settings);
+    }
+    if (p === '/flow/dictionary' || p.startsWith('/flow/dictionary/')) {
+      const dictPart = (line) => { const [term, rest] = String(line).split(':'); return { term: term.trim(), aliases: (rest || '').split(',').map((a) => a.trim()).filter(Boolean) }; };
+      const dictView = () => { const entries = flow.lines.map(dictPart); return { words: entries.map((e) => e.term), entries, aliased: entries.filter((e) => e.aliases.length).length }; };
+      if (req.method === 'GET') return json(res, 200, dictView());
+      if (req.method === 'POST' || req.method === 'PATCH') {
+        const w = (data?.word || '').trim();
+        if (!w) return json(res, 400, { detail: 'word_required' });
+        const { term, aliases } = dictPart(w);
+        if (!term) return json(res, 400, { detail: 'word_required' });
+        const index = flow.lines.findIndex((l) => dictPart(l).term.toLowerCase() === term.toLowerCase());
+        if (index < 0) flow.lines.push(term + (aliases.length ? ': ' + aliases.join(', ') : ''));
+        else {
+          const known = dictPart(flow.lines[index]).aliases;
+          const merged = [...known, ...aliases.filter((a) => !known.some((k) => k.toLowerCase() === a.toLowerCase()))];
+          if (merged.length !== known.length) flow.lines[index] = term + ': ' + merged.join(', ');
+        }
+        return json(res, 200, dictView());
+      }
+      if (req.method === 'DELETE') {
+        const w = decodeURIComponent(p.split('/')[3] || '').toLowerCase();
+        if (!w) return json(res, 400, { detail: 'word_required' });
+        flow.lines = flow.lines.filter((l) => dictPart(l).term.toLowerCase() !== w);
+        return json(res, 200, dictView());
+      }
+    }
+    if (p === '/flow/status') return json(res, 200, { recent: [{ at: new Date().toISOString(), chars: 84, intent: 'paste', cleanup: 'rules', total_ms: 640 }], count: 1, avg_total_ms: 640, p95_total_ms: 640, errors: [], effective_cleanup: flow.settings.effective_cleanup });
+    if (p === '/flow/test') return json(res, 200, { ms: 420, word_count: 5, cleanup: flow.settings.cleanup, effective_cleanup: flow.settings.effective_cleanup, text: 'This is a test of dictation.' });
     if (p === '/voices') return json(res, 200, { ok: true, current: 'v1', current_name: 'Adrian', voices: [{ name: 'Adrian', reference_id: 'v1', description: 'Warm, steady', current: true }, { name: 'Maya', reference_id: 'v2', description: 'Bright and quick' }, { name: 'Theo', reference_id: 'v3', description: 'Low and calm' }] });
     if (p === '/session/start') return json(res, 200, { session_id: 's' + ++db.session });
     if (p === '/turn/text') return json(res, 200, { reply: 'Start with the follow-up to your first client, then clear the two items waiting on you.', provider: 'ollama' });

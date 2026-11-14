@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { FlowSection } from '../components/FlowSection';
 import type { AppSettings, CoreEnvView, EnvKey } from '../../shared/types';
 import { PageHead, Setting, Switch } from '../components/ui';
 import { useAct, usePoll, useStore } from '../lib/store';
@@ -101,6 +102,8 @@ export function Settings() {
         <KeyField label="Fish Audio (voice)" envKey="MAZ_FISH_API_KEY" isSet={!!env?.hasFishKey} onSaved={saved} />
         <p className="meta" style={{ paddingTop: 'var(--s-2)' }}>Keys are stored in Core's own settings file on this PC and are never shown again. Changes apply after Core restarts.</p>
       </section>
+
+      <FlowSection />
 
       <section className="card" aria-labelledby="app-h">
               <h2 id="app-h">This app</h2>
