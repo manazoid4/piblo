@@ -53,7 +53,9 @@ p { text-wrap: pretty; }
 .pip { width: 7px; height: 7px; border-radius: 50%; background: var(--tomato); }
 .hero h1 { max-width: 11.5em; margin: 0 auto; }
 .lede { margin: 20px auto 0; max-width: 31em; font-size: clamp(17px, 1.55vw, 21px); line-height: 1.5; color: var(--ink-2); }
-.actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 26px; }
+.actions { display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; margin-top: 26px; }
+.text-link { font-size: 15px; font-weight: 600; color: var(--ink-2); text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.text-link:hover { color: var(--accent-ink); }
 .hero-fig { margin-top: 30px; }
 .stage { background: radial-gradient(70% 55% at 50% 30%, var(--stage-glow), transparent 70%), linear-gradient(180deg, var(--stage-a), var(--stage-b)); }
 .hero-stage { display: flex; justify-content: center; padding: 40px 0 60px; border-radius: 32px; overflow: hidden; }
@@ -82,17 +84,14 @@ p { text-wrap: pretty; }
 .needs { margin: 22px auto 0; max-width: 46em; text-align: center; font-size: 14.5px; color: var(--ink-2); }
 .needs strong { color: var(--ink); }
 
-/* big feature tiles */
-.tiles { display: grid; gap: 14px; }
-.tile { display: flex; flex-direction: column; background: var(--card); border-radius: 28px; overflow: hidden; box-shadow: var(--shadow); }
-.tile-copy { padding: 22px 22px 18px; }
-.tile-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
-.tile-name { font-family: var(--font-mono); font-size: 12px; letter-spacing: .03em; color: var(--ink-2); }
-.tile h3 { font-size: clamp(26px, 2.9vw, 38px); }
-.tile-copy > p:last-child { margin-top: 10px; color: var(--ink-2); font-size: 16.5px; }
-.tile-stage { margin-top: auto; display: flex; justify-content: center; align-items: flex-end; padding-top: 20px; background: radial-gradient(70% 70% at 50% 20%, var(--stage-glow), transparent 70%), linear-gradient(180deg, var(--stage-a), var(--stage-b)); overflow: hidden; }
-.tile-stage .device { --u: 3.6px; }
-.sim-note { margin-top: 14px; text-align: center; }
+/* feature grid */
+.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.tile { display: flex; flex-direction: column; padding: 20px 20px 18px; background: var(--card); border-radius: 22px; box-shadow: var(--shadow); }
+.tile h3 { font-size: 18px; letter-spacing: -.02em; line-height: 1.2; margin-bottom: 8px; }
+.tile > p { color: var(--ink-2); font-size: 15.5px; line-height: 1.45; }
+.tile-status { margin-top: 14px; }
+.legend { margin: 0 auto 24px; max-width: 34em; text-align: center; font-size: 14.5px; color: var(--ink-2); }
+@media (max-width: 359px) { .tiles { grid-template-columns: 1fr; } }
 
 /* compact grid */
 .key { display: grid; justify-content: center; gap: 6px; margin: -8px 0 20px; font-size: 13.5px; color: var(--ink-2); }
@@ -148,6 +147,7 @@ p { text-wrap: pretty; }
 .join-card { max-width: 640px; margin: 0 auto; padding: 32px 20px 24px; background: var(--card); border-radius: 32px; box-shadow: var(--shadow); text-align: center; }
 .join-card h2 { font-size: clamp(28px, 3.6vw, 44px); }
 .join-lede { margin: 12px auto 24px; max-width: 28em; color: var(--ink-2); font-size: 16px; }
+.needs-box { margin: -8px auto 22px; padding: 14px 18px; border-radius: 18px; background: var(--tint); font-size: 15px; line-height: 1.5; color: var(--ink-2); }
 .waitlist-form { text-align: left; }
 .waitlist-fields { display: grid; gap: 12px; }
 .waitlist-label { display: grid; gap: 6px; }
@@ -181,9 +181,7 @@ p { text-wrap: pretty; }
   .hero-stage .device { --u: 4.6px; }
   .steps { grid-template-columns: repeat(3, 1fr); gap: 14px; }
   .steps li { flex-direction: column; padding: 26px; border-radius: 28px; }
-  .tiles { grid-template-columns: 1fr 1fr; gap: 18px; }
-  .tile-copy { padding: 36px 36px 28px; }
-  .tile-stage .device { --u: 4.6px; }
+  .tiles { gap: 18px; }
   .grid { grid-template-columns: 1fr 1fr; column-gap: 40px; padding: 10px 32px; }
   .grid li:nth-child(2) { border-top: 0; }
   .grid summary { pointer-events: none; padding: 16px 0 6px; }
@@ -206,22 +204,14 @@ p { text-wrap: pretty; }
   .hero-stage .device { --u: 5px; }
   .sec { padding-top: 112px; }
   .sec > h2 { margin-bottom: 44px; }
-  .tile-stage { padding-top: 44px; }
-  .tile-stage .device { --u: 5.4px; }
+  .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .tile { padding: 24px 24px 22px; }
   .grid { grid-template-columns: repeat(3, 1fr); }
   .grid li:nth-child(3) { border-top: 0; }
   .band { margin-top: 112px; padding: 112px 0; }
   .band-lede { margin-bottom: 44px; }
   #waitlist { padding-bottom: 112px; }
 }
-
-/* Bright Studio: the big feature screens use a light, paper-like display so the page stays light.
-   The hero and edition devices keep the dark screen, like the real one. */
-.tile-stage .scr { --scr-bg: #fbf9f4; --scr-ink: #1d1b18; --scr-dim: #6b675f; background: linear-gradient(180deg, #ffffff, var(--scr-bg)); animation: none; box-shadow: inset 0 0 0 .1em rgba(29,27,24,.08); }
-.tile-stage .scr-label--hot { color: var(--accent-ink); }
-.tile-stage .scr-label--ok { color: #0d6e4f; }
-.tile-stage .scr-keys b { border-color: rgba(29,27,24,.25); }
-.tile-stage .scr-list--lined dt, .tile-stage .scr-list--lined dd { border-top-color: rgba(29,27,24,.12); }
 
 /* Private by design cards */
 .priv-grid { display: grid; gap: 14px; }
