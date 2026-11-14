@@ -35,6 +35,7 @@ from .buddy_companion import install_companion_routes
 from .buddy_store import BuddyStore
 from .needs_routes import build_needs_router
 from .commands import parse_command
+from .voice_shortcuts import VoiceShortcuts, build_voice_shortcuts_router
 from .config import Settings
 from .control_routes import install_control_routes
 from .core import CoreError, MazCore
@@ -488,6 +489,11 @@ def create_app(
         command = None if pocket_context else parse_command(refined.text)
         if command:
             return deterministic_command(session_id, refined.text, command, refined.actions)
+        shortcut_reply = None if pocket_context else voice_shortcuts.handle(refined.text)
+        if shortcut_reply is not None:
+            sessions.add_turn(session_id, refined.text, shortcut_reply)
+            return {"text": refined.text, "reply": shortcut_reply, "provider": "shortcut-local",
+                    "actions": refined.actions, "timings": {"llm_ms": 0}}
         feature_reply = None if pocket_context else feature_commands.handle(refined.text)
         if feature_reply is not None:
             if not sessions.has(session_id):
@@ -1151,6 +1157,8 @@ def create_app(
     buddy_store = None if cfg.buddy_db == "off" else BuddyStore(
         cfg.buddy_db or resolve_data_dir(cfg) / "buddy.sqlite3")
     buddy = install_buddy_routes(api, Buddy(store=buddy_store, focus=focus, device_keys=device_keys))
+    voice_shortcuts = VoiceShortcuts(buddy_store, pc_controller)
+    api.include_router(build_voice_shortcuts_router(voice_shortcuts))
     if cfg.vault_dir and cfg.vault_remote_url:
         raise ValueError('Choose a local vault folder or a remote home vault, not both')
     vault = (RemoteFileVault(cfg.vault_remote_url, cfg.vault_remote_token)
@@ -1229,7 +1237,8 @@ def create_app(
     api.include_router(build_onboarding_router(onboarding))
     api.include_router(build_buddy_forms_router(onboarding=onboarding))
     async def feature_voice_command(text):
-        return await run_in_threadpool(feature_commands.handle, text)
+        reply = await run_in_threadpool(voice_shortcuts.handle, text)
+        return reply if reply is not None else await run_in_threadpool(feature_commands.handle, text)
 
     install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command)
     # ------------------------------------------------------------ SUBTITLES
