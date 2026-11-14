@@ -4,6 +4,7 @@
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include "remote_tls.h"
+#include <fw_version.h>  // firmware/nod/include (pure version guard)
 #include <WiFi.h>
 
 #include "../core/settings.h"
@@ -463,6 +464,8 @@ bool fwUpdate() {
     if (target == running) return fwFail("precheck", "No free slot: reinstall via Launcher", ESP_ERR_OTA_PARTITION_CONFLICT, size);
     if (size < 65536 || size > target->size) return fwFail("precheck", "Image too big for slot", ESP_ERR_INVALID_SIZE, size);
     if (want.length() != 64) return fwFail("manifest", "bad manifest");
+    // Never downgrade: a stale or older staged image is refused here, not only by Core.
+    if (!nod::fwIsNewer(doc["version"] | "", NOD_FW_VERSION)) return fwFail("precheck", "Already up to date", ESP_ERR_INVALID_VERSION, size);
 
     // A fresh Launcher install can leave this image PENDING_VERIFY, which makes esp_ota_begin refuse.
     esp_ota_img_states_t st;

@@ -13,6 +13,7 @@
 #include "../include/nod_theme.h"
 #include "../include/safe_file.h"
 #include "../include/pair_connect.h"
+#include "../include/fw_version.h"
 #include <map>
 #include <string>
 using namespace nod;
@@ -39,6 +40,11 @@ struct FakeFs {
 };
 
 int main() {
+    // firmware version guard: only strictly newer staged images install
+    CHECK(fwIsNewer("1.6.0", "1.5.1")); CHECK(fwIsNewer("1.10.0", "1.9.9")); CHECK(fwIsNewer("v2.0", "1.9.9"));
+    CHECK(!fwIsNewer("1.5.1", "1.6.0")); CHECK(!fwIsNewer("1.6.0", "1.6.0")); CHECK(!fwIsNewer("1.6.0-beta", "1.6.0"));
+    CHECK(!fwIsNewer("", "1.5.1")); CHECK(!fwIsNewer("bad", "1.5.1")); CHECK(!fwIsNewer("1.6.0", "")); CHECK(!fwIsNewer(nullptr, "1.0.0"));
+
     // battery curve
     CHECK(voltageToPercent(3000) == 0); CHECK(voltageToPercent(4300) == 100);
     CHECK(voltageToPercent(3840) == 50);
