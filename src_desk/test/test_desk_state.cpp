@@ -14,9 +14,10 @@ int main() {
   assert(!strcmp(s.bState, "thinking") && s.working == 2 && s.focusRemain == 754 && s.approvalsPending == 3);
   assert(s.battery == -1 && s.charging == -1 && s.coreOk);
   assert(strchr(s.bLine, '?'));                       // non-ASCII neutralised
-  const char* nul = "{\"task\":null,\"focus\":null,\"approvals\":null,\"device\":null,\"core\":{\"ok\":false}}";
+  const char* nul = "{\"buddy\":{\"state\":\"idle\"},\"task\":null,\"focus\":null,\"approvals\":null,\"device\":null,\"core\":{\"ok\":false}}";
   assert(deskParse(nul, strlen(nul), s) && !s.hasTask && !s.hasFocus && !s.hasApprovals && !s.coreOk);
-  assert(!deskParse("not json", 8, s));
+  assert(!deskParse("{}", 2, s) && !s.valid);
+  assert(!deskParse("not json", 8, s) && !s.valid);
   assert(!deskParse("[1,2]", 5, s));
   char o[16]; deskClip(o, sizeof o, "abcdefghijklmnopqrstuvwxyz", 10); assert(!strcmp(o, "abcdefg..."));
   deskClip(o, sizeof o, "short", 10); assert(!strcmp(o, "short"));

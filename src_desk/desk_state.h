@@ -62,8 +62,10 @@ inline void deskMmss(char* out, size_t cap, int32_t s) {
 
 // Returns false (and leaves out.valid=false) on bad JSON / not an object. Unknown fields are ignored.
 inline bool deskParse(const char* json, size_t len, DeskState& o) {
+  o.valid = false;
   JsonDocument doc;  // ArduinoJson 7: heap-grown; bounded by the caller's body cap + nesting limit
   if (deserializeJson(doc, json, len, DeserializationOption::NestingLimit(6)) || !doc.is<JsonObject>()) return false;
+  if (!doc["buddy"]["state"].is<const char*>() || !doc["core"]["ok"].is<bool>()) return false;
   DeskState s;
   s.ts = doc["ts"] | 0;
   JsonObjectConst b = doc["buddy"];

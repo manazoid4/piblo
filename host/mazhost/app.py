@@ -49,6 +49,7 @@ from .errors import ErrorCode, RouteError
 from .focus import Focus, install_focus_routes
 from .maker import install_maker_routes
 from .where import build_where_router
+from .desk_routes import build_desk_router
 from .memory_notes import (MAX_MEMORY_CHARS, NO_SECRETS, REDACTED, TOO_LONG, MemoryNotes, build_memory_router,
                            is_sensitive, parse_remember)
 from .learning import Learning
@@ -1212,6 +1213,7 @@ def create_app(
     install_maker_routes(api, cfg, buddy)
     install_focus_routes(api, focus, buddy.sync_focus)
     api.include_router(build_where_router(cfg, buddy, focus))
+    api.include_router(build_desk_router(buddy, focus))
     api.include_router(build_memory_router(memory_notes))
     install_rescue_routes(api, security.authorize, resolve_data_dir(cfg))
     api.include_router(build_agent_router(
