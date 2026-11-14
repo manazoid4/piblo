@@ -14,7 +14,8 @@ export function CommandPalette({
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-  const items = filterCommands(PALETTE_COMMANDS, query);
+    const commands = import.meta.env.DEV ? PALETTE_COMMANDS : PALETTE_COMMANDS.filter((c) => c.group !== 'Piblo Dev');
+    const items = filterCommands(commands, query);
 
   useEffect(() => {
     if (open) {

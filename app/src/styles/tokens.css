@@ -5,8 +5,9 @@
  */
 :root {
   /* brand palette (concept A) */
-  --paper: #fff4e0;
-  --paper-2: #fbe3bd;
+    --paper: #fff4e0;
+    --paper-2: #fbe3bd;
+    --paper-bg: #fbfaf7;
   --card: #fffaf0;
   --ink: #2a1a12;
   --ink-soft: #5b4336;
@@ -55,7 +56,7 @@
   --rail-w: 224px;
 
   /* surfaces and text */
-  --bg: #fbfaf7;
+    --bg: var(--paper-bg);
   --surface: var(--card);
   --surface-2: var(--paper-2);
   --surface-3: #f4d3a0;
@@ -80,9 +81,11 @@
           --danger-soft: #ffd1c4;
 
   /* tactile pressed-button feel: solid ink offset, not a blur */
-  --btn-stroke: 2px solid var(--ink);
-  --btn-shadow: 0 3px 0 var(--ink);
-  --btn-shadow-pressed: 0 0 0 var(--ink);
+    --btn-stroke: 2px solid var(--ink);
+    --btn-shadow: 0 3px 0 var(--ink);
+    --btn-shadow-pressed: 0 0 0 var(--ink);
+    --btn-shadow-soft: 0 1px 2px rgb(42 26 18 / 6%), 0 4px 12px rgb(42 26 18 / 6%);
+    --btn-shadow-soft-pressed: 0 0 0 transparent;
   --shadow-1: 0 1px 0 rgb(42 26 18 / 8%);
   --shadow-2: 0 10px 28px rgb(42 26 18 / 16%);
   --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--ink);
@@ -127,9 +130,11 @@
                     --danger-soft: #ffd1c4;
 
           /* tactile: cream stroke/shadow on dark */
-          --btn-stroke: 2px solid #fff4e0;
-          --btn-shadow: 0 3px 0 #fff4e0;
-          --btn-shadow-pressed: 0 0 0 #fff4e0;
+                    --btn-stroke: 2px solid #fff4e0;
+                    --btn-shadow: 0 3px 0 #fff4e0;
+                    --btn-shadow-pressed: 0 0 0 #fff4e0;
+                    --btn-shadow-soft: 0 1px 2px rgb(255 244 224 / 8%), 0 4px 12px rgb(255 244 224 / 6%);
+                    --btn-shadow-soft-pressed: 0 0 0 transparent;
 
           /* calmer shadows in dark mode */
           --shadow-1: 0 1px 0 rgb(255 244 224 / 6%);
@@ -163,10 +168,12 @@
                     --warn-soft: #986610;
                     --danger: var(--tomato);
                     --danger-soft: #ffd1c4;
-          --btn-stroke: 2px solid #fff4e0;
-          --btn-shadow: 0 3px 0 #fff4e0;
-          --btn-shadow-pressed: 0 0 0 #fff4e0;
-          --shadow-1: 0 1px 0 rgb(255 244 224 / 6%);
+                              --btn-stroke: 2px solid #fff4e0;
+                              --btn-shadow: 0 3px 0 #fff4e0;
+                              --btn-shadow-pressed: 0 0 0 #fff4e0;
+                              --btn-shadow-soft: 0 1px 2px rgb(255 244 224 / 8%), 0 4px 12px rgb(255 244 224 / 6%);
+                              --btn-shadow-soft-pressed: 0 0 0 transparent;
+                              --shadow-1: 0 1px 0 rgb(255 244 224 / 6%);
           --shadow-2: 0 10px 28px rgb(255 244 224 / 10%);
           --focus: 0 0 0 2px var(--bg), 0 0 0 4px var(--text);
         }

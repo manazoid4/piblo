@@ -147,16 +147,16 @@ function Shell() {
   }, []);
 
   const runPaletteCommand = (cmd: PaletteCommand) => {
-    setWelcome(false);
-    if (cmd.id.startsWith('nav:')) {
-      const target = cmd.id.slice(4) as Section;
-      setSection(target);
-    } else if (cmd.id.startsWith('dev:')) {
-      const targetTab = cmd.id.slice(4) as DevTab;
-      setDevTab(targetTab);
-      setSection('dev');
-    }
-  };
+      setWelcome(false);
+      if (cmd.id.startsWith('nav:')) {
+        const target = cmd.id.slice(4) as Section;
+        setSection(target);
+      } else if (cmd.id.startsWith('dev:') && isDev) {
+        const targetTab = cmd.id.slice(4) as DevTab;
+        setDevTab(targetTab);
+        setSection('dev');
+      }
+    };
 
   const decide = async (requestId: string, decision: 'allow' | 'deny') => {
     const out = await pairing.decide(requestId, decision);
