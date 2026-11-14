@@ -55,7 +55,7 @@
   --rail-w: 224px;
 
   /* surfaces and text */
-  --bg: var(--paper);
+  --bg: #fbfaf7;
   --surface: var(--card);
   --surface-2: var(--paper-2);
   --surface-3: #f4d3a0;

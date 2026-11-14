@@ -69,10 +69,9 @@ export function LiveView() {
     setSending(true);
     const r = await window.piblo.api('POST', '/core/cardputer/key', { keys });
     setSending(false);
-    if (r.ok) {
-      setText('');
-      toast('Sent to Piblo');
-    } else toast(r.message, true);
+        if (r.ok) {
+          setText('');
+        } else toast(r.message, true);
   };
 
   const save = async () => {

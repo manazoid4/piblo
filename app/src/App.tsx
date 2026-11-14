@@ -71,7 +71,9 @@ function useTheme() {
 
 export { useTheme };
 
-type Section = 'home' | 'live' | 'ask' | 'memory' | 'actions' | 'settings' | 'dev' | 'teach';
+type Section = 'home' | 'live' | 'ask' | 'memory' | 'actions' | 'settings' | 'teach' | 'dev';
+
+const isDev = import.meta.env.DEV;
 const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'device' },
   { id: 'live', label: 'Live View', icon: 'screen' },
@@ -79,7 +81,7 @@ const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'memory', label: 'Memory', icon: 'memory' },
   { id: 'actions', label: 'Actions', icon: 'actions' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
-  { id: 'dev', label: 'Piblo Dev', icon: 'dev' },
+  ...(isDev ? [{ id: 'dev' as const, label: 'Piblo Dev', icon: 'dev' }] : []),
   { id: 'teach', label: 'Show me once', icon: 'screen' },
 ];
 
@@ -198,7 +200,7 @@ function Shell() {
             {n.id === 'actions' && badge > 0 ? <span className="rail-badge" aria-label={`${badge} waiting`}>{badge}</span> : <kbd>Ctrl+{i + 1}</kbd>}
           </button>
         ))}
-        <div className="rail-foot meta">{running ? (core?.managed ? 'Piblo on this PC: running' : 'Piblo on this PC: already running') : ''}</div>
+        <div className="rail-foot meta">{running ? (core?.managed ? 'Running' : 'Ready') : ''}</div>
       </nav>
       <main className="content">
         {welcome === null ? null : welcome ? (
