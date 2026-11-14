@@ -83,7 +83,7 @@ export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline
   fs.writeFileSync(path.join(dir, '.env'), `MAZ_TOKEN=${token}\nMAZ_PORT=${port}\nMAZ_DEFAULT_ROUTE=local\nMAZ_GROQ_API_KEY=x\n`);
   const now = () => Math.floor(Date.now() / 1000);
   const frame = drawScreen();
-  const flow = { settings: { input_mode: 'paste', press_enter: false, cleanup: 'auto', stt: 'auto', effective_cleanup: 'rules', has_groq_key: false }, lines: ['Piblo', 'Cardputer', 'Maz Works', 'Groq', 'Rampage: ram page, ram payge'], get words() { return this.lines.map((l) => l.split(':')[0].trim()); } };
+  const flow = { settings: { input_mode: 'paste', press_enter: false, cleanup: 'auto', stt: 'auto', effective_cleanup: 'rules', has_groq_key: false }, lines: ['Piblo', 'Cardputer', 'Piblo Flow', 'Groq', 'Rampage: ram page, ram payge'], get words() { return this.lines.map((l) => l.split(':')[0].trim()); } };
   const db = {
     beam: [{ id: 'b1', text: 'https://example.com/read-later', direction: 'to_pocket', created: now() - 4000, kind: 'link' }],
     dumps: [

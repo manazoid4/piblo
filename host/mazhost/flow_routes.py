@@ -26,6 +26,7 @@ DEFAULTS = {"input_mode": "paste", "press_enter": False, "cleanup": "auto", "stt
 LATENCY_KEEP = 50
 DICTIONARY_MAX = 500
 _DICTIONARY_LOCK = threading.Lock()
+_SETTINGS_LOCK = threading.Lock()
 
 
 # ---------------------------------------------------------------- persistence
@@ -316,11 +317,12 @@ def build_flow_router(flow) -> APIRouter:
 
     @api.patch("/flow/settings")
     def patch_settings(body: FlowSettingsIn):
-        stored = read_settings(flow)
-        for key, value in body.model_dump(exclude_none=True).items():
-            stored[key] = value
-        write_settings(flow, stored)
-        apply_settings(flow, stored)
+        with _SETTINGS_LOCK:
+            stored = read_settings(flow)
+            for key, value in body.model_dump(exclude_none=True).items():
+                stored[key] = value
+            write_settings(flow, stored)
+            apply_settings(flow, stored)
         return settings_view()
 
     @api.get("/flow/dictionary")
@@ -366,7 +368,9 @@ def build_flow_router(flow) -> APIRouter:
         errors = []
         path = Path(flow.dir) / "errors.log"
         try:
-            errors = path.read_text(encoding="utf-8").splitlines()[-5:]
+            raw = path.read_text(encoding="utf-8").splitlines()
+            # Return last 120 chars of each line: keeps error codes, strips long paths
+            errors = [line.strip()[-120:] for line in raw[-5:] if line.strip()]
         except OSError:
             pass
         return {

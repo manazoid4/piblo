@@ -34,6 +34,8 @@ export class CoreSidecar extends EventEmitter {
   private exited = false;
   private misses = 0;
   private retries = 0;
+  private _restartTimer: ReturnType<typeof setTimeout> | null = null;
+  private _crashRestarts = 0;
   private inflight: Promise<CoreState> | null = null;
   state: CoreState;
 
@@ -94,7 +96,8 @@ export class CoreSidecar extends EventEmitter {
       );
     }
     this.retries = 0;
-    return this.set(this.make('running', 'Piblo on this PC is running.', undefined, managed));
+        this._crashRestarts = 0;
+        return this.set(this.make('running', 'Piblo on this PC is running.', undefined, managed));
   }
 
   private async spawnAndWait(loc: CoreLocation): Promise<CoreState> {
@@ -113,17 +116,25 @@ export class CoreSidecar extends EventEmitter {
       return this.state;
     }
     child.once('exit', (code) => {
-      if (this.child !== child) return; // an older Core exiting late says nothing about this one
-      this.exited = true;
-      this.child = null;
-      const wasHealthy = this.state.phase === 'running';
-      if (wasHealthy || this.state.phase === 'starting') {
-        this.set(this.make('failed', 'Piblo on this PC stopped unexpectedly.', `Exit code ${code ?? 'unknown'}. ${this.deps.logTail?.() ?? ''}`.trim()));
-        if (!wasHealthy) this.retryAfterFailure();
-      }
-      // A Core that was healthy and then died is restarted at once; one that keeps dying while starting gets a few spaced tries.
-      if (wasHealthy) void this.deps.sleep(1000).then(() => this.ensure());
-    });
+          if (this.child !== child) return; // an older Core exiting late says nothing about this one
+          this.exited = true;
+          this.child = null;
+          const wasHealthy = this.state.phase === 'running';
+          if (wasHealthy || this.state.phase === 'starting') {
+            this.set(this.make('failed', 'Piblo on this PC stopped unexpectedly.', `Exit code ${code ?? 'unknown'}. ${this.deps.logTail?.() ?? ''}`.trim()));
+            if (!wasHealthy) this.retryAfterFailure();
+          }
+          // A Core that was healthy and then died: back off if it keeps crashing, then restart.
+          if (wasHealthy) {
+            const delays = this.deps.retryDelays ?? RETRY_DELAYS;
+            const delay = delays[Math.min(this._crashRestarts, delays.length - 1)] ?? delays[delays.length - 1];
+            this._crashRestarts += 1;
+            this._restartTimer = setTimeout(() => {
+              this._restartTimer = null;
+              if (this.state.phase === 'failed') void this.ensure();
+            }, delay);
+          }
+        });
     const deadline = this.deps.startTimeoutMs ?? 30_000;
     for (let waited = 0; waited < deadline; waited += 500) {
       if (this.exited) break;
@@ -173,8 +184,12 @@ export class CoreSidecar extends EventEmitter {
   }
 
   /** Stops only a Core this app launched. A Core someone else started is left alone. */
-  stop(): void {
-    const c = this.child;
+    stop(): void {
+      if (this._restartTimer) {
+        clearTimeout(this._restartTimer);
+        this._restartTimer = null;
+      }
+      const c = this.child;
     this.child = null;
     if (c) {
       this.exited = true;
