@@ -995,6 +995,7 @@ def create_app(
             path.unlink(missing_ok=True)
 
     flow_service = Flow(cfg, speech, model_router)
+    api.state._flow = flow_service  # test hook: tweak dictate_timeout, _cancel, etc.
 
     @api.post("/dictate")
     async def dictate(request: Request, target: str = "text"):
@@ -1011,7 +1012,12 @@ def create_app(
         try:
             security.validate_upload(path, size)
             armed = flow_foreground() if target == "pc-paste" else 0  # focus when the audio landed
-            result = await run_in_threadpool(flow_service.dictate, path)
+            try:
+                result = await asyncio.wait_for(
+                    run_in_threadpool(flow_service.dictate, path), timeout=flow_service.dictate_timeout)
+            except asyncio.TimeoutError:
+                flow_service._cancel.set()
+                raise HTTPException(504, "stt_timeout")
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
                 prefs = read_settings(flow_service)
                 enter = result["intent"] == "claude" or bool(prefs["press_enter"])
@@ -1028,7 +1034,10 @@ def create_app(
                 result["reply"] = result["pc"]  # firmware decodeReply reads `reply` as the outcome
             return result
         finally:
-            path.unlink(missing_ok=True)
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                pass
 
     # ---------------------------------------------------------- extraction
     @api.post("/extract")

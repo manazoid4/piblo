@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+import threading
 import time
 from pathlib import Path
 
@@ -89,6 +90,8 @@ class Flow:
         self.dir.mkdir(parents=True, exist_ok=True)
         self.lines = load_dictionary(self.dir / "dictionary.txt")
         self.words = [line.partition(":")[0].strip() for line in self.lines]  # terms only, for prompts
+        self._cancel = threading.Event()
+        self.dictate_timeout = 60  # seconds before the endpoint returns 504
 
     def _cleanup(self, text: str) -> tuple[str, str]:
         # Local by default: STT already punctuates, so no network/LLM hop unless explicitly configured.
@@ -139,12 +142,13 @@ class Flow:
         t2 = time.perf_counter()
         ms = {"stt": round((t1 - t0) * 1000), "clean": round((t2 - t1) * 1000),
               "total": round((t2 - t0) * 1000)}
-        if intent == "note":
-            self._append("inbox.md", f"- {time.strftime('%Y-%m-%d %H:%M')} {body}")
-        elif intent == "remind":
-            self._append("reminders-pending.md", f"- {time.strftime('%Y-%m-%d %H:%M')} {body}")
-        self._append("latency.log", f"{time.strftime('%Y-%m-%dT%H:%M:%S')} dictate intent={intent} "
-                     f"stt={ms['stt']} clean={ms['clean']} total={ms['total']} via={provider} stt_via={engine} chars={len(body)}")
+        if not self._cancel.is_set():
+            if intent == "note":
+                self._append("inbox.md", f"- {time.strftime('%Y-%m-%d %H:%M')} {body}")
+            elif intent == "remind":
+                self._append("reminders-pending.md", f"- {time.strftime('%Y-%m-%d %H:%M')} {body}")
+            self._append("latency.log", f"{time.strftime('%Y-%m-%dT%H:%M:%S')} dictate intent={intent} "
+                         f"stt={ms['stt']} clean={ms['clean']} total={ms['total']} via={provider} stt_via={engine} chars={len(body)}")
         return {"text": body, "intent": intent, "raw": raw, "ms": ms}
 
     def _append(self, name: str, line: str) -> None:
@@ -208,8 +212,8 @@ def safe_paste(text: str, enter: bool, armed_hwnd: int, paste_fn=None, fg_fn=for
     if not armed_hwnd or now != armed_hwnd or not typable_fn(now):
         (copy_fn or _copy)(text)
         return "clipboard"
-    (paste_fn or paste)(text, enter=enter)
-    return "pasted"
+    result = (paste_fn or paste)(text, enter=enter)
+    return result if isinstance(result, str) else "pasted"
 
 
 def _copy(text: str) -> None:
@@ -218,8 +222,11 @@ def _copy(text: str) -> None:
     pyperclip.copy(text)
 
 
-def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> None:
-    """Save clipboard, set text, Ctrl+V, restore clipboard (Windows)."""
+def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> str:
+    """Save clipboard, set text, Ctrl+V, restore clipboard (Windows).
+    Returns "pasted" on success, "failed" if the clipboard was busy (nothing pasted),
+    or "restore_failed" (text pasted but old clipboard not restored).
+    """
     import ctypes
     import pyperclip
 
@@ -230,7 +237,10 @@ def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> None:
         old = pyperclip.paste()
     except Exception:  # noqa: BLE001
         old = None
-    pyperclip.copy(text)
+    try:
+        pyperclip.copy(text)
+    except Exception:  # noqa: BLE001
+        return "failed"
 
     def tap(*vks: int) -> None:
         for vk in vks:
@@ -246,7 +256,11 @@ def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> None:
         tap(0x0D)
     time.sleep(0.4)  # slow targets (RDP, heavy Electron) read the clipboard late
     if old:  # an image/files clipboard cannot be restored: leave the dictated text rather than blank it
-        pyperclip.copy(old)
+        try:
+            pyperclip.copy(old)
+        except Exception:  # noqa: BLE001
+            return "restore_failed"
+    return "pasted"
 
 
 
