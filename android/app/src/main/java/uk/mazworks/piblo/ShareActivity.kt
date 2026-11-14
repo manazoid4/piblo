@@ -10,7 +10,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uk.mazworks.piblo.data.MAX_SHARE_QUEUE
 import uk.mazworks.piblo.data.Prefs
-import uk.mazworks.piblo.data.PibloApp
 import uk.mazworks.piblo.data.ShareEntry
 
 /** Android's text share target: queues locally, sends when Core link reconnects. */
@@ -25,7 +24,7 @@ class ShareActivity : ComponentActivity() {
             finish()
             return
         }
-        val url = Regex("https?://[^\s]+").find(text)?.value.orEmpty()
+        val url = Regex("""https?://\S+""").find(text)?.value.orEmpty()
         lifecycleScope.launch {
             val app = application as PibloApp
             val prefs = withContext(Dispatchers.IO) { app.settings.now() }
@@ -35,27 +34,23 @@ class ShareActivity : ComponentActivity() {
                 finish()
                 return@launch
             }
-            val queued = withContext(Dispatchers.IO) {
+            // Room work on IO; toasts only on the main thread (a Toast off the main thread crashes).
+            val message = withContext(Dispatchers.IO) {
                 try {
                     val dao = app.db.dao()
-                    // Bound the queue so it cannot grow without bound.
                     if (dao.shareQueueCount() >= MAX_SHARE_QUEUE) {
-                        Toast.makeText(this@ShareActivity, "Share queue full. Wait for queued shares to send.", Toast.LENGTH_LONG).show()
-                        false
+                        "Share queue full. Wait for queued shares to send."
                     } else {
                         dao.enqueueShare(
                             ShareEntry(text = text, title = title, url = url,
                                 createdAt = System.currentTimeMillis(),
                                 idempotencyId = java.util.UUID.randomUUID().toString())
                         )
-                        true
+                        "Saved to Piblo. It will be sent when your computer is connected."
                     }
-                } catch (_: Exception) { false }
+                } catch (_: Exception) { "Couldn't save. Open Piblo and check your computer connection." }
             }
-            Toast.makeText(this@ShareActivity,
-                if (queued) "Saved to Piblo. It will be sent when your computer is connected."
-                else "Couldn't save. Open Piblo and check your computer connection.",
-                Toast.LENGTH_LONG).show()
+            Toast.makeText(this@ShareActivity, message, Toast.LENGTH_LONG).show()
             finish()
         }
     }
