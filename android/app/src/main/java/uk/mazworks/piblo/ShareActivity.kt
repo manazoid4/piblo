@@ -8,12 +8,9 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import uk.mazworks.piblo.data.Prefs
-import uk.mazworks.piblo.data.SecretBox
-import uk.mazworks.piblo.proto.CoreClient
+import uk.mazworks.piblo.data.ShareEntry
 
-/** Android's text share target uses the same paired Core client as the app. */
+/** Android's text share target: queues locally, sends when Core link reconnects. */
 class ShareActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -25,20 +22,20 @@ class ShareActivity : ComponentActivity() {
             finish()
             return
         }
+        val url = Regex("https?://[^\\s]+").find(text)?.value.orEmpty()
         lifecycleScope.launch {
-            val saved = withContext(Dispatchers.IO) {
+            val queued = withContext(Dispatchers.IO) {
                 try {
-                    val prefs = (application as PibloApp).settings.now()
-                    check(prefs.mode == Prefs.Mode.COMPUTER && prefs.hasComputer)
-                    val token = SecretBox.decrypt(prefs.tokenBlob) ?: error("pairing_required")
-                    val url = Regex("https?://[^\\s]+").find(text)?.value.orEmpty()
-                    val body = JSONObject().put("text", text).put("title", title).put("url", url)
-                    CoreClient(prefs.coreUrl, token, BuildConfig.VERSION_NAME).share(body.toString())
+                    val app = application as PibloApp
+                    app.db.dao().enqueueShare(
+                        ShareEntry(text = text, title = title, url = url, createdAt = System.currentTimeMillis())
+                    )
                     true
                 } catch (_: Exception) { false }
             }
             Toast.makeText(this@ShareActivity,
-                if (saved) "Saved to Piblo." else "Couldn't save. Open Piblo and check your computer connection.",
+                if (queued) "Saved to Piblo. It will be sent when your computer is connected."
+                else "Couldn't save. Open Piblo and check your computer connection.",
                 Toast.LENGTH_LONG).show()
             finish()
         }

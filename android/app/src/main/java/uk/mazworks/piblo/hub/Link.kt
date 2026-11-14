@@ -5,6 +5,8 @@ import uk.mazworks.piblo.proto.CoreHttpException
 import uk.mazworks.piblo.proto.EventsPage
 import uk.mazworks.piblo.proto.Summary
 import java.io.IOException
+import kotlin.math.min
+import kotlin.random.Random
 
 data class PollResult(val summary: Summary, val page: EventsPage)
 
@@ -47,17 +49,45 @@ object BleTransportStub : Transport {
     override fun pressKeys(keys: String) = na()
 }
 
-class Backoff(private val minMs: Long = 2_000, private val maxMs: Long = 60_000) {
+/**
+ * Exponential backoff with 25% uniform jitter.
+ * @param minMs initial delay (default 2s)
+ * @param maxMs cap (default 30s, per the task spec)
+ */
+class Backoff(private val minMs: Long = 2_000, private val maxMs: Long = 30_000) {
     private var cur = minMs
-    fun next(): Long { val v = cur; cur = minOf(cur * 2, maxMs); return v }
+
+    /** Next delay in ms, with [0, 0.25 * cur) uniform jitter subtracted. */
+    fun next(): Long {
+        val v = cur
+        cur = min(cur * 2, maxMs)
+        val jitter = (v * Random.nextDouble(0.0, 0.25)).toLong()
+        return (v - jitter).coerceAtLeast(1_000) // floor at 1s so polling never races
+    }
+
+    /** Immediate reconnect: reset to minMs (caller triggers a fresh attempt right away, but [next()] is called on failure). */
     fun reset() { cur = minMs }
+
+    /** Current raw delay without jitter (for testing and visibility). */
+    fun currentRaw(): Long = cur
 }
 
 /** One blocking cycle of "send what the person answered, then poll", returning how long to wait before the next one. */
-class CoreLink(private val hub: Hub, private val t: Transport, private val pollMs: Long = 2_500, private val authRetryMs: Long = 30_000) {
+class CoreLink(
+    private val hub: Hub,
+    private val t: Transport,
+    private val pollMs: Long = 2_500,
+    private val authRetryMs: Long = 30_000,
+    /** Called when a share should be drained; returns true if any share was sent. */
+    private val drainShares: (suspend () -> Unit)? = null,
+) {
     private val backoff = Backoff()
     private var since = 0
     private var initial = true
+    @Volatile private var reconnectRequested = false
+
+    /** Call from the lifecycle / network-callback thread to break out of a long backoff sleep. */
+    fun requestReconnect() { reconnectRequested = true }
 
     fun cycle(): Long {
         try {
@@ -92,6 +122,18 @@ class CoreLink(private val hub: Hub, private val t: Transport, private val pollM
         } catch (e: uk.mazworks.piblo.proto.ProtoException) {
             return offline()
         }
+    }
+
+    /** After [cycle] returns, the caller should sleep for [delayMs] then call [cycle] again.
+     *  If a reconnect was requested in the meantime, this returns true and the caller should
+     *  skip the remaining delay and call [cycle] immediately. */
+    fun shouldWakeEarly(delayMs: Long): Boolean {
+        if (reconnectRequested) {
+            reconnectRequested = false
+            backoff.reset()
+            return true
+        }
+        return false
     }
 
     private fun offline(): Long {

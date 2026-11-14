@@ -2,6 +2,11 @@ package uk.mazworks.piblo
 
 import android.app.Activity
 import android.app.Application
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Bundle
 import android.os.SystemClock
 import kotlinx.coroutines.CoroutineScope
@@ -14,6 +19,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import uk.mazworks.piblo.data.Message
 import uk.mazworks.piblo.data.Prefs
 import uk.mazworks.piblo.data.PibloDb
@@ -42,10 +48,13 @@ class PibloApp : Application() {
     val db by lazy { PibloDb.get(this) }
     val settings by lazy { SettingsRepo(this) }
     @Volatile private var visible = 0
+    @Volatile private var prevVisible = 0
     @Volatile var transport: Transport? = null
     private var linkJob: Job? = null
+    private var link: CoreLink? = null
     private var lastForward = 0L
     private var lastForwardKey = ""
+    private var netCbRegistered = false
 
     val hub = Hub(
         object : Clock {
@@ -63,7 +72,11 @@ class PibloApp : Application() {
         inst = this
         Notifier.channels(this)
         registerActivityLifecycleCallbacks(object : ActivityLifecycleCallbacks {
-            override fun onActivityStarted(a: Activity) { visible++ }
+            override fun onActivityStarted(a: Activity) {
+                prevVisible = visible
+                visible++
+                if (prevVisible == 0 && visible == 1) onAppForegrounded()
+            }
             override fun onActivityStopped(a: Activity) { visible-- }
             override fun onActivityCreated(a: Activity, b: Bundle?) {}
             override fun onActivityResumed(a: Activity) {}
@@ -74,6 +87,32 @@ class PibloApp : Application() {
         scope.launch { while (isActive) { delay(1000); hub.tick() } }
         scope.launch {
             settings.prefs.map { it.copy(forwardNotifications = false, forwardPackages = emptySet()) }.distinctUntilChanged().collectLatest(::applyMode)
+        }
+        registerNetworkCallback()
+    }
+
+    /** Called when the app transitions from background to foreground. Resets backoff and reconnects immediately. */
+    private fun onAppForegrounded() {
+        link?.requestReconnect()
+    }
+
+    /** Registers a ConnectivityManager callback so we reconnect when Wi-Fi / mobile comes back. */
+    private fun registerNetworkCallback() {
+        if (netCbRegistered) return
+        try {
+            val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+            val req = NetworkRequest.Builder()
+                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .build()
+            cm.registerNetworkCallback(req, object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) { link?.requestReconnect() }
+                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                    if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) link?.requestReconnect()
+                }
+            })
+            netCbRegistered = true
+        } catch (_: Exception) {
+            // ConnectivityManager not available (e.g. unit tests) -- skip
         }
     }
 
@@ -88,8 +127,47 @@ class PibloApp : Application() {
         val t = CoreTransport(CoreClient(p.coreUrl, token, BuildConfig.VERSION_NAME))
         transport = t
         hub.setLink(LinkState.CONNECTING)
-        val link = CoreLink(hub, t)
-        linkJob = scope.launch(Dispatchers.IO) { while (isActive) delay(link.cycle()) }
+        val l = CoreLink(hub, t, drainShares = { drainShareQueue(t) })
+        link = l
+        linkJob = scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                val delayMs = l.cycle()
+                if (l.shouldWakeEarly(delayMs)) {
+                    hub.log("Reconnecting (foreground or network change)")
+                    continue
+                }
+                val chunk = 500L
+                var remaining = delayMs
+                while (remaining > 0 && isActive) {
+                    if (l.shouldWakeEarly(remaining)) { remaining = 0; break }
+                    delay(minOf(chunk, remaining))
+                    remaining -= chunk
+                }
+                if (remaining <= 0 && hub.state.value.link == LinkState.ONLINE) {
+                    drainShareQueue(t)
+                }
+            }
+        }
+    }
+
+    /** Drains the local share queue by sending each pending entry to Core. */
+    private suspend fun drainShareQueue(t: Transport) = withContext(Dispatchers.IO) {
+        val dao = db.dao()
+        val pending = dao.pendingShares()
+        for (s in pending) {
+            try {
+                t.postText(java.util.UUID.randomUUID().toString(), s.text, "insert")
+                dao.dequeueShare(s.id)
+                hub.log("Sent queued share: " + (s.title.ifBlank { s.text.take(50) }))
+            } catch (e: Exception) {
+                dao.markShareRetry(s.id)
+                if (s.retries >= 3) {
+                    dao.dequeueShare(s.id)
+                    hub.log("Gave up on queued share after " + (s.retries + 1) + " tries")
+                }
+                break
+            }
+        }
     }
 
     private fun onShown(item: Item, source: String) {

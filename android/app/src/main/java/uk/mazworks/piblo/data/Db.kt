@@ -10,6 +10,8 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Entity(tableName = "notes")
@@ -23,8 +25,20 @@ data class Reminder(@PrimaryKey(autoGenerate = true) val id: Long = 0, val text:
 @Entity(tableName = "messages")
 data class Message(@PrimaryKey(autoGenerate = true) val id: Long = 0, val atMs: Long, val source: String, val title: String, val body: String, val priority: String)
 
+/** A share queued while offline, sent when the Core link reconnects. */
+@Entity(tableName = "share_queue")
+data class ShareEntry(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val text: String,
+    val title: String,
+    val url: String,
+    val createdAt: Long,
+    val retries: Int = 0,
+)
+
 const val MAX_MESSAGES = 200
 const val MAX_NOTES = 500
+const val MAX_SHARE_RETRIES = 3
 
 @Dao
 interface PibloDao {
@@ -45,16 +59,32 @@ interface PibloDao {
     @Insert suspend fun insert(m: Message): Long
     @Query("DELETE FROM messages WHERE id NOT IN (SELECT id FROM messages ORDER BY atMs DESC, id DESC LIMIT :keep)") suspend fun trimMessages(keep: Int = MAX_MESSAGES)
     @Query("DELETE FROM messages") suspend fun clearMessages()
+
+    // ---- share queue ----
+    @Query("SELECT * FROM share_queue ORDER BY createdAt ASC") suspend fun pendingShares(): List<ShareEntry>
+    @Insert suspend fun enqueueShare(s: ShareEntry): Long
+    @Query("DELETE FROM share_queue WHERE id = :id") suspend fun dequeueShare(id: Long)
+    @Query("DELETE FROM share_queue") suspend fun clearShares()
+    @Query("UPDATE share_queue SET retries = retries + 1 WHERE id = :id") suspend fun markShareRetry(id: Long)
+    @Query("DELETE FROM share_queue WHERE retries >= :maxRetries") suspend fun drainStaleShares(maxRetries: Int = MAX_SHARE_RETRIES)
 }
 
-@Database(entities = [Note::class, Reminder::class, Message::class], version = 1, exportSchema = true)
+@Database(entities = [Note::class, Reminder::class, Message::class, ShareEntry::class], version = 2, exportSchema = true)
 abstract class PibloDb : RoomDatabase() {
     abstract fun dao(): PibloDao
 
     companion object {
         @Volatile private var inst: PibloDb? = null
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE TABLE IF NOT EXISTS share_queue (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, text TEXT NOT NULL, title TEXT NOT NULL, url TEXT NOT NULL, createdAt INTEGER NOT NULL, retries INTEGER NOT NULL DEFAULT 0)")
+            }
+        }
+
         fun get(ctx: Context): PibloDb = inst ?: synchronized(this) {
-            inst ?: Room.databaseBuilder(ctx.applicationContext, PibloDb::class.java, "piblo.db").build().also { inst = it }
+            inst ?: Room.databaseBuilder(ctx.applicationContext, PibloDb::class.java, "piblo.db")
+                .addMigrations(MIGRATION_1_2)
+                .build().also { inst = it }
         }
     }
 }
