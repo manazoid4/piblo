@@ -71,7 +71,7 @@ public:
     }
     const char* title() const override { return titleFor(_kind); }
     const char* hints() const override {
-        if (_view == View::Working) return "hub working   stay here / ESC safe";
+        if (_view == View::Working) return "PC working  stay here";
         if (_view == View::Result) return "ENTER save to Inbox   N new";
         if (_view == View::Template) return "UP/DOWN template   ENTER choose";
         if (_view == View::Project) return "UP/DOWN project   ENTER choose   S skip";
@@ -89,7 +89,8 @@ public:
         _projectCursor.sel = _projectCursor.first = 0;
         _templateCursor.sel = _templateCursor.first = 0;
         _view = _kind == ToolKind::Prompt ? View::Template : View::Project;
-        refreshProjects();
+        _loadAt = millis() + 80;  // paint "Loading..." first; the fetch blocks
+        _loading = true;
         invalidate();
     }
 
@@ -142,6 +143,7 @@ public:
     }
 
     void update() override {
+        if (_loading && millis() >= _loadAt) { _loading = false; refreshProjects(); invalidate(); }
         if (_view == View::Working) consumeResult();
         // Retry a failed project load, but only once a background poll saw Core
         // online: coreProjects() blocks up to its connect timeout while it is down.
@@ -171,7 +173,7 @@ public:
 
         g.setFont(&fonts::Font0);
         g.setTextColor(DIM, BG);
-        g.drawString(descriptionFor(_kind), PAD, BODY_Y + 18);
+        g.drawString(descriptionFor(_kind), PAD, BELOW_RULE);
         _task.draw(g, PAD, BODY_Y + 39, SCREEN_W - PAD * 2,
                    _kind == ToolKind::Retro ? "what happened / optional note..." : "what do you want done...");
         g.setTextColor(DIM, BG);
@@ -203,7 +205,8 @@ private:
     void renderProjects(M5Canvas& g) {
         g.setFont(&fonts::Font0);
         g.setTextColor(DIM, BG);
-        g.drawString("Choose context. S = no project", PAD, BODY_Y + 13);
+        g.drawString("Choose context. S = no project", PAD, BELOW_RULE);
+        if (_loading) { g.drawString("Loading...", PAD, BODY_Y + 39); return; }
         if (_projects.empty()) {
             g.setTextColor(WARN, BG);
             g.drawString(_projectError.empty() ? "No projects found; press S" : _projectError.c_str(), PAD, BODY_Y + 39);
@@ -238,8 +241,8 @@ private:
         g.setFont(&fonts::Font0);
         g.setTextColor(_ok ? OK : WARN, BG);
         const std::string status = (_ok ? std::string("READY / ") : std::string("FAILED / ")) +
-                                   (_provider.empty() ? "HUB" : _provider);
-        g.drawString(status.c_str(), PAD, BODY_Y + 17);
+                                   (_provider.empty() ? "PC" : _provider);
+        g.drawString(status.c_str(), PAD, BELOW_RULE);
         constexpr size_t WIDTH = 37;
         for (int row = 0; row < 5; ++row) {
             const size_t start = static_cast<size_t>(_scroll + row) * WIDTH;
@@ -251,7 +254,7 @@ private:
 
     void submit() {
         if (host_worker::busy()) {
-            notify::post(Note::Info, "hub busy", "finish current hub job first");
+            notify::post(Note::Info, "PC busy", "finish current hub job first");
             return;
         }
         const std::string task = _task.text;
@@ -319,6 +322,8 @@ private:
     bool _ok = false;
     uint32_t _lastPaint = 0;
     uint32_t _lastTry = 0;
+    uint32_t _loadAt = 0;
+    bool _loading = false;
 };
 
 }  // namespace

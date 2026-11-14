@@ -15,7 +15,7 @@
 #include "../net/host_worker.h"
 #include "../net/mazhost.h"
 #include "../storage/store.h"
-#include "../ui/talk_orb.h"
+#include "../ui/character.h"
 #include "apps.h"
 #include "common.h"
 
@@ -55,7 +55,7 @@ constexpr int CONTROL_COUNT = sizeof(CONTROLS) / sizeof(CONTROLS[0]);
 
 const char* controlLabel(const std::string& action) {
     for (const auto& item : CONTROLS) if (action == item.key) return item.label;
-    return "HUB COMMAND";
+    return "PC COMMAND";
 }
 
 class CommApp : public App {
@@ -233,8 +233,8 @@ public:
             state(g, Phase::Thinking, "voice loading...");
             drawCommWrapped(g, early, REPLY_Y, 0);
         } else if (busy) {
-            state(g, Phase::Thinking,
-                  host_worker::state() == host_worker::State::Queued ? "waiting for hub" : "Piblo is working on it");
+            const std::string why = host_worker::state() == host_worker::State::Queued ? "waiting for hub" : "Piblo is working on it";
+            state(g, Phase::Thinking, (why + (_thinkAt ? "  " + std::to_string((millis() - _thinkAt) / 1000) + "s" : "")).c_str());
         } else if (voice::isPlaying()) {
             state(g, Phase::Speaking, "SPACE stops the voice");
             drawCommWrapped(g, _reply, REPLY_Y, _scroll);
@@ -249,7 +249,12 @@ public:
         } else if (const char* link = linkSentence(true)) {
             state(g, Phase::Offline, link);
         } else {
-            state(g, Phase::Ready, gCommSession.empty() ? "hold SPACE and speak" : "hold SPACE for next turn");
+            state(g, Phase::Ready, gCommSession.empty() ? "hold SPACE to talk" : "hold SPACE: next turn");
+            g.setFont(&fonts::Font0);
+            g.setTextDatum(top_center);
+            g.setTextColor(DIM, BG);
+            g.drawString("ENTER: type a line instead", SCREEN_W / 2, REPLY_Y + 6);
+            g.setTextDatum(top_left);
         }
     }
 
@@ -268,13 +273,13 @@ private:
         const ui::StatusWord sw = ui::statusWord(p);
         const char* word = sw.text;
         constexpr int GLYPH = 20;
-        constexpr int SIDE = PAD + GLYPH + 6;  // word stays centred with room for the glyph
-        if (p == Phase::Ready || p == Phase::Listening || p == Phase::Thinking || p == Phase::Speaking) {
-            // Same Talk circle as Home, small: pulses with the mic, spins while thinking.
-            ui::talkOrb(g, PAD + GLYPH / 2, STATE_Y + 4 + GLYPH / 2, 7,
-                        p == Phase::Listening ? nod::TALK_LISTENING : p == Phase::Thinking ? nod::TALK_THINKING
-                        : p == Phase::Speaking ? nod::TALK_SPEAKING : nod::TALK_IDLE,
-                        voice::level());
+        const bool talk = p == Phase::Ready || p == Phase::Listening || p == Phase::Thinking || p == Phase::Speaking;
+        const int SIDE = PAD + (talk ? ui::CHAR_W : GLYPH) + 6;  // word stays centred with room for the figure
+        if (talk) {
+            // Piblo himself: bobs with the mic while listening, bounces while speaking, sways while thinking.
+            ui::character(g, PAD, STATE_Y, p == Phase::Listening ? nod::TALK_LISTENING : p == Phase::Thinking ? nod::TALK_THINKING
+                          : p == Phase::Speaking ? nod::TALK_SPEAKING : nod::TALK_IDLE,
+                          voice::level(), millis());
         } else {
             ui::glyph(g, PAD, STATE_Y + 4, GLYPH, p);
         }
@@ -286,12 +291,13 @@ private:
         g.setTextSize(1);
         g.setFont(&fonts::Font2);
         g.setTextColor(DIM, BG);
-        g.drawString(reason, SCREEN_W / 2, REASON_Y);
+        g.setTextDatum(top_center);
+        g.drawString(ui::ellipsis(reason, 32).c_str(), SCREEN_W / 2, REASON_Y);
         g.setTextDatum(top_left);
     }
 
     void renderControl(M5Canvas& g) {
-        ui::header(g, "HUB QUICK CONTROL", host::linkName());
+        ui::header(g, "PC QUICK CONTROL", host::linkName());
         const int prev = (_controlSel + CONTROL_COUNT - 1) % CONTROL_COUNT;
         const int next = (_controlSel + 1) % CONTROL_COUNT;
         g.setTextDatum(top_center);
@@ -313,7 +319,7 @@ private:
     }
 
     void runControl() {
-        if (host_worker::busy()) { notify::post(Note::Info, "hub busy", "wait for current action"); return; }
+        if (host_worker::busy()) { notify::post(Note::Info, "PC busy", "wait for current action"); return; }
         const auto& control = CONTROLS[_controlSel];
         if (!host_worker::submitPcAction(control.key)) {
             notify::post(Note::Error, "Command not queued", host_worker::stateName());
@@ -354,6 +360,7 @@ private:
         delete _sink;
         _sink = nullptr;
         _sending = true;
+        _thinkAt = millis();
         _sendAt = millis() + 120;
         invalidate();
     }
@@ -404,10 +411,10 @@ private:
             const char* label = controlLabel(result.action);
             if (result.reply.ok) {
                 sfx::confirm();
-                notify::post(Note::Success, label, result.reply.text.empty() ? "hub acknowledged" : result.reply.text);
+                notify::post(Note::Success, label, result.reply.text.empty() ? "PC acknowledged" : result.reply.text);
             } else {
                 sfx::error();
-                notify::post(Note::Error, "Command failed", result.reply.error.empty() ? "hub unavailable" : result.reply.error);
+                notify::post(Note::Error, "Command failed", result.reply.error.empty() ? "PC unavailable" : result.reply.error);
             }
             invalidate();
             return;
@@ -431,7 +438,7 @@ private:
         Serial.printf("[call] ok=%d status=%d err=%s wav=%s\n", result.reply.ok, result.reply.status,
                       result.reply.error.c_str(), result.wavPath.c_str());
         if (!result.reply.ok) {
-            queueRaw(result.wavPath, result.reply.error.empty() ? "hub unavailable" : result.reply.error, result.context);
+            queueRaw(result.wavPath, result.reply.error.empty() ? "PC unavailable" : result.reply.error, result.context);
             _err = failReason(result.reply);
             sfx::error();
             notify::post(Note::Warn, _err, "voice call kept in outbox");
@@ -523,7 +530,7 @@ private:
         auto has = [&](const char* k) { return e.find(k) != std::string::npos; };
         if (r.status <= 0 || has("unreachable") || has("offline") || has("hub")) {
             const char* link = linkSentence(false);
-            return link ? link : "hub not answering. Retry.";
+            return link ? link : "PC not answering. Retry.";
         }
         if (r.status == 429 || r.status == 502 || r.status == 503 || r.status == 504 ||
             has("busy") || has("LLM") || has("brain") || has("model"))
@@ -571,6 +578,7 @@ private:
     bool _discard = false;        // ESC cancelled the in-flight talk job; drop its result
     uint32_t _sendAt = 0;
     uint32_t _waitSince = 0;
+    uint32_t _thinkAt = 0;
     uint32_t _lastWorkerPaint = 0;
 };
 

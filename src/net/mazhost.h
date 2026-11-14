@@ -187,6 +187,7 @@ Reply talkTextContext(const std::string& session, const std::string& text,
                       const std::string& context);
 Reply talkAudio(const std::string& session, const std::string& wavPath);
 Reply transcribe(const std::string& wavPath);
+Reply flowPaste(const std::string& wavPath);  // /dictate?target=pc-paste
 Reply brainDump(const std::string& wavPath, const std::vector<uint32_t>& highlights);
 Reply pcAction(const std::string& action);
 bool speak(const std::string& text, const std::string& wavPath);
@@ -241,7 +242,7 @@ Reply workIncrement(const std::string& trackId, const std::string& eventTypeId);
 
 CoreStatus coreStatus();
 // Core /health: its version plus the firmware it holds (fw_latest). Polled in the background.
-struct CoreInfo { bool ok = false; std::string version, fwVersion, fwSha, remoteUrl; };
+struct CoreInfo { bool ok = false, fwUpdateAvailable = false; std::string version, fwVersion, fwSha, remoteUrl; };
 CoreInfo fetchCoreInfo();
 // Core /buddy: Claude Code approvals waiting for a thumb (see docs/APPROVALS.md).
 // The Nod: a detailed approval has summary = "THE NOD  PAYMENT" / amount / "to recipient" on three lines; nod = hold-to-approve.

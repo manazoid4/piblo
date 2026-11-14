@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import json
 import wave
 
 import pytest
@@ -75,6 +76,46 @@ def test_dictate_endpoint(tmp_path):
     assert j["ms"]["total"] >= 0
     assert "buy the cables" in (tmp_path / "inbox.md").read_text()
     assert "dictate" in (tmp_path / "latency.log").read_text()
+
+
+@pytest.mark.parametrize("mode,intent,press_enter,outcome", [
+    ("paste", "claude", False, "clipboard"),
+    ("type", "paste", True, "pasted"),
+])
+def test_dictate_pc_paste_keeps_focus_guard_and_settings(tmp_path, monkeypatch, mode, intent, press_enter, outcome):
+    from mazhost import app as app_module
+    from mazhost.flow import Flow
+
+    (tmp_path / "settings.json").write_text(json.dumps({
+        "input_mode": mode, "press_enter": press_enter, "cleanup": "auto", "stt": "auto",
+    }), encoding="utf-8")
+    monkeypatch.setattr(Flow, "dictate", lambda self, path: {"intent": intent, "text": "Hello."})
+    monkeypatch.setattr(app_module, "flow_foreground", lambda: 42)
+    seen = {}
+
+    def fake_safe_paste(text, enter, armed, paste_fn):
+        seen.update(text=text, enter=enter, armed=armed, paste_fn=paste_fn)
+        if paste_fn:
+            paste_fn(text, enter)
+        return outcome
+
+    typed = []
+    monkeypatch.setattr(app_module, "flow_safe_paste", fake_safe_paste)
+    monkeypatch.setattr(app_module, "insert_text", lambda text, enter, flow: typed.append((text, enter)))
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path), groq_api_key="",
+                   flow_cleanup_llm=False, stt_provider="whisper", flow_cloud=False)
+    client = TestClient(create_app(cfg, stt=Stt(), models=Models()))
+    response = client.post("/dictate?target=pc-paste", content=_wav(),
+                           headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["pc"] == response.json()["reply"] == outcome
+    assert seen["text"] == "Hello." and seen["armed"] == 42
+    assert seen["enter"] is (intent == "claude" or press_enter)
+    if mode == "type":
+        assert typed == [("Hello.", True)]
+    else:
+        assert seen["paste_fn"] is None and typed == []
 
 
 def test_one_release_one_paste(monkeypatch):
@@ -221,3 +262,49 @@ def test_warm_loads_whisper_first(tmp_path, monkeypatch):
     monkeypatch.setattr(s, "_get_onnx", lambda download=False: order.append("parakeet"))
     s.warm()
     assert order == ["whisper", "parakeet"]
+
+
+def test_safe_paste_pastes_into_armed_window():
+    from mazhost.flow import safe_paste
+    got = []
+    out = safe_paste("hi.", False, 42, paste_fn=lambda t, enter=False: got.append((t, enter)),
+                     fg_fn=lambda: 42, copy_fn=lambda t: got.append(("copy", t)), typable_fn=lambda h: True)
+    assert out == "pasted" and got == [("hi.", False)]
+
+
+def test_safe_paste_keeps_text_on_clipboard_when_focus_moved():
+    from mazhost.flow import safe_paste
+    got = []
+    out = safe_paste("hi.", True, 42, paste_fn=lambda t, enter=False: got.append("PASTED"),
+                     fg_fn=lambda: 99, copy_fn=lambda t: got.append(("copy", t)))
+    assert out == "clipboard" and got == [("copy", "hi.")]
+
+
+def test_safe_paste_never_types_when_locked():
+    from mazhost.flow import safe_paste
+    got = []
+    out = safe_paste("hi.", False, 0, paste_fn=lambda t, enter=False: got.append("PASTED"),
+                     fg_fn=lambda: 0, copy_fn=lambda t: got.append("copy"))
+    assert out == "clipboard" and "PASTED" not in got
+
+
+def test_dictionary_fixes_what_parakeet_hears():
+    from mazhost.flow import apply_dictionary
+    got = apply_dictionary("So this is a test of Pebloflow on the card Puter.", ["Piblo", "Cardputer"])
+    assert got == "So this is a test of Piblo Flow on the Cardputer."
+
+
+def test_dictionary_user_aliases_and_no_false_join():
+    from mazhost.flow import apply_dictionary
+    assert apply_dictionary("ask graw queue", ["Groq: graw queue"]) == "ask Groq"
+    assert apply_dictionary("a fish dish", ["Fish"]) == "a Fish dish"
+    # ordinary word pairs are never glued into a term (no automatic splitting)
+    assert apply_dictionary("come out look at this", ["Outlook"]) == "come out look at this"
+
+
+def test_safe_paste_admin_window_goes_to_clipboard():
+    from mazhost.flow import safe_paste
+    got = []
+    out = safe_paste("hi.", False, 42, paste_fn=lambda t, enter=False: got.append("PASTED"),
+                     fg_fn=lambda: 42, copy_fn=lambda t: got.append("copy"), typable_fn=lambda h: False)
+    assert out == "clipboard" and got == ["copy"]

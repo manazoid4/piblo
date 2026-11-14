@@ -14,6 +14,7 @@ import { Memory } from './pages/Memory';
 import { Onboarding } from './pages/Onboarding';
 import { PibloDev, type DevTab } from './pages/PibloDev';
 import { Settings } from './pages/Settings';
+import { Teach } from './pages/Teach';
 import { StoreProvider, usePoll, useStore } from './lib/store';
 
 type ThemeMode = 'light' | 'dark' | 'system';
@@ -70,7 +71,7 @@ function useTheme() {
 
 export { useTheme };
 
-type Section = 'home' | 'live' | 'ask' | 'memory' | 'actions' | 'settings' | 'dev';
+type Section = 'home' | 'live' | 'ask' | 'memory' | 'actions' | 'settings' | 'dev' | 'teach';
 const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'device' },
   { id: 'live', label: 'Live View', icon: 'screen' },
@@ -79,6 +80,7 @@ const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'actions', label: 'Actions', icon: 'actions' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
   { id: 'dev', label: 'Piblo Dev', icon: 'dev' },
+  { id: 'teach', label: 'Show me once', icon: 'screen' },
 ];
 
 function DevicePillView() {
@@ -165,7 +167,7 @@ function Shell() {
   };
 
   const needsCore = section !== 'settings' && !running;
-  const Page = { home: Home, live: LiveView, ask: Ask, memory: Memory, actions: Actions, settings: Settings }[section === 'dev' ? 'home' : section];
+  const Page = { home: Home, live: LiveView, ask: Ask, memory: Memory, actions: Actions, settings: Settings, teach: Teach }[section === 'dev' ? 'home' : section];
 
   return (
     <div className="shell">

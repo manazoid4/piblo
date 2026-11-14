@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     groq_key: str = ""
     groq_api_key: str = ""  # Alias for groq_key (PR #43 uses this name)
     groq_models: str = "openai/gpt-oss-120b,qwen/qwen3.8-27b,openai/gpt-oss-20b"
-    # Conversational turns on LOCAL/AUTO use the full free chain (local last).
+    # Legacy preference; explicit LOCAL always stays local. Choose AUTO for the cloud chain.
     smart_voice: bool = True
     now_path: str = "~/Desktop/Maz Works Knowledge Vault/NOW.md"
 
@@ -94,6 +94,7 @@ class Settings(BaseSettings):
     # live voice brain: "cloud" = LFM3 hears/speaks, OpenRouter thinks (falls back to Ollama, then LFM3);
     # "lfm" = today's direct LFM3 speech-to-speech.
     live_brain: Literal["cloud", "lfm"] = "cloud"
+    live_model: str = ""  # upstream realtime model (MAZ_LIVE_MODEL); empty = server default
     live_cloud_default: str = "nemotron"  # voice alias resolved to a :free OpenRouter id until Maz switches by voice
     # tried in order when the chosen cloud model fails (429 etc.), before the slow local fallback. Measured 8 Nov 2026:
     # nemotron-3.5-lightning:free ~0.6 s first token; deepseek-v4.1-flash (cheap paid) ~0.7 s; gemma :free was 429ing.
@@ -101,6 +102,12 @@ class Settings(BaseSettings):
     live_ollama_model: str = "qwen36-heretic:latest"
     live_memory_github: str = ""  # owner/repo:path; empty = off; needs github_token
     live_memory_file: str = ""  # "remember ..." notes; empty = <data_dir>/piblo-memory.md
+    wakeword: bool = True  # MAZ_WAKEWORD=0: live voice listens without "Hey Piblo"; on but ungated if sherpa-onnx/model missing
+    wakeword_model_dir: str = ""  # empty = %LOCALAPPDATA%\Piblo\wakeword-model (scripts/setup-wakeword.py)
+    vault_dir: str = ""  # explicitly selected document folder; disabled by default
+    vault_remote_url: str = ""  # home PC's Tailscale Core, for a travelling client
+    vault_remote_token: str = ""  # stays on this PC, never in a URL or device reply
+    shortcuts_file: str = ""  # owner-configured fixed names and targets JSON
     max_upload_mb: int = Field(default=12, ge=1, le=64)
     max_audio_seconds: int = Field(default=900, ge=1, le=3600)
     session_ttl_minutes: int = Field(default=120, ge=1, le=1440)

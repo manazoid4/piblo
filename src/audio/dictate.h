@@ -29,7 +29,11 @@ enum class State : uint8_t {
 // `owner` scopes a session to one field. A screen can hold several fields
 // (Decision has "what" and "why"), and only the one that started dictating may
 // collect the result.
-bool  start(const void* owner);
+// toPc: send to the PC's /dictate?target=pc-paste instead, so the cleaned text
+// is typed into whatever window is focused on the computer (Piblo Flow).
+bool  start(const void* owner, bool toPc = false);
+// After a toPc take(): "pasted", "clipboard" (focus moved / PC locked) or "".
+const char* pcOutcome();
 void  stop();    // finish recording and begin transcribing
 void  cancel();  // abandon: no upload, recording discarded
 void  update();  // pump from the shell loop

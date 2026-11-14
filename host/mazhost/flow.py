@@ -12,7 +12,7 @@ from . import private_mode
 
 log = logging.getLogger("mazhost.flow")
 
-DEFAULT_WORDS = ["Piblo", "nod", "Maz Works", "Cardputer", "Claude", "MAZos", "FlowLens", "Groq", "Fish"]
+DEFAULT_WORDS = ["Piblo", "Piblo Flow", "nod", "Cardputer", "Claude", "MAZos", "FlowLens", "Groq", "Fish"]
 GROQ_URL = "https://api.groq.com/openai/v1"
 CLEAN_MODEL = "openai/gpt-oss-20b"
 
@@ -29,7 +29,17 @@ _PREFIX = re.compile(r"(?is)^\W*(note|remind me|claude)\b[\s,:;.\-]*(.*)$")
 _INTENT = {"note": "note", "remind me": "remind", "claude": "claude"}
 
 
+# What local STT actually hears for our own names (measured with Parakeet, 14 Nov).
+# Always applied, so installs whose dictionary.txt predates this still benefit.
+BUILTIN_ALIASES = {
+    "Piblo Flow": ["Pebloflow", "Peblo flow", "Pibloflow", "Peblo Flow", "Paper blue flow"],
+    "Piblo": ["Peblo", "Pibblo", "Pebblo", "Piblow", "Paper blue", "Peb low", "Peb Lowe"],
+    "Cardputer": ["card puter", "card pewter", "card computer", "Card putter"],
+}
+
+
 def load_dictionary(path: Path) -> list[str]:
+    """One term per line; `Term: alias, alias` adds misheard spellings."""
     path = Path(path)
     if not path.exists():
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -38,8 +48,14 @@ def load_dictionary(path: Path) -> list[str]:
 
 
 def apply_dictionary(text: str, words: list[str]) -> str:
-    for w in words:
-        text = re.sub(rf"(?i)\b{re.escape(w)}\b", w, text)
+    entries: dict[str, list[str]] = {k: list(v) for k, v in BUILTIN_ALIASES.items()}
+    for line in words:
+        term, _, aliases = line.partition(":")
+        entries.setdefault(term.strip(), []).extend(a.strip() for a in aliases.split(",") if a.strip())
+    # Longest first so "Piblo Flow" wins over "Piblo".
+    for term in sorted(entries, key=len, reverse=True):
+        alts = [re.escape(term)] + [re.escape(a) for a in entries[term]]
+        text = re.sub(rf"(?i)\b(?:{'|'.join(alts)})\b", term, text)
     return text
 
 
@@ -71,7 +87,8 @@ class Flow:
         self.client = client or private_mode.client(timeout=20)
         self.dir = Path(settings.flow_dir).expanduser()
         self.dir.mkdir(parents=True, exist_ok=True)
-        self.words = load_dictionary(self.dir / "dictionary.txt")
+        self.lines = load_dictionary(self.dir / "dictionary.txt")
+        self.words = [line.partition(":")[0].strip() for line in self.lines]  # terms only, for prompts
 
     def _cleanup(self, text: str) -> tuple[str, str]:
         # Local by default: STT already punctuates, so no network/LLM hop unless explicitly configured.
@@ -117,7 +134,7 @@ class Flow:
         if not raw.strip():
             return {"text": "", "intent": "paste", "raw": "", "ms": {"stt": 0, "clean": 0, "total": 0}}
         cleaned, provider = self._cleanup(raw)
-        cleaned = apply_dictionary(cleaned, self.words)
+        cleaned = apply_dictionary(cleaned, self.lines)
         intent, body = parse_prefix(cleaned)
         t2 = time.perf_counter()
         ms = {"stt": round((t1 - t0) * 1000), "clean": round((t2 - t1) * 1000),
@@ -135,6 +152,72 @@ class Flow:
             f.write(line + "\n")
 
 
+def foreground() -> int:
+    """Top-level foreground window handle (0 when locked / no desktop)."""
+    import ctypes
+
+    u = ctypes.windll.user32
+    hwnd = u.GetForegroundWindow()
+    return u.GetAncestor(hwnd, 2) if hwnd else 0
+
+
+def typable(hwnd: int) -> bool:
+    """False when the window belongs to a process we cannot query (an elevated/admin
+    window): Windows silently drops our Ctrl+V there, so 'pasted' would be a lie."""
+    import ctypes
+    from ctypes import wintypes
+
+    u, k, a = ctypes.windll.user32, ctypes.windll.kernel32, ctypes.windll.advapi32
+    k.OpenProcess.restype = wintypes.HANDLE
+
+    def elevated(pid: int) -> bool | None:
+        proc = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not proc:
+            return None
+        tok = wintypes.HANDLE()
+        try:
+            if not a.OpenProcessToken(wintypes.HANDLE(proc), 0x0008, ctypes.byref(tok)):  # TOKEN_QUERY
+                return None
+            val, n = wintypes.DWORD(), wintypes.DWORD()
+            ok = a.GetTokenInformation(tok, 20, ctypes.byref(val), 4, ctypes.byref(n))  # TokenElevation
+            k.CloseHandle(tok)
+            return bool(val.value) if ok else None
+        finally:
+            k.CloseHandle(wintypes.HANDLE(proc))
+
+    pid = wintypes.DWORD()
+    u.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+    target, me = elevated(pid.value), elevated(k.GetCurrentProcessId())
+    if target is None:  # cannot even look at it: treat as untypable
+        return False
+    return not (target and not me)
+
+
+def safe_paste(text: str, enter: bool, armed_hwnd: int, paste_fn=None, fg_fn=foreground,
+               copy_fn=None, typable_fn=typable) -> str:
+    """Paste only into the top-level window that was focused when the audio arrived.
+
+    Limits (by design): the guard covers the ~1 s of transcription, not the speaking time,
+    and it compares whole windows, so switching a tab/pane inside the same app still pastes.
+
+    Returns "pasted", or "clipboard" when focus moved, the PC is locked or the window is
+    an admin one we cannot type into: the text is left on the clipboard so nothing is
+    typed into the wrong window and nothing is lost.
+    """
+    now = fg_fn()
+    if not armed_hwnd or now != armed_hwnd or not typable_fn(now):
+        (copy_fn or _copy)(text)
+        return "clipboard"
+    (paste_fn or paste)(text, enter=enter)
+    return "pasted"
+
+
+def _copy(text: str) -> None:
+    import pyperclip
+
+    pyperclip.copy(text)
+
+
 def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> None:
     """Save clipboard, set text, Ctrl+V, restore clipboard (Windows)."""
     import ctypes
@@ -146,7 +229,7 @@ def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> None:
     try:
         old = pyperclip.paste()
     except Exception:  # noqa: BLE001
-        old = ""
+        old = None
     pyperclip.copy(text)
 
     def tap(*vks: int) -> None:
@@ -161,8 +244,9 @@ def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> None:
     if enter:
         time.sleep(0.05)
         tap(0x0D)
-    time.sleep(0.15)  # let the target read the clipboard before restoring
-    pyperclip.copy(old)
+    time.sleep(0.4)  # slow targets (RDP, heavy Electron) read the clipboard late
+    if old:  # an image/files clipboard cannot be restored: leave the dictated text rather than blank it
+        pyperclip.copy(old)
 
 
 

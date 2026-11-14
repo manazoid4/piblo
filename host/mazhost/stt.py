@@ -110,6 +110,7 @@ class SpeechToText:
                         name,
                         device=selected_device,
                         compute_type=selected_compute,
+                        local_files_only=True,  # model installation is separate from a private spoken turn
                     )
         return self._models[key]
 
@@ -153,7 +154,8 @@ class SpeechToText:
     def transcribe_prompted(self, path: Path, prompt: str) -> str:
         """Groq Whisper when keyed (fast, free); local Whisper otherwise."""
         groq_key = self.settings.groq_api_key or self.settings.groq_key
-        if groq_key:
+        from . import private_mode
+        if groq_key and not private_mode.enabled():
             try:
                 return self._groq(path, prompt)
             except Exception:  # noqa: BLE001 - fall back to local

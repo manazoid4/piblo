@@ -13,6 +13,7 @@ import json
 import logging
 import time
 from collections import deque
+from urllib.parse import urlencode
 
 import numpy as np
 from fastapi import WebSocket
@@ -37,7 +38,11 @@ FRAME = 1280  # 40 ms reply frame to the device, bytes
 AHEAD_S = 0.4  # never run further than this ahead of real-time playback
 MIN_SPEECH_MS = 250
 PREROLL_MS = 300
+LONG_SPEECH_MS = 1500  # after this much speech a pause is more likely mid-thought than the end
+LONG_SPEECH_HANGOVER = 1.5
 FIRST_AUDIO_LIMIT_S = 4.0
+UPSTREAM_STEP_S = 5.0  # each handshake event from the realtime socket must arrive within this
+UPSTREAM_CONNECT_S = 6.0  # whole upstream handshake, so a silent or text-only server fails fast
 INSTRUCTIONS = ("You are Piblo, a friendly, warm and calm voice assistant on a tiny pocket device. "
                 "Never name or reveal your model. Keep replies short and spoken. "
                 "Respond with interleaved text and audio.")
@@ -97,7 +102,10 @@ class Vad:
                 self.last_loud_at = time.monotonic()
             else:
                 self._silence += 1
-                ended = self._silence >= self.end_blocks
+                need = self.end_blocks
+                if self.speech_ms >= LONG_SPEECH_MS:
+                    need = round(need * LONG_SPEECH_HANGOVER)
+                ended = self._silence >= need
         return out, ended
 
     @property
@@ -149,8 +157,12 @@ class Resampler24to16:
 class LiveBridge:
     """One device session: owns the upstream realtime socket and the per-turn state machine."""
 
-    def __init__(self, ws: WebSocket, cfg: Settings, timings=None) -> None:
+    def __init__(self, ws: WebSocket, cfg: Settings, timings=None, command_handler=None) -> None:
         self.ws, self.cfg, self.timings = ws, cfg, timings
+        self.command_handler = command_handler
+        from .wakeword import load
+        self.wakeword = load(cfg)
+        self._armed = bool(self.wakeword)
         self.url = cfg.llamacpp_url.replace("http", "ws", 1).rstrip("/") + "/v1/realtime"
         self.vad = Vad(cfg.live_end_silence_ms)
         self.gain = cfg.live_mic_gain
@@ -169,6 +181,7 @@ class LiveBridge:
         # cloud brain: LFM3 only hears (ASR over HTTP) and speaks (TTS on the realtime socket).
         # Private mode forces the local LFM3 speech-to-speech path (no cloud model).
         self.cloud = cfg.live_brain == "cloud" and not private_mode.enabled()
+        self.kokoro = self.cloud and cfg.tts_provider == "kokoro"
         self.brain = LiveBrain(cfg) if self.cloud else None
         self._turn: list[bytes] = []
         self._cloud: asyncio.Task | None = None
@@ -177,11 +190,17 @@ class LiveBridge:
     # ---- device side -----------------------------------------------------
     async def run(self) -> None:
         try:
-            await self._connect()
-        except Exception as error:  # model server down: tell the device, do not crash Core
+            if not self.kokoro:
+                await asyncio.wait_for(self._connect(), UPSTREAM_CONNECT_S)
+        except Exception as error:  # model server down or text-only: tell the device, do not crash Core
             log.warning("live: model server unavailable: %s", error)
             await self._send({"type": "error", "message": "Piblo's brain is offline"})
-            await self.ws.close(1011)
+            if self.up:
+                await self.up.close()
+            try:
+                await self.ws.close(1011)
+            except RuntimeError:  # already closed by the device
+                pass
             return
         await self._set_state("listening")
         try:
@@ -223,8 +242,14 @@ class LiveBridge:
             return  # half-duplex: the codec is playing (or a cloud turn is in flight), mic is not ours
         if time.monotonic() < self._mute_until:
             return  # tail of our own reply / codec switch noise: never a user turn
+        detector_pcm = pcm  # speech gain can clip; keyword features use the original stream
         if self.gain != 1.0:
             pcm = boost(pcm, self.gain)
+        if self._armed:
+            if self.wakeword.feed(detector_pcm):
+                self._armed = False
+                self.vad.reset()
+            return
         blocks, ended = self.vad.feed(pcm)
         if blocks and self.cloud:
             self._turn.extend(blocks)  # buffered on Core; transcribed once the turn ends
@@ -258,7 +283,8 @@ class LiveBridge:
 
     async def _interrupt(self) -> None:
         self._end_turn_tasks()
-        await self._up_send({"type": "response.cancel"})
+        if not self.kokoro:
+            await self._up_send({"type": "response.cancel"})
         await self._send({"type": "stop"})
         await self._set_state("listening")
         self.vad.reset()
@@ -287,12 +313,16 @@ class LiveBridge:
             t["asr_ms"] = round((time.monotonic() - t0) * 1000)
             if is_noise(text):
                 log.info("live: dropped noise turn %r", text)
+                self._rearm()
                 return  # still "listening": the device never saw a state change
             await self._send({"type": "text", "role": "user", "text": text})
             await self._set_state("thinking")
             self.brain.on_slow = lambda: sentences.put_nowait("One sec.")
-            reply = await self.brain.command(text)
-            if reply:
+            reply = await self.command_handler(text) if self.command_handler else None
+            handled = reply is not None
+            if not handled:
+                reply = await self.brain.command(text)
+            if handled or reply:
                 sentences.put_nowait(reply)
                 sentences.put_nowait(None)
             else:
@@ -308,8 +338,11 @@ class LiveBridge:
         except Exception as error:
             log.warning("live: cloud turn failed: %s", error)
             await self._send({"type": "error", "message": "Piblo's brain hit a snag"})
-            if not self._player:
-                await self._set_state("listening")
+            self._end_turn_tasks()
+            await self._send({"type": "stop"})
+            if self.state == "listening":
+                self._rearm()  # _set_state only re-arms on a state change
+            await self._set_state("listening")
         finally:
             if producer:
                 producer.cancel()
@@ -335,6 +368,21 @@ class LiveBridge:
             sentences.put_nowait(None)
 
     async def _tts(self, sentence: str) -> None:
+        if self.kokoro:
+            async with private_mode.async_client(timeout=20, trust_env=False) as client:
+                async with client.stream("GET", "http://127.0.0.1:8880/", params={"text": sentence}) as response:
+                    response.raise_for_status()
+                    pending = b""
+                    async for chunk in response.aiter_bytes(1024):
+                        pending += chunk
+                        size = len(pending) & ~1
+                        if size:
+                            await self._audio(pending[:size])
+                            pending = pending[size:]
+                    if pending:
+                        raise ValueError("Kokoro returned truncated PCM16")
+            self._t["done"] = time.monotonic()
+            return
         self._tts_done.clear()
         await self._up_send({"type": "conversation.item.create", "item": {
             "type": "message", "role": "user", "content": [{"type": "input_text", "text": sentence}]}})
@@ -345,10 +393,16 @@ class LiveBridge:
             log.warning("live: TTS timed out")
             self._need_reset = True
 
+    def _rearm(self) -> None:
+        if self.wakeword:
+            self.wakeword.reset()
+            self._armed = True
+
     async def _set_state(self, state: str) -> None:
         if state == "listening" and self.state != "listening":
             self._mute_until = time.monotonic() + self.holdoff
             self.vad.reset()
+            self._rearm()
         self.state = state
         await self._send({"type": "state", "state": state})
 
@@ -363,14 +417,21 @@ class LiveBridge:
         private_mode.guard(self.url)
         self.cloud = self.cfg.live_brain == "cloud" and not private_mode.enabled()
         self.brain = LiveBrain(self.cfg) if self.cloud else None
-        self.up = await _PrivateSafeConnect(self.url, max_size=None, open_timeout=5, proxy=None if private_mode.enabled() else True)
-        json.loads(await self.up.recv())  # session.created
+        url = self.url + ("?" + urlencode({"model": self.cfg.live_model}) if self.cfg.live_model else "")
+        self.up = await _PrivateSafeConnect(url, max_size=None, open_timeout=5, proxy=None if private_mode.enabled() else True)
+        await self._expect("session.created")
         await self.up.send(json.dumps({"type": "session.update", "session": {
             "type": "realtime", "instructions": TTS_INSTRUCTIONS if self.cloud else INSTRUCTIONS,
             "output_modalities": ["audio"] if self.cloud else ["text", "audio"]}}))
-        json.loads(await self.up.recv())  # session.updated
+        await self._expect("session.updated")
         self._need_reset = False
         self._reader = asyncio.create_task(self._read_up())
+
+    async def _expect(self, kind: str) -> None:
+        """The next upstream event must be `kind`; an error event, a close or silence means the connect failed."""
+        ev = json.loads(await asyncio.wait_for(self.up.recv(), UPSTREAM_STEP_S))
+        if ev.get("type") != kind:
+            raise ConnectionError(f"upstream sent {ev.get('type')!r} instead of {kind}: {ev.get('error')}")
 
     async def _up_send(self, obj: dict) -> None:
         if self._need_reset or self.up is None:  # cancel was refused or socket died: fresh session
@@ -404,14 +465,7 @@ class LiveBridge:
         elif kind == "response.output_text.delta" and not self.cloud:
             await self._send({"type": "text", "role": "assistant", "text": ev.get("delta", "")})
         elif kind == "response.output_audio.delta":
-            pcm = self._rs.feed(base64.b64decode(ev.get("delta", "")))
-            if pcm and "first" not in self._t:
-                self._t["first"] = time.monotonic()
-                self._guard and self._guard.cancel()
-                await self._set_state("speaking")
-                self._player = asyncio.create_task(self._play())
-            if pcm:
-                self._q.put_nowait(pcm)
+            await self._audio(base64.b64decode(ev.get("delta", "")))
         elif kind == "response.done" and self.cloud:
             self._tts_done.set()  # one sentence spoken; _cloud_turn closes the audio queue when all are
         elif kind == "response.done":
@@ -420,6 +474,16 @@ class LiveBridge:
             if "first" not in self._t:  # model produced no audio: nothing to wait for
                 self._end_turn_tasks()
                 await self._set_state("listening")
+
+    async def _audio(self, pcm24: bytes) -> None:
+        pcm = self._rs.feed(pcm24)
+        if pcm and "first" not in self._t:
+            self._t["first"] = time.monotonic()
+            self._guard and self._guard.cancel()
+            await self._set_state("speaking")
+            self._player = asyncio.create_task(self._play())
+        if pcm:
+            self._q.put_nowait(pcm)
 
     async def _play(self) -> None:
         """Pace reply frames to the device (<= AHEAD_S ahead), then wait for playback_done."""
@@ -464,7 +528,7 @@ class LiveBridge:
             self.timings.add(row)
 
 
-def install_live_voice(api, cfg: Settings, security, timings=None) -> None:
+def install_live_voice(api, cfg: Settings, security, timings=None, command_handler=None) -> None:
     """Register /voice/live. Plain Starlette route: the app-wide HTTP auth dependency can't take a WebSocket."""
 
     async def endpoint(ws: WebSocket) -> None:
@@ -474,6 +538,16 @@ def install_live_voice(api, cfg: Settings, security, timings=None) -> None:
         if not security.token_ok(auth):
             await ws.close(4401)
             return
-        await LiveBridge(ws, cfg, timings).run()
+        try:
+            bridge = LiveBridge(ws, cfg, timings, command_handler)
+        except Exception as error:
+            log.error("live: session setup failed: %s", error)
+            try:
+                await ws.send_text(json.dumps({"type": "error", "message": "Live voice setup failed on PC"}))
+                await ws.close(1011)
+            except RuntimeError:  # already closed by the device
+                pass
+            return
+        await bridge.run()
 
     api.router.routes.append(WebSocketRoute("/voice/live", endpoint))

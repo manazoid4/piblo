@@ -1,0 +1,59 @@
+{
+  "date": "2026-11-14",
+  "voices_listed": [
+    "Adrian",
+    "Sarah",
+    "Ethan",
+    "Selene",
+    "Slax",
+    "ELITE",
+    "Verity",
+    "Energetic Male"
+  ],
+  "rows": [
+    {
+      "phrase": "short",
+      "text": "Okay, done.",
+      "provider": "kokoro",
+      "ttfb_ms": 17328,
+      "total_ms": 17328,
+      "wav_bytes": 36226,
+      "stt_ms": 3784,
+      "transcript": "Okay done.",
+      "wer": 0.0
+    },
+    {
+      "phrase": "long",
+      "text": "Your meeting with the dentist is at ten thirty tomorrow morning, so you should leave the house by ten, and I have set a reminder for nine forty five just in case.",
+      "provider": "kokoro",
+      "ttfb_ms": 14394,
+      "total_ms": 14399,
+      "wav_bytes": 322946,
+      "stt_ms": 10794,
+      "transcript": "Your meeting with the dentist is at 1030 tomorrow morning, so you should leave the house by 10. And I have set a reminder for 945 just in case.",
+      "wer": 0.156
+    },
+    {
+      "phrase": "name",
+      "text": "Hi, I am Piblo, your pocket assistant on the Cardputer.",
+      "provider": "kokoro",
+      "ttfb_ms": 7850,
+      "total_ms": 7851,
+      "wav_bytes": 119510,
+      "stt_ms": 1948,
+      "transcript": "Hi, I am Piblow, your Pocket Assistant on the Card Pewter.",
+      "wer": 0.3
+    },
+    {
+      "phrase": "numbers",
+      "text": "The total is 42 pounds and your code is 7 1 9 3.",
+      "provider": "kokoro",
+      "ttfb_ms": 5638,
+      "total_ms": 5653,
+      "wav_bytes": 134530,
+      "stt_ms": 8196,
+      "transcript": "The total is 42 pounds and your code is 7193.",
+      "wer": 0.286
+    }
+  ]
+}

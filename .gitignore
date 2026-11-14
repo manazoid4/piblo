@@ -15,3 +15,6 @@ host/.env
 host/data/
 node_modules/
 host/Microsoft/
+
+# Playwright screenshots from verify scripts
+app/artifacts/

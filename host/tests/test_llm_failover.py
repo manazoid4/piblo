@@ -81,7 +81,7 @@ def test_auto_prefers_mazlatest_when_healthy(monkeypatch):
 
 
 def test_auto_falls_back_to_cloud_when_mazlatest_down(monkeypatch):
-    models = Models(settings(mazlatest_key="m"))
+    models = Models(settings(mazlatest_key="m", cloud_key="c"))
     monkeypatch.setattr(models, "_mazlatest", _unavailable)
     monkeypatch.setattr(models, "_cloud", lambda _messages, timeout=None: ("cloud ok", "cloud"))
     monkeypatch.setattr(models, "_local_stage", lambda *a, **k: (_ for _ in ()).throw(AssertionError("local used")))

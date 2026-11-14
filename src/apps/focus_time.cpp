@@ -32,8 +32,8 @@ public:
         if (shell::focus::running())
             return shell::focus::paused() ? "ENTER resume   C cancel"
                                           : "ENTER pause   C cancel";
-        if (_labelling) return "ENTER start   ESC skip label";
-        return "up/down preset   ENTER label & start";
+        if (_labelling) return "ENTER start  ESC skip";
+        return "UP/DOWN preset  ENTER start";
     }
 
     void onEnter() override { invalidate(); }

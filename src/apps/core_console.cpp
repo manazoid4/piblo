@@ -22,14 +22,14 @@ constexpr int ACTION_COUNT = 5;
 class CoreConsoleApp final : public App {
 public:
     const char* id() const override { return "core"; }
-    const char* title() const override { return "HUB"; }
+    const char* title() const override { return "PC"; }
     const char* hints() const override {
-        if (_view == View::Result) return "R refresh job  ESC actions";
+        if (_view == View::Result) return "R refresh  ESC actions";
         if (_view == View::Actions) return "ENTER run  ESC projects";
-        return "R refresh  ENTER project  ESC back";
+        return "R refresh  ENTER project";
     }
 
-    void onEnter() override { refresh(); }
+    void onEnter() override { _view = View::Projects; _loadAt = millis() + 80; _loading = true; invalidate(); }
 
     bool onKey(const KeyEvent& e) override {
         if (!e.down) return false;
@@ -62,6 +62,7 @@ public:
     }
 
     void update() override {
+        if (_loading && millis() >= _loadAt) { _loading = false; refresh(); }
         if (_view == View::Result && !_job.id.empty() && _job.state != "done" &&
             millis() - _lastPoll > 1500) pollJob(false);
     }
@@ -86,11 +87,12 @@ private:
     }
 
     void renderProjects(M5Canvas& g) {
-        std::string right = _status.ok ? (_status.ollama ? "AI + HUB" : "HUB / AI OFF") : "OFFLINE";
-        ui::header(g, "HUB", right.c_str());
+        std::string right = _status.ok ? (_status.ollama ? "AI + PC" : "PC / AI OFF") : "OFFLINE";
+        ui::header(g, "PC", _loading ? "" : right.c_str());
+        if (_loading) { line(g, 0, "Loading...", DIM); return; }
         if (!_status.ok) {
             line(g, 0, _status.error.c_str(), WARN);
-            line(g, 2, "Configure CONTROL > HUB", DIM);
+            line(g, 2, "Configure CONTROL > PC", DIM);
             line(g, 3, "then press R to refresh", DIM);
             return;
         }
@@ -110,13 +112,13 @@ private:
             char sub[32];
             snprintf(sub, sizeof(sub), "%s%s%d", _projects[idx].branch.c_str(),
                      _projects[idx].dirty ? " *" : " ", _projects[idx].dirty);
-            ui::listRow(g, row + 2, idx == _cursor.sel, _projects[idx].name.c_str(), sub);
+            ui::listRow(g, row + 2, idx == _cursor.sel, ui::ellipsis(_projects[idx].name, 18).c_str(), sub);
         }
         ui::scrollBar(g, static_cast<int>(_projects.size()), _cursor.first, visible);
     }
 
     void renderActions(M5Canvas& g) {
-        ui::header(g, _project.c_str(), "HUB ACTIONS");
+        ui::header(g, _project.c_str(), "PC ACTIONS");
         for (int row = 0; row < ACTION_COUNT; ++row)
             ui::listRow(g, row + 1, row == _cursor.sel, ACTION_LABELS[row], row >= 1 && row <= 2 ? "job" : "safe");
     }
@@ -148,7 +150,7 @@ private:
     void renderResult(M5Canvas& g) {
         std::string right = _job.state.empty() ? "ERROR" : _job.state;
         ui::header(g, _project.c_str(), right.c_str());
-        std::string heading = _job.action.empty() ? "HUB JOB" : _job.action;
+        std::string heading = _job.action.empty() ? "PC JOB" : _job.action;
         line(g, 0, heading.c_str(), ACCENT);
         if (_job.state != "done" && !_job.id.empty()) {
             line(g, 2, "Running on hub...", TEXT);
@@ -166,7 +168,7 @@ private:
         g.setFont(&fonts::Font0);
         g.setTextDatum(top_left);
         g.setTextColor(color, BG);
-        g.drawString(text, PAD, BODY_Y + 17 + row * 15);
+        g.drawString(text, PAD, BELOW_RULE + row * 15);
     }
 
     View _view = View::Projects;
@@ -178,6 +180,8 @@ private:
     std::string _error;
     std::string _result;
     uint32_t _lastPoll = 0;
+    uint32_t _loadAt = 0;
+    bool _loading = false;
 };
 
 }  // namespace

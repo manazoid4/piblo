@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Empty, Icon, PageHead } from '../components/ui';
 import { useAct, usePoll } from '../lib/store';
+import { FileVault } from '../components/FileVault';
 
 interface Dump {
   id: string;
@@ -159,6 +160,7 @@ export function Memory() {
       <PageHead title="Memory" sub="Everything your Piblo heard and everything you saved, in one place." />
       <Inbox />
       <Library />
+      <FileVault />
     </div>
   );
 }

@@ -21,7 +21,7 @@ from pathlib import Path
 import httpx
 import pyttsx3
 
-from . import netpool
+from . import netpool, private_mode
 
 from .config import Settings
 from .voices import ADRIAN_ID, VoiceService
@@ -222,7 +222,7 @@ class SpeechOut:
         except (OSError, ValueError, EOFError, wave.Error):
             log.warning("TTS WAV format could not be normalized", exc_info=True)
 
-    def synthesize(self, text: str) -> Path:
+    def synthesize(self, text: str, local_only: bool = False) -> Path:
         if not self.settings.tts_enabled:
             raise RuntimeError("tts_disabled")
         clean = " ".join(text.strip().split())
@@ -231,6 +231,9 @@ class SpeechOut:
         clean = clean[:1400]
 
         provider = self.settings.tts_provider
+        strict_local = local_only or private_mode.enabled() or not self.settings.fish_api_key
+        if local_only or (strict_local and provider == "fish"):
+            provider = "kokoro"
         voice = ("kokoro-" + self.settings.kokoro_voice if provider == "kokoro" else
                  "windows" if provider == "windows" else self.voices.current())
         cached = self._cache_file(clean, voice)
@@ -256,6 +259,9 @@ class SpeechOut:
                     self._cache_store(path, cached)
                 return path
             except Exception as error:
+                if strict_local:
+                    path.unlink(missing_ok=True)
+                    raise RuntimeError("kokoro_unavailable") from error
                 reason = f"kokoro:{type(error).__name__}"
         elif provider == "fish":
             for _ in range(2):  # Fish first, retried once

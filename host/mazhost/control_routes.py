@@ -13,6 +13,8 @@ from .debug_capsule import DebugCapsules
 from .executor import ElevatedExecutor, ExecutionError, Shell
 from .llm import Route
 from .phone_control import build_phone_app
+from .skill_routes import install_skill_routes
+from .skill_vault import SkillVault
 from .stt import SpeechToText
 from .teach_capture import TeachCapture
 from .teach_routes import install_teach_routes
@@ -116,6 +118,7 @@ def install_control_routes(
     workflows = WorkflowService(settings, model_router, core_service, nudge_client)
     install_workflow_routes(api, workflows)
     install_teach_routes(api, TeachCapture(settings, SpeechToText(settings)))
+    install_skill_routes(api, SkillVault(settings, model_router))
     agents = AgentRunner(settings, broker)
 
     @api.get("/authority/token-id")

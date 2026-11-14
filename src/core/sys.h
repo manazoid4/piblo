@@ -77,6 +77,7 @@ struct SysState {
 
     static constexpr int WORK_MAX_TRACKS = 4;
     static constexpr int WORK_HISTORY_DAYS = 7;
+    std::string workError;           // last failed poll's reason; empty when the last poll was fine
     bool        workLoaded = false;  // ever received one successful payload
     uint32_t    workReceivedAt = 0;  // millis() of the last successful poll
     uint8_t     workTrackCount = 0;

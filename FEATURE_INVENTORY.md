@@ -60,6 +60,17 @@ Source of truth for "nothing useful gets silently removed". Base: MAZ Pocket **v
 
 ## Other
 
+## 13 November experimental integrations
+
+| Feature | Implementation | Automated evidence | Physical / remote evidence |
+|---|---|---|---|
+| Hey Piblo | Local streaming keyword detector gates an already-open Live session | Gate/re-arm tests; 2/2 synthetic wake phrases and 0/20 synthetic negatives at tested gains; default speech gain bypassed for detector to avoid clipping | Real device mic and false-activation rate unconfirmed; not always-on from Home; model-weight rights unresolved |
+| Voice shortcuts | Fixed configured webhook or signed-authority PC command; exact request approval before run | Signed device-proof tests; real PowerShell print command under a test-issued grant; no execution on deny | Real owner/device confirmation unconfirmed; direct local/private speech-to-speech has no command-intent hook |
+| Fetch from Home | Opt-in folder, bounded originals, handle-verified root; travelling Core can proxy home Core over Tailscale | Auth, traversal, replacement race, remote transport fixture, exact-byte Electron download and text preview | Real two-PC/Tailscale test unconfirmed; no passport/user files used |
+| Show me once | Finished PC capture to explicit draft review and saved skill | Backend route/auth/persistence tests; Electron draft/discard/explicit-save flow | Real recording unconfirmed; model sees narration/marks, not frames; no automatic replay |
+
+All four remain unconfirmed on hardware. No firmware was flashed or feature release published.
+
 | Feature | Status | Notes |
 |---|---|---|
 | Web flasher | Preserved | `web-flasher/`, tests pass in CI |

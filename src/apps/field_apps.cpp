@@ -31,8 +31,8 @@ std::string pct(int value) {
 class LaptopApp : public App {
 public:
     const char* id() const override { return "laptop"; }
-    const char* title() const override { return "Hub"; }
-    const char* hints() const override { return "R refresh   Fn+F FIELD   ESC back"; }
+    const char* title() const override { return "PC"; }
+    const char* hints() const override { return "R refresh   Fn+F FIELD"; }
 
     void onEnter() override {
         field::requestSystemStatus();
@@ -77,14 +77,14 @@ public:
 
     void render(M5Canvas& g) override {
         g.fillScreen(BG);
-        ui::header(g, "HUB", Cfg.fieldMode ? "FIELD" : "ON DEMAND");
+        ui::header(g, "PC", Cfg.fieldMode ? "FIELD" : "ON DEMAND");
         g.setFont(&fonts::Font0);
         g.setTextDatum(top_left);
 
         if (!Sys.laptopStatusOk) {
             const bool loading = host_worker::jobKind() == host_worker::JobKind::SystemStatus &&
                                  host_worker::busy();
-            ui::emptyState(g, loading ? "Reading hub..." : "hub unavailable",
+            ui::emptyState(g, loading ? "Reading hub..." : "PC unavailable",
                            loading ? "one lightweight snapshot" : "R retry / hub may be offline");
             return;
         }
@@ -97,7 +97,7 @@ public:
             g.drawString(value.c_str(), SCREEN_W - PAD, y);
             g.setTextDatum(top_left);
         };
-        row(BODY_Y + 18, "CPU", pct(Sys.laptopCpuPct));
+        row(BELOW_RULE, "CPU", pct(Sys.laptopCpuPct));
         row(BODY_Y + 31, "RAM", pct(Sys.laptopRamPct));
         if (Sys.laptopGpuAvailable) {
             row(BODY_Y + 44, "GPU", pct(Sys.laptopGpuPct) + "  " + std::to_string(Sys.laptopGpuTempC) + "C");
@@ -214,7 +214,7 @@ public:
         if (_editing) {
             g.setFont(&fonts::Font0);
             g.setTextColor(DIM, BG);
-            g.drawString("SEND TO HUB / queues offline", PAD, BODY_Y + 22);
+            g.drawString("SEND TO PC / queues offline", PAD, BODY_Y + 22);
             _field.draw(g, PAD, BODY_Y + 40, SCREEN_W - PAD * 2, "text or https://...");
             return;
         }

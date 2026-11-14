@@ -214,8 +214,8 @@ public:
     const char* id() const override { return _pc ? "connect_pc" : "pairing"; }
     const char* title() const override { return _pc ? "CONNECT TO COMPUTER" : "PAIRING + PHONE"; }
     const char* hints() const override {
-        if (!_pc) return "ENTER pair device   ESC back";
-        if (gLink.phase == nod::pair::Phase::Approved) return "ESC back";
+        if (!_pc) return "ENTER pair device";
+        if (gLink.phase == nod::pair::Phase::Approved) return "ENTER done";
         return canRetry() ? "ENTER try again   ESC back" : "ESC cancel";
     }
 
@@ -292,9 +292,9 @@ public:
         ui::header(g, "PAIRING + PHONE", host::linkName());
         g.setFont(&fonts::Font0);
         g.setTextColor(DIM, BG);
-        g.drawString("TOKEN ID", PAD, BODY_Y + 15);
+        g.drawString("TOKEN ID", PAD, BELOW_RULE);
         g.setTextColor(ACCENT, BG);
-        g.drawString(tokenId().c_str(), 80, BODY_Y + 15);
+        g.drawString(tokenId().c_str(), 80, BELOW_RULE);
 
         g.setTextColor(ACCENT2, BG);
         g.drawString("PAIR DEVICE", PAD, BODY_Y + 35);

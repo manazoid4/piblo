@@ -16,6 +16,7 @@ const Descriptor TABLE[] = {
     {"recall",     "Memory",      "MEMORY", "memory inbox notes prompt deck snippets viewer skills knowledge", 0, true, makeRecall},
     {"flow",       "Work",        "WORK",   "work job hunt applications maz works consistency track focus reminders sprint tasks shift", 0, true, makeFlow},
 
+    {"pctype",     "Type on PC",   "TYPE",   "type on pc flow dictate dictation paste voice typing wispr computer", KEY_Y, false, makePcType},
     {"braindump",  "Brain Dump",   "BRAIN",  "brain dump voice structured capture highlight",        0, false, makeCapture},
     {"teach",      "Teach Demo",   "TEACH",  "teach demonstration screen record monitor mark workflow", 0, false, makeTeach},
     {"nudge",      "Agent Status", "STATUS", "agent status nudge assurance sync evidence",          0, false, makeAgentsV3},

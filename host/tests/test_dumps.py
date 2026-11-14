@@ -97,6 +97,9 @@ class Models:
         return {}
 
     def chat(self, messages, route):
+        if self.fail == "route":  # what the real router raises with no model at all
+            from mazhost.errors import ErrorCode, RouteError
+            raise RouteError(ErrorCode.ROUTE_UNAVAILABLE, "degraded")
         if self.fail:
             raise RuntimeError("llm down")
         return json.dumps(STRUCT), "local"
@@ -152,9 +155,12 @@ def test_braindump_save_failure_does_not_break_reply(tmp_path, monkeypatch):
     assert r.status_code == 200 and r.json()["dump_id"] is None
 
 
-def test_llm_failure_still_saves_transcript(tmp_path):
-    client, inbox = make(tmp_path, Models(fail=True))
-    assert post_dump(client).status_code == 503
+@pytest.mark.parametrize("fail", [True, "route"])
+def test_llm_failure_still_saves_transcript(tmp_path, fail):
+    client, inbox = make(tmp_path, Models(fail=fail))
+    r = post_dump(client)  # no brain must not look like "Core is off" on the device
+    assert r.status_code == 200, r.text
+    assert r.json()["provider"].startswith("none") and r.json()["dump_id"]
     [m] = dumps.list_dumps(inbox)
     assert "spoken words for the dump." in dumps.get_dump(inbox, m["id"])["body"]
 

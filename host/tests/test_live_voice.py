@@ -229,3 +229,95 @@ def test_boosted_room_noise_never_starts_a_turn():
         with pytest.raises(WebSocketDisconnect):
             ws.receive_text()
     assert "response.create" not in fake.events
+
+
+def _vad_ended_after(loud_ms, silence_ms):
+    import numpy as np
+    from mazhost.live_voice import Vad, BLOCK_MS
+    v = Vad(450)
+    loud = (np.sin(np.arange(320) / 3) * 5000).astype("<i2").tobytes()
+    quiet = bytes(640)
+    for _ in range(loud_ms // BLOCK_MS):
+        v.feed(loud)
+    for i in range(silence_ms // BLOCK_MS):
+        if v.feed(quiet)[1]:
+            return (i + 1) * BLOCK_MS
+    return None
+
+
+def test_short_utterance_ends_after_base_silence():
+    assert _vad_ended_after(600, 1500) == 440  # 22 blocks, within one block of 450 ms
+
+
+def test_long_utterance_waits_longer_for_mid_thought_pause():
+    assert _vad_ended_after(2400, 1500) == 660  # 22 blocks * 1.5 = 33 blocks
+
+
+def test_long_speech_boundary_is_1500_ms_of_speech():
+    assert _vad_ended_after(1500, 1500) == 660
+    assert _vad_ended_after(1480, 1500) == 440
+
+
+class BadUpstream:
+    """Realtime upstream that fails the handshake: model_not_found error, hangs, or closes at once."""
+
+    def __init__(self, mode: str) -> None:
+        self.mode, self.paths = mode, []
+        started = threading.Event()
+        threading.Thread(target=self._run, args=(started,), daemon=True).start()
+        started.wait(5)
+
+    def _run(self, started: threading.Event) -> None:
+        async def main():
+            async with serve(self._handle, "127.0.0.1", 0) as server:
+                self.port = server.sockets[0].getsockname()[1]
+                started.set()
+                await asyncio.Future()
+
+        asyncio.run(main())
+
+    async def _handle(self, ws) -> None:
+        self.paths.append(ws.request.path)
+        if self.mode == "model_not_found":  # llama-swap: text-only server, no session.created
+            await ws.send(json.dumps({"type": "error", "error": {"code": "model_not_found"}}))
+            await asyncio.Future()
+        elif self.mode == "hang":
+            await asyncio.Future()
+        # "close": handler returns, socket closes before any event
+
+
+@pytest.mark.parametrize("mode", ["model_not_found", "hang", "close"])
+def test_upstream_handshake_failure_sends_error_frame_and_ends_cleanly(mode):
+    upstream = BadUpstream(mode)
+    client = make_client(upstream)
+    with client.websocket_connect(f"/voice/live?token={TOKEN}") as ws:
+        assert text(ws) == {"type": "error", "message": "Piblo's brain is offline"}
+        with pytest.raises(WebSocketDisconnect) as err:
+            ws.receive_text()
+        assert err.value.code == 1011
+
+
+def test_live_model_setting_is_sent_upstream():
+    upstream = BadUpstream("close")
+    client = make_client(upstream, live_model="lfm-omni")
+    with client.websocket_connect(f"/voice/live?token={TOKEN}") as ws:
+        assert text(ws)["type"] == "error"
+    assert upstream.paths == ["/v1/realtime?model=lfm-omni"]
+
+
+def test_cloud_brain_never_transcribes_when_upstream_fails(monkeypatch):
+    from mazhost.live_brain import LiveBrain
+
+    calls = []
+
+    async def no_asr(self, pcm):
+        calls.append(len(pcm))
+        return "hello"
+
+    monkeypatch.setattr(LiveBrain, "transcribe", no_asr)
+    client = make_client(BadUpstream("model_not_found"), live_brain="cloud")
+    with client.websocket_connect(f"/voice/live?token={TOKEN}") as ws:
+        assert text(ws)["type"] == "error"
+        with pytest.raises(WebSocketDisconnect):
+            ws.receive_text()
+    assert calls == []

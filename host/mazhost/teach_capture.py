@@ -365,6 +365,11 @@ class TeachCapture:
         return result
 
     def recent(self, limit: int = 20) -> list[dict[str, Any]]:
+        for manifest in self.root.glob("teach_*/manifest.json"):
+            try:
+                self._get(manifest.parent.name)
+            except TeachError:
+                continue
         with self._lock:
             sessions = sorted(self._sessions.values(), key=lambda s: s.created_at, reverse=True)
         return [self.status(item.session_id) for item in sessions[: max(1, min(limit, 50))]]

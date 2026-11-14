@@ -33,6 +33,7 @@ App* makeHome();
 App* makeLive();
 App* makeComm();
 App* makeCapture();
+App* makePcType();
 App* makeCaptureHub();
 App* makeTeach();
 App* makeAgentsHub();

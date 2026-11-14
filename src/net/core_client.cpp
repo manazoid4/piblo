@@ -15,7 +15,7 @@ namespace {
 
 // Follows the link chosen by host::health(): LAN is always tried first (short
 // timeout) there, and the remote HTTPS URL is used only while LAN is down.
-bool coreBegin(NodHttp& http, const std::string& path, bool allowRemote = true) {
+bool coreBegin(NodHttp& http, const std::string& path, bool allowRemote = true, bool fast = false) {
     if (Cfg.hostToken.empty() || WiFi.status() != WL_CONNECTED) return false;
     bool remote = false;
     std::string base;
@@ -28,8 +28,9 @@ bool coreBegin(NodHttp& http, const std::string& path, bool allowRemote = true) 
     } else {
         return false;
     }
-    http.setConnectTimeout(remote ? 6500 : 1800);
-    http.setTimeout(12000);
+    // fast = UI-thread read: worst case ~4 s instead of ~18 s (ESC is dead while it blocks).
+    http.setConnectTimeout(remote ? (fast ? 2500 : 6500) : 1800);
+    http.setTimeout(fast ? 2000 : 12000);
     if (!http.open((base + path).c_str(), remote)) return false;
     http.addHeader("Authorization", ("Bearer " + Cfg.hostToken).c_str());
     return true;
@@ -66,15 +67,14 @@ static CoreInfo gCoreInfo;
 const CoreInfo& coreInfo() { return gCoreInfo; }
 void setCoreInfo(const CoreInfo& info) { gCoreInfo = info; }
 bool updateReady() {
-    return gCoreInfo.ok && !gCoreInfo.fwVersion.empty() &&
-           (gCoreInfo.fwVersion != NOD_FW_VERSION || gCoreInfo.fwSha != NOD_FW_SHA);
+    return Sys.wifiConnected && Sys.hostOnline && gCoreInfo.ok && gCoreInfo.fwUpdateAvailable;
 }
 
 CoreInfo fetchCoreInfo() {
     CoreInfo out;
     NodHttp http;
     const bool viaRemote = onRemoteLink();
-    if (!coreBegin(http, "/health")) return out;
+    if (!coreBegin(http, "/health?fw_version=" NOD_FW_VERSION, true, true)) return out;
     const int status = http.GET();
     const String body = status > 0 ? http.getString() : String();
     http.end();
@@ -84,6 +84,7 @@ CoreInfo fetchCoreInfo() {
     out.version = doc["version"] | "";
     out.fwVersion = doc["fw_latest"]["version"] | "";
     out.fwSha = doc["fw_latest"]["sha"] | "";
+    out.fwUpdateAvailable = doc["fw_update_available"].is<bool>() && doc["fw_update_available"].as<bool>();
     // Core tells us its Tailscale Funnel URL. Accept only when read over the LAN
     // (not via the remote link), https, a *.ts.net host, bounded length.
     if (!viaRemote) {
@@ -110,7 +111,7 @@ CoreInfo fetchCoreInfo() {
 BuddyPoll buddyPoll() {
     BuddyPoll out;
     NodHttp http;
-    if (!coreBegin(http, "/buddy/summary")) return out;
+    if (!coreBegin(http, "/buddy/summary", true, true)) return out;
     const int status = http.GET();
     const String body = status > 0 ? http.getString() : String();
     http.end();
@@ -160,7 +161,7 @@ bool buddyDecide(const std::string& id, const std::string& decision, std::string
 CoreStatus coreStatus() {
     CoreStatus out;
     NodHttp http;
-    if (!coreBegin(http, "/core/status")) {
+    if (!coreBegin(http, "/core/status", true, true)) {
         out.error = "hub not paired / Wi-Fi offline";
         return out;
     }
@@ -190,7 +191,7 @@ std::vector<CoreProject> coreProjects(std::string& error) {
     std::vector<CoreProject> out;
     error.clear();
     NodHttp http;
-    if (!coreBegin(http, "/core/projects")) {
+    if (!coreBegin(http, "/core/projects", true, true)) {
         error = "hub not paired / Wi-Fi offline";
         return out;
     }

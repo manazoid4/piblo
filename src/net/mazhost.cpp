@@ -97,7 +97,8 @@ Reply decodeReply(HTTPClient& http, int status) {
 }
 
 Reply upload(const char* path, const std::string& wavPath,
-             const std::vector<std::pair<std::string, std::string>>& headers) {
+             const std::vector<std::pair<std::string, std::string>>& headers,
+             bool idempotent = true) {
     Reply out;
     if (!configured() || WiFi.status() != WL_CONNECTED || !store::ready()) {
         out.error = "host offline";
@@ -122,6 +123,15 @@ Reply upload(const char* path, const std::string& wavPath,
                       static_cast<unsigned>(file.size()), status);
         if (status <= 0) {
             http.end();
+            // A paste types on the PC, so only try the next address when nothing was
+            // sent (refused / header failed); a lost reply must not type it twice.
+            if (!idempotent && status != HTTPC_ERROR_CONNECTION_REFUSED &&
+                status != HTTPC_ERROR_SEND_HEADER_FAILED) {
+                file.close();
+                Sys.hostOnline = false;
+                out.error = "no reply - check the PC";
+                return out;
+            }
             continue;
         }
         file.close();
@@ -204,6 +214,7 @@ std::string startSession() {
     for (const auto& base : bases()) {
         NodHttp http;
         if (!beginRequest(http, base.first, "/session/start", base.second)) continue;
+        http.addHeader("X-MAZ-Route", route());
         const int status = http.POST("");
         if (status <= 0) {
             http.end();
@@ -279,7 +290,12 @@ Reply talkAudio(const std::string& session, const std::string& wavPath) {
 }
 
 Reply transcribe(const std::string& wavPath) {
-    return upload("/transcribe/raw", wavPath, {});
+    return upload("/transcribe/raw", wavPath, {{"X-MAZ-Route", route()}});
+}
+
+Reply flowPaste(const std::string& wavPath) {
+    // Piblo Flow: Core cleans the text and types it into the focused PC window.
+    return upload("/dictate?target=pc-paste", wavPath, {}, /*idempotent=*/false);
 }
 
 Reply brainDump(const std::string& wavPath,
@@ -310,6 +326,7 @@ bool postWav(const char* path, const std::string& body, const std::string& wavPa
     for (const auto& base : bases()) {
         NodHttp http;
         if (!beginRequest(http, base.first, path, base.second)) continue;
+        http.addHeader("X-MAZ-Route", route());
         int status;
         if (get) {
             status = http.GET();

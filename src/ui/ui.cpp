@@ -143,8 +143,15 @@ void hintBar(M5Canvas& g, const char* hints) {
 
     // HINT_CHARS is what fits beside the chip at Font0's 6px advance. Hints used
     // to run off the right edge silently; now they are cut where they land.
-    char buf[HINT_CHARS + 1];
-    snprintf(buf, sizeof(buf), "%.*s", HINT_CHARS, hints && *hints ? hints : "ESC back");  // never a bare bar
+    // Items are separated by two or more spaces; drop whole trailing items, never cut mid-word.
+    std::string h = hints && *hints ? hints : "";
+    while (h.size() > static_cast<size_t>(HINT_CHARS)) {
+        const size_t cut = h.rfind("  ", h.size() - 1);
+        if (cut == std::string::npos || cut == 0) { h.resize(HINT_CHARS); break; }
+        h.erase(cut);
+        while (!h.empty() && h.back() == ' ') h.pop_back();
+    }
+    const char* buf = h.c_str();
     g.setTextColor(HINT, PANEL);
     g.drawString(buf, 41, y + 3);
 }

@@ -22,5 +22,8 @@ esptool==4.8.1
 
 # Optional local text-to-speech (MAZ_TTS_ENABLED=true). Windows SAPI, offline.
 pyttsx3==2.98
+# "Hey Piblo" wake word in Live voice (MAZ_WAKEWORD, on by default). Apache-2.0. The model is
+# fetched separately by scripts/setup-wakeword.py; without it Live voice simply listens ungated.
+sherpa-onnx==2.0.1
 pyperclip>=1.8
 sounddevice>=0.4

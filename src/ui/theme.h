@@ -11,6 +11,7 @@ constexpr int SCREEN_H = 135;
 constexpr int STATUS_H = 15;
 constexpr int HINT_H   = 14;
 constexpr int BODY_Y   = STATUS_H;
+constexpr int BELOW_RULE = BODY_Y + 22;  // first y under ui::header's rule (BODY_Y+19)
 constexpr int BODY_H   = SCREEN_H - STATUS_H - HINT_H;
 constexpr int PAD      = 6;
 constexpr int ROW_H    = 17;
@@ -44,9 +45,9 @@ constexpr uint16_t OK      = 0x8EF7;  // mint #8FDCB8 (screen-ring) — saved
 constexpr uint16_t WARN    = 0xFE47;  // sun #FFC93C
 constexpr uint16_t ERR     = 0xE245;  // derived bright warm red #E04A2E (tomato-deep lightened)
 // The talk dot stays blue inside the warm palette (Maz, 7 Nov).
-constexpr uint16_t TALK_BLUE     = 0x2B5F;  // #2E6BFF
-constexpr uint16_t TALK_BLUE_HI  = 0x649F;  // #6090FF
-constexpr uint16_t TALK_BLUE_DIM = 0x1ABC;  // #1E56E0
+constexpr uint16_t TALK_BLUE     = 0xEC07;  // orange cheeks #E8833A
+constexpr uint16_t TALK_BLUE_HI  = 0xF739;  // cream #F3E6C8
+constexpr uint16_t TALK_BLUE_DIM = 0x5BC7;  // olive #5B7A3A
 
 namespace rgb {
 constexpr uint32_t BG     = 0x2A1A12;
@@ -60,9 +61,9 @@ constexpr uint32_t ACCENT2 = 0xFFF4E0;
 constexpr uint32_t OK     = 0x8FDCB8;
 constexpr uint32_t WARN   = 0xFFC93C;
 constexpr uint32_t ERR    = 0xE04A2E;
-constexpr uint32_t TALK_BLUE     = 0x2E6BFF;
-constexpr uint32_t TALK_BLUE_HI  = 0x6090FF;
-constexpr uint32_t TALK_BLUE_DIM = 0x1E56E0;
+constexpr uint32_t TALK_BLUE     = 0xE8833A;
+constexpr uint32_t TALK_BLUE_HI  = 0xF3E6C8;
+constexpr uint32_t TALK_BLUE_DIM = 0x5B7A3A;
 }  // namespace rgb
 
 // Calm UI tokens (see docs/UI-GUIDE.md). Fonts: state word Font4 scaled,

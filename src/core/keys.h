@@ -44,6 +44,7 @@ struct KeyEvent {
     uint8_t mods  = MOD_NONE;  // modifier bitmask at the time of the event
     bool    down  = false;     // true = pressed, false = released
     bool    isMod = false;     // this event *is* a modifier key
+    bool    physical = false;  // only the device keyboard may confirm firmware installs
 
     bool pressed(uint8_t c) const { return down && code == c; }
     bool released(uint8_t c) const { return !down && code == c; }
