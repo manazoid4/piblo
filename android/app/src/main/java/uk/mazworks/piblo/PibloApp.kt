@@ -25,6 +25,7 @@ import uk.mazworks.piblo.data.Prefs
 import uk.mazworks.piblo.data.PibloDb
 import uk.mazworks.piblo.data.SecretBox
 import uk.mazworks.piblo.data.SettingsRepo
+import uk.mazworks.piblo.data.MAX_SHARE_RETRIES
 import uk.mazworks.piblo.hub.Clock
 import uk.mazworks.piblo.hub.CoreLink
 import uk.mazworks.piblo.hub.CoreTransport
@@ -51,7 +52,7 @@ class PibloApp : Application() {
     @Volatile private var prevVisible = 0
     @Volatile var transport: Transport? = null
     private var linkJob: Job? = null
-    private var link: CoreLink? = null
+    @Volatile private var link: CoreLink? = null
     private var lastForward = 0L
     private var lastForwardKey = ""
     private var netCbRegistered = false
@@ -106,9 +107,6 @@ class PibloApp : Application() {
                 .build()
             cm.registerNetworkCallback(req, object : ConnectivityManager.NetworkCallback() {
                 override fun onAvailable(network: Network) { link?.requestReconnect() }
-                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
-                    if (caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) link?.requestReconnect()
-                }
             })
             netCbRegistered = true
         } catch (_: Exception) {
@@ -127,11 +125,13 @@ class PibloApp : Application() {
         val t = CoreTransport(CoreClient(p.coreUrl, token, BuildConfig.VERSION_NAME))
         transport = t
         hub.setLink(LinkState.CONNECTING)
-        val l = CoreLink(hub, t, drainShares = { drainShareQueue(t) })
+        val l = CoreLink(hub, t)
         link = l
         linkJob = scope.launch(Dispatchers.IO) {
+            var prevLinkState: LinkState? = null
             while (isActive) {
                 val delayMs = l.cycle()
+                val nowState = hub.state.value.link
                 if (l.shouldWakeEarly(delayMs)) {
                     hub.log("Reconnecting (foreground or network change)")
                     continue
@@ -143,29 +143,57 @@ class PibloApp : Application() {
                     delay(minOf(chunk, remaining))
                     remaining -= chunk
                 }
-                if (remaining <= 0 && hub.state.value.link == LinkState.ONLINE) {
+                if (remaining <= 0 && nowState == LinkState.ONLINE && prevLinkState != LinkState.ONLINE) {
                     drainShareQueue(t)
                 }
+                prevLinkState = nowState
             }
         }
     }
-
-    /** Drains the local share queue by sending each pending entry to Core. */
+    /** Drains the local share queue by sending each pending entry to Core via POST /share. */
     private suspend fun drainShareQueue(t: Transport) = withContext(Dispatchers.IO) {
         val dao = db.dao()
         val pending = dao.pendingShares()
         for (s in pending) {
             try {
-                t.postText(java.util.UUID.randomUUID().toString(), s.text, "insert")
+                t.share(Proto.shareJson(s.text, s.title, s.url, s.idempotencyId))
                 dao.dequeueShare(s.id)
                 hub.log("Sent queued share: " + (s.title.ifBlank { s.text.take(50) }))
-            } catch (e: Exception) {
-                dao.markShareRetry(s.id)
-                if (s.retries >= 3) {
-                    dao.dequeueShare(s.id)
-                    hub.log("Gave up on queued share after " + (s.retries + 1) + " tries")
+            } catch (e: CoreHttpException) {
+                when {
+                    e.status == 429 -> {
+                        // Rate-limited: don't count against retries, stop this drain cycle
+                        hub.log("Share drain rate-limited by Core, backing off")
+                        break
+                    }
+                    e.status in 400..499 -> {
+                        // Permanent per-item error: count toward eviction, skip this item, try the next
+                        dao.markShareRetry(s.id)
+                        if (s.retries + 1 >= MAX_SHARE_RETRIES) {
+                            dao.dequeueShare(s.id)
+                            Notifier.post(this@PibloApp, "Share dropped", s.title.ifBlank { "Shared text" })
+                            hub.log("Gave up on queued share after ${MAX_SHARE_RETRIES} tries")
+                        }
+                        continue
+                    }
+                    else -> {
+                        // 5xx or unknown CoreHttpException: don't count against retries, stop this drain
+                        break
+                    }
                 }
+            } catch (e: IOException) {
+                // Network trouble: don't count against retries, stop this drain cycle
+                hub.log("Share drain network error: ${e.message}")
                 break
+            } catch (e: Exception) {
+                // Unexpected error: count toward eviction, skip this item
+                dao.markShareRetry(s.id)
+                if (s.retries + 1 >= MAX_SHARE_RETRIES) {
+                    dao.dequeueShare(s.id)
+                    Notifier.post(this@PibloApp, "Share dropped", s.title.ifBlank { "Shared text" })
+                    hub.log("Gave up on queued share after ${MAX_SHARE_RETRIES} tries")
+                }
+                continue
             }
         }
     }

@@ -13,6 +13,7 @@ class BackoffTest {
         // With 25% jitter subtracted, delay should be in [minMs*0.75, minMs] = [1500, 2000]
         // Floor is 1000, so actual range [1000, 2000]
         repeat(100) {
+            b.reset() // each sample is a first delay; next() doubles cur
             val d = b.next()
             assertTrue("delay $d should be >= 1000", d >= 1000)
             assertTrue("delay $d should be <= 2000", d <= 2000)

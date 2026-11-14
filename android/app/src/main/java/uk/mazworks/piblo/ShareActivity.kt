@@ -8,6 +8,9 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import uk.mazworks.piblo.data.MAX_SHARE_QUEUE
+import uk.mazworks.piblo.data.Prefs
+import uk.mazworks.piblo.data.PibloApp
 import uk.mazworks.piblo.data.ShareEntry
 
 /** Android's text share target: queues locally, sends when Core link reconnects. */
@@ -22,15 +25,31 @@ class ShareActivity : ComponentActivity() {
             finish()
             return
         }
-        val url = Regex("https?://[^\\s]+").find(text)?.value.orEmpty()
+        val url = Regex("https?://[^\s]+").find(text)?.value.orEmpty()
         lifecycleScope.launch {
+            val app = application as PibloApp
+            val prefs = withContext(Dispatchers.IO) { app.settings.now() }
+            // Only queue when paired to a computer; otherwise tell the user to open Piblo and pair first.
+            if (prefs.mode != Prefs.Mode.COMPUTER || !prefs.hasComputer) {
+                Toast.makeText(this@ShareActivity, "Open Piblo and connect to your computer first.", Toast.LENGTH_LONG).show()
+                finish()
+                return@launch
+            }
             val queued = withContext(Dispatchers.IO) {
                 try {
-                    val app = application as PibloApp
-                    app.db.dao().enqueueShare(
-                        ShareEntry(text = text, title = title, url = url, createdAt = System.currentTimeMillis())
-                    )
-                    true
+                    val dao = app.db.dao()
+                    // Bound the queue so it cannot grow without bound.
+                    if (dao.shareQueueCount() >= MAX_SHARE_QUEUE) {
+                        Toast.makeText(this@ShareActivity, "Share queue full. Wait for queued shares to send.", Toast.LENGTH_LONG).show()
+                        false
+                    } else {
+                        dao.enqueueShare(
+                            ShareEntry(text = text, title = title, url = url,
+                                createdAt = System.currentTimeMillis(),
+                                idempotencyId = java.util.UUID.randomUUID().toString())
+                        )
+                        true
+                    }
                 } catch (_: Exception) { false }
             }
             Toast.makeText(this@ShareActivity,
@@ -41,3 +60,4 @@ class ShareActivity : ComponentActivity() {
         }
     }
 }
+

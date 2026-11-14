@@ -34,11 +34,13 @@ data class ShareEntry(
     val url: String,
     val createdAt: Long,
     val retries: Int = 0,
+    val idempotencyId: String = "",
 )
 
 const val MAX_MESSAGES = 200
 const val MAX_NOTES = 500
 const val MAX_SHARE_RETRIES = 3
+const val MAX_SHARE_QUEUE = 50
 
 @Dao
 interface PibloDao {
@@ -67,6 +69,7 @@ interface PibloDao {
     @Query("DELETE FROM share_queue") suspend fun clearShares()
     @Query("UPDATE share_queue SET retries = retries + 1 WHERE id = :id") suspend fun markShareRetry(id: Long)
     @Query("DELETE FROM share_queue WHERE retries >= :maxRetries") suspend fun drainStaleShares(maxRetries: Int = MAX_SHARE_RETRIES)
+    @Query("SELECT COUNT(*) FROM share_queue") suspend fun shareQueueCount(): Int
 }
 
 @Database(entities = [Note::class, Reminder::class, Message::class, ShareEntry::class], version = 2, exportSchema = true)
@@ -77,7 +80,7 @@ abstract class PibloDb : RoomDatabase() {
         @Volatile private var inst: PibloDb? = null
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                db.execSQL("CREATE TABLE IF NOT EXISTS share_queue (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, text TEXT NOT NULL, title TEXT NOT NULL, url TEXT NOT NULL, createdAt INTEGER NOT NULL, retries INTEGER NOT NULL DEFAULT 0)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS share_queue (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, text TEXT NOT NULL, title TEXT NOT NULL, url TEXT NOT NULL, createdAt INTEGER NOT NULL, retries INTEGER NOT NULL, idempotencyId TEXT NOT NULL)")
             }
         }
 

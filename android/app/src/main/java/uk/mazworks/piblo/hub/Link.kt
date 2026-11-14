@@ -19,6 +19,7 @@ interface Transport {
     fun postAlert(json: String): String
     fun postText(id: String, text: String, mode: String): String
     fun textStatus(id: String): String
+    fun share(json: String)
     fun screenPng(): ByteArray
     fun pressKeys(keys: String)
 }
@@ -31,6 +32,7 @@ class CoreTransport(private val c: CoreClient) : Transport {
     override fun postAlert(json: String) = c.postAlert(json)
     override fun postText(id: String, text: String, mode: String) = c.postText(id, text, mode)
     override fun textStatus(id: String) = c.textStatus(id)
+    override fun share(json: String) = c.share(json)
     override fun screenPng() = c.screenPng()
     override fun pressKeys(keys: String) = c.pressKeys(keys)
 }
@@ -46,6 +48,7 @@ object BleTransportStub : Transport {
     override fun postText(id: String, text: String, mode: String): String = na()
     override fun textStatus(id: String): String = na()
     override fun screenPng(): ByteArray = na()
+    override fun share(json: String) = na()
     override fun pressKeys(keys: String) = na()
 }
 
@@ -78,8 +81,6 @@ class CoreLink(
     private val t: Transport,
     private val pollMs: Long = 2_500,
     private val authRetryMs: Long = 30_000,
-    /** Called when a share should be drained; returns true if any share was sent. */
-    private val drainShares: (suspend () -> Unit)? = null,
 ) {
     private val backoff = Backoff()
     private var since = 0
