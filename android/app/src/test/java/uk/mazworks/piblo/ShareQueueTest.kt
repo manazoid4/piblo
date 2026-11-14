@@ -94,7 +94,7 @@ class ShareQueueTest {
         // Next drain: sends "second" successfully then "third"
         val transport2 = FakeTransport()
         drain(queue, transport2)
-        assertEquals(listOf("second", "third"), transport2.sentJsons)
+        assertEquals(listOf("second", "third"), transport2.sentJsons.map(::textOf))
         assertTrue(queue.pendingShares().isEmpty())
     }
 
@@ -131,7 +131,7 @@ class ShareQueueTest {
         queue.enqueue("third", "", "", "id-3")
         val transport = FakeTransport()
         drain(queue, transport)
-        assertEquals(listOf("first", "second", "third"), transport.sentJsons)
+        assertEquals(listOf("first", "second", "third"), transport.sentJsons.map(::textOf))
     }
 
     @Test
@@ -145,6 +145,8 @@ class ShareQueueTest {
         assertEquals("stable-id-123", s.idempotencyId)
         assertEquals(1, s.retries)
     }
+
+    private fun textOf(json: String): String = Regex(""""text":"([^"]*)"""").find(json)!!.groupValues[1]
 
     /** Helper that mirrors drainShareQueue in PibloApp. */
     private fun drain(queue: MemShareQueue, transport: FakeTransport, maxRetries: Int = 3) {
