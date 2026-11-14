@@ -151,7 +151,7 @@ class ShareQueueTest {
         val pending = queue.pendingShares()
         for (s in pending) {
             try {
-                transport.share("{"text":"${s.text}","title":null,"url":null,"idempotency_id":"${s.idempotencyId}"}")
+                transport.share("""{"text":"${s.text}","title":null,"url":null,"idempotency_id":"${s.idempotencyId}"}""")
                 queue.dequeue(s.id)
             } catch (e: IOException) {
                 queue.markRetry(s.id)
