@@ -107,6 +107,15 @@ object Proto {
     fun parseTextId(json: String): String = guard { JSONObject(json).getString("id") }
 
     /** POST /core/cardputer/key body. Key names the device presses, optionally repeated ("down*2"). */
+    /** POST /share body. text contains the shared content, title is optional, url is optional, idempotencyKey allows Core to dedupe. */
+    fun shareJson(text: String, title: String, url: String, idempotencyId: String): String =
+        JSONObject()
+            .put("text", truncate(text, TEXT_MAX))
+            .put("title", title)
+            .put("url", url)
+            .put("idempotency_id", idempotencyId)
+            .toString()
+
     fun keysJson(keys: String): String = JSONObject().put("keys", truncate(keys, KEY_MAX)).toString()
 
     /** GET /buddy/text/{id} status: pending / inserted / no_field / too_long (device acks). */

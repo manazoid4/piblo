@@ -1,0 +1,62 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 2,
+    "identityHash": "placeholder-hash-to-be-regenerated-by-room",
+    "entities": [
+      {
+        "tableName": "notes",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `text` TEXT NOT NULL, `createdAt` INTEGER NOT NULL)",
+        "fields": [
+          {"fieldPath": "id", "columnName": "id", "affinity": "INTEGER", "notNull": true},
+          {"fieldPath": "text", "columnName": "text", "affinity": "TEXT", "notNull": true},
+          {"fieldPath": "createdAt", "columnName": "createdAt", "affinity": "INTEGER", "notNull": true}
+        ],
+        "primaryKey": {"autoGenerate": true, "columnNames": ["id"]}
+      },
+      {
+        "tableName": "reminders",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `text` TEXT NOT NULL, `atMs` INTEGER NOT NULL, `kind` TEXT NOT NULL, `done` INTEGER NOT NULL)",
+        "fields": [
+          {"fieldPath": "id", "columnName": "id", "affinity": "INTEGER", "notNull": true},
+          {"fieldPath": "text", "columnName": "text", "affinity": "TEXT", "notNull": true},
+          {"fieldPath": "atMs", "columnName": "atMs", "affinity": "INTEGER", "notNull": true},
+          {"fieldPath": "kind", "columnName": "kind", "affinity": "TEXT", "notNull": true},
+          {"fieldPath": "done", "columnName": "done", "affinity": "INTEGER", "notNull": true}
+        ],
+        "primaryKey": {"autoGenerate": true, "columnNames": ["id"]}
+      },
+      {
+        "tableName": "messages",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `atMs` INTEGER NOT NULL, `source` TEXT NOT NULL, `title` TEXT NOT NULL, `body` TEXT NOT NULL, `priority` TEXT NOT NULL)",
+        "fields": [
+          {"fieldPath": "id", "columnName": "id", "affinity": "INTEGER", "notNull": true},
+          {"fieldPath": "atMs", "columnName": "atMs", "affinity": "INTEGER", "notNull": true},
+          {"fieldPath": "source", "columnName": "source", "affinity": "TEXT", "notNull": true},
+          {"fieldPath": "title", "columnName": "title", "affinity": "TEXT", "notNull": true},
+          {"fieldPath": "body", "columnName": "body", "affinity": "TEXT", "notNull": true},
+          {"fieldPath": "priority", "columnName": "priority", "affinity": "TEXT", "notNull": true}
+        ],
+        "primaryKey": {"autoGenerate": true, "columnNames": ["id"]}
+      },
+      {
+        "tableName": "share_queue",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `text` TEXT NOT NULL, `title` TEXT NOT NULL, `url` TEXT NOT NULL, `createdAt` INTEGER NOT NULL, `retries` INTEGER NOT NULL, `idempotencyId` TEXT NOT NULL)",
+        "fields": [
+          {"fieldPath": "id", "columnName": "id", "affinity": "INTEGER", "notNull": true},
+          {"fieldPath": "text", "columnName": "text", "affinity": "TEXT", "notNull": true},
+          {"fieldPath": "title", "columnName": "title", "affinity": "TEXT", "notNull": true},
+          {"fieldPath": "url", "columnName": "url", "affinity": "TEXT", "notNull": true},
+          {"fieldPath": "createdAt", "columnName": "createdAt", "affinity": "INTEGER", "notNull": true},
+          {"fieldPath": "retries", "columnName": "retries", "affinity": "INTEGER", "notNull": true},
+          {"fieldPath": "idempotencyId", "columnName": "idempotencyId", "affinity": "TEXT", "notNull": true}
+        ],
+        "primaryKey": {"autoGenerate": true, "columnNames": ["id"]}
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'placeholder-hash-to-be-regenerated-by-room')"
+    ]
+  }
+}
