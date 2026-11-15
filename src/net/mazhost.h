@@ -186,8 +186,8 @@ Reply talkText(const std::string& session, const std::string& text);
 Reply talkTextContext(const std::string& session, const std::string& text,
                       const std::string& context);
 Reply talkAudio(const std::string& session, const std::string& wavPath);
-Reply transcribe(const std::string& wavPath);
-Reply flowPaste(const std::string& wavPath);  // /dictate?target=pc-paste
+Reply transcribe(const std::string& wavPath, uint32_t timeoutMs = 60000);
+Reply flowPaste(const std::string& wavPath, uint32_t timeoutMs = 60000);  // /dictate?target=pc-paste
 Reply brainDump(const std::string& wavPath, const std::vector<uint32_t>& highlights);
 Reply pcAction(const std::string& action);
 bool speak(const std::string& text, const std::string& wavPath);

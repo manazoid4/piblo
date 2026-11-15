@@ -43,6 +43,7 @@ bool        active(const void* owner);  // this owner is listening or working
 const char* error();
 float       level();  // 0..1 mic level, for the caller's meter
 uint32_t    elapsedSeconds();
+uint32_t    sendingMs();  // how long the current upload has been in flight
 
 // True exactly once, when `owner`'s transcript is ready; `out` receives it.
 bool take(const void* owner, std::string& out);
