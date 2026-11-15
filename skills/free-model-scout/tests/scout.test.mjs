@@ -58,3 +58,9 @@ test("probe defaults OFF, fixtures cannot turn it on, paid choice rejected", () 
   assert.equal(r.status, 1);
   assert.match(r.stderr, /probe needs/);
 });
+test("Ollama -cloud / :cloud models are not local, free or eligible", () => {
+  const ms = normalize("ollama", { models: [
+    { name: "gpt-oss:120b-cloud" }, { name: "kimi:cloud" }, { name: "x:1b", remote_host: "https://ollama.com:443" }, { name: "qwen3:4b", size: 5 }] });
+  assert.deepEqual(eligible(ms).map(x => x.id), ["qwen3:4b"]);
+  assert.ok(ms.slice(0, 3).every(x => x.status === "ollama-cloud-unverified"));
+});

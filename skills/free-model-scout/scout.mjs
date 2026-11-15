@@ -28,13 +28,20 @@ export const verifiedZero = (model) =>
     Number.isFinite(Number(model.pricing[key])) &&
     Number(model.pricing[key]) === 0);
 
+const CLOUD_NAME = /-cloud|:cloud/i;
 export function normalize(provider, data) {
   if (provider === "ollama") {
     return (Array.isArray(data?.models) ? data.models : []).filter(x => typeof x.name === "string")
-      .map(x => ({
-        provider, id: x.name, context: null, input: ["text"], status: "local-unmetered",
-        source: "local Ollama", size_bytes: x.size || 0, evidence: "local model; hardware costs apply",
-      }));
+      .map(x => {
+        // Ported from mazrouter: *-cloud / :cloud models run remotely (account quota, not local/private/free).
+        const cloud = CLOUD_NAME.test(x.name) || typeof x.remote_host === "string";
+        return {
+          provider, id: x.name, context: null, input: ["text"],
+          status: cloud ? "ollama-cloud-unverified" : "local-unmetered",
+          source: "local Ollama", size_bytes: x.size || 0,
+          evidence: cloud ? "Ollama cloud model: runs remotely, entitlement unverified" : "local model; hardware costs apply",
+        };
+      });
   }
   const models = Array.isArray(data?.data) ? data.data : [];
   return models.filter(x => typeof x.id === "string").map(x => {
