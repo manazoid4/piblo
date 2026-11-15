@@ -1,0 +1,11 @@
+{
+  "_comment": "Editable manual snapshot. Read the counters from the app yourself; Scout never scrapes or logs in. Update checked_at when you edit.",
+  "tz": "Europe/London",
+  "meters": [
+    { "provider": "claude", "provider_kind": "APP", "window": "5h", "limit": 100, "remaining": 40,
+      "reset_local": "2026-11-15T23:00", "checked_at": "2026-11-15T18:00:00Z", "unknown_reason": null },
+    { "provider": "claude", "provider_kind": "APP", "window": "weekly", "limit": 100, "remaining": 55,
+      "reset_local": "2026-11-20T09:00", "checked_at": "2026-11-15T18:00:00Z" },
+    { "provider": "local-ollama", "provider_kind": "LOCAL", "price": "local", "verified_free": true, "privacy": "local" }
+  ]
+}

@@ -2,10 +2,11 @@
 // Piblo Free Model Scout: no dependencies, no paid-model fallback, no hidden probing.
 import { parseArgs } from "node:util";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
+import { SAFE_ID } from "./contract.mjs";
+import { DEFAULT_DIR, State, assertZeroSpend, afterHttp, orderCandidates } from "./guard.mjs";
 
 const SOURCES = Object.freeze({
   openrouter: { url: "https://openrouter.ai/api/v1/models", env: "OPENROUTER_API_KEY" },
@@ -13,7 +14,7 @@ const SOURCES = Object.freeze({
   nvidia: { url: "https://integrate.api.nvidia.com/v1/models", env: "NVIDIA_API_KEY" },
   ollama: { url: "http://127.0.0.1:11434/api/tags", env: null },
 });
-const CACHE_DIR = process.env.PIBLO_SCOUT_CACHE || join(homedir(), ".cache", "piblo-free-model-scout");
+const CACHE_DIR = DEFAULT_DIR;
 const CACHE_MS = 5 * 60 * 1000;
 const MAX_BODY_BYTES = 2_000_000;
 
@@ -28,16 +29,23 @@ export const verifiedZero = (model) =>
     Number.isFinite(Number(model.pricing[key])) &&
     Number(model.pricing[key]) === 0);
 
+const CLOUD_NAME = /[-:]cloud(:|$)/i;
 export function normalize(provider, data) {
   if (provider === "ollama") {
-    return (Array.isArray(data?.models) ? data.models : []).filter(x => typeof x.name === "string")
-      .map(x => ({
-        provider, id: x.name, context: null, input: ["text"], status: "local-unmetered",
-        source: "local Ollama", size_bytes: x.size || 0, evidence: "local model; hardware costs apply",
-      }));
+    return (Array.isArray(data?.models) ? data.models : []).filter(x => typeof x.name === "string" && SAFE_ID.test(x.name))
+      .map(x => {
+        // Ported from the owner's private router: *-cloud / :cloud models run remotely (account quota, not local/private/free).
+        const cloud = CLOUD_NAME.test(x.name) || typeof x.remote_host === "string";
+        return {
+          provider, id: x.name, context: null, input: ["text"],
+          status: cloud ? "ollama-cloud-unverified" : "local-unmetered",
+          source: "local Ollama", size_bytes: x.size || 0,
+          evidence: cloud ? "Ollama cloud model: runs remotely, entitlement unverified" : "local model; hardware costs apply",
+        };
+      });
   }
   const models = Array.isArray(data?.data) ? data.data : [];
-  return models.filter(x => typeof x.id === "string").map(x => {
+  return models.filter(x => typeof x.id === "string" && SAFE_ID.test(x.id)).map(x => {
     const free = provider === "openrouter" && verifiedZero(x);
     const input = x.architecture?.input_modalities || ["text"];
     return {
@@ -106,9 +114,12 @@ const TESTS = {
   code: { prompt: "Reply with only the integer result of 17 * 19. Do not explain.", expected: "323" },
   tools: { prompt: "Reply with exactly PING and nothing else.", expected: "PING" },
 };
-async function probe(model, task, timeoutMs) {
+async function probe(model, task, timeoutMs, state) {
+  assertZeroSpend(model);
   if (model.provider !== "openrouter" || model.status !== "catalog-zero-cost")
     throw Error("online probes only support live-verified OpenRouter :free models");
+  const cooling = await state.active(model.provider);
+  if (cooling) throw Error(model.provider + " cooling down (" + cooling + "); not probing");
   if (!process.env.OPENROUTER_API_KEY) throw Error("OPENROUTER_API_KEY is required for opt-in probe");
   const t = TESTS[task] || TESTS.quick;
   const start = performance.now();
@@ -118,15 +129,21 @@ async function probe(model, task, timeoutMs) {
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + process.env.OPENROUTER_API_KEY },
     body: JSON.stringify({ model: model.id, messages: [{ role: "user", content: t.prompt }], max_tokens: 64 }),
   });
-  if (!response.ok) throw Error("probe HTTP " + response.status + " (no retry; stop on 402/429)");
+  if (!response.ok) {
+    await afterHttp(state, model.provider, response.status, response.headers); // 401/402/429 start a cooldown
+    await state.record({ provider: model.provider, id: model.id, task, success: false, status: String(response.status) });
+    throw Error("probe HTTP " + response.status + " (no retry; stop on 401/402/429)");
+  }
   const json = await response.json();
   const output = String(json?.choices?.[0]?.message?.content || "").trim();
-  return {
+  const result = {
     provider: model.provider, id: model.id, task, success: output === t.expected,
     latency_ms: Math.round(performance.now() - start), input_tokens: json.usage?.prompt_tokens ?? null,
     output_tokens: json.usage?.completion_tokens ?? null, at: new Date().toISOString(),
     // Never log prompt, output or API key; model quality needs more rigorous benchmarks.
   };
+  await state.record({ ...result, status: "200" }); // metadata-only ledger row
+  return result;
 }
 async function main() {
   const { values } = parseArgs({ options: {
@@ -151,17 +168,19 @@ async function main() {
     "Free API tiers and quotas can change; never fall back to a paid model.",
     "Never send private code/customer data to a free endpoint without informed consent.",
   ] };
+  const state = new State(CACHE_DIR), cooling = await state.cooling();
   for (const provider of providers) {
     try {
+      if (cooling[provider] && !values.offline && !values.fixture) throw Error("cooling down until " + new Date(cooling[provider]).toISOString() + "; not contacting provider");
       const v = await discover(provider, { offline: values.offline, fixture: values.fixture, timeoutMs: timeout });
       for (const m of eligible(v.models, { includeUnverified: values["include-unverified"] }))
-        output.models.push({ ...m, fetched: v.fetched, stale: v.stale, heuristic_score: rank(m, values.task) });
+        output.models.push({ ...m, task: values.task, fetched: v.fetched, stale: v.stale, heuristic_score: rank(m, values.task) });
     } catch (err) {
       output.errors.push({ provider, message: String(err.message).slice(0, 160) });
     }
   }
-  output.models.sort((a, b) => b.heuristic_score - a.heuristic_score || a.id.localeCompare(b.id));
-  output.models = output.models.slice(0, limit);
+  // Measured results from the local metadata-only ledger rank first; otherwise the labelled heuristic.
+  output.models = orderCandidates(output.models, await state.rows(), { cooling }).slice(0, limit);
   if (values.probe) {
     if (!values["confirm-free-probe"] || values.offline || values.fixture)
       throw Error("probe needs --confirm-free-probe, network and a live price check");
@@ -169,11 +188,11 @@ async function main() {
     const raw = await requestJson(SOURCES.openrouter.url, process.env.OPENROUTER_API_KEY, timeout);
     const match = eligible(normalize("openrouter", raw)).find(m => m.id === values.probe);
     if (!match) throw Error("model is not currently certified catalog-zero-cost");
-    output.probe = await probe(match, values.task, timeout);
+    output.probe = await probe(match, values.task, timeout, state);
     // No automatic multi-model fan-out, no hidden retries, no provider-key rotation.
   }
   console.log(values.json ? JSON.stringify(output, null, 2) :
-    output.models.map(m => [m.provider, m.id, m.status, "score=" + m.heuristic_score, m.stale ? "STALE" : ""].join("  ")).join("\n") +
+    output.models.map(m => [m.provider, m.id, m.status, m.rank_basis === "measured" ? "measured" : "score=" + m.heuristic_score, m.stale ? "STALE" : ""].join("  ")).join("\n") +
     (output.errors.length ? "\nErrors: " + JSON.stringify(output.errors) : "") +
     (output.probe ? "\nProbe: " + JSON.stringify(output.probe) : ""));
 }
