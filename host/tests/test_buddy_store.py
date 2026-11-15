@@ -277,8 +277,8 @@ def test_approved_idempotency_key_rejects_changed_action_even_after_restart(tmp_
     payload = {'tool': 'Send', 'summary': 'Original', 'idempotency_key': 'bound'}
     item = c.post('/buddy/request', json=payload, headers=H).json()
     assert c.post('/buddy/decide', json={'id': item['id'], 'decision': 'allow'}, headers=H).json()['decision'] == 'allow'
-    for client in (c, boot(tmp_path)):
-        assert client.post('/buddy/request', json=payload, headers=H).json()['decision'] == 'allow'
+    for client, expected in ((c, 'allow'), (boot(tmp_path), 'cancel')):
+        assert client.post('/buddy/request', json=payload, headers=H).json()['decision'] == expected
         changed = client.post('/buddy/request', json={**payload, 'summary': 'Different'}, headers=H)
         assert changed.status_code == 409
         assert 'idempotency' in changed.text.lower()
@@ -340,3 +340,31 @@ def test_expired_snooze_does_not_renag_on_every_restart(tmp_path, monkeypatch):
     import sqlite3
     row = sqlite3.connect(str(tmp_path / "buddy.sqlite3")).execute("SELECT outcome FROM alerts WHERE id=?", (aid,)).fetchone()
     assert row[0] is None   # the persisted row no longer says "snoozed", so a restart cannot re-nag
+
+
+def test_approved_idempotent_request_expires_in_memory_and_after_restart(tmp_path, monkeypatch):
+    c = boot(tmp_path)
+    payload = {"tool": "Send", "summary": "Original", "idempotency_key": "expiry"}
+    item = c.post("/buddy/request", json=payload, headers=H).json()
+    assert c.post("/buddy/decide", json={"id": item["id"], "decision": "allow"}, headers=H).json()["decision"] == "allow"
+    real = buddy_mod.time.monotonic
+    monkeypatch.setattr(buddy_mod.time, "monotonic", lambda: real() + buddy_mod.TIMEOUT_S + 1)
+    assert c.post("/buddy/request", json=payload, headers=H).json()["decision"] == "cancel"
+    restarted = boot(tmp_path)
+    assert restarted.get("/buddy/state", params={"id": item["id"]}, headers=H).json()["decision"] == "cancel"
+    assert restarted.post("/buddy/request", json=payload, headers=H).json()["decision"] == "cancel"
+
+
+@pytest.mark.parametrize("removal", ["restart", "eviction"])
+def test_stored_allow_cannot_be_used_without_live_deadline(tmp_path, monkeypatch, removal):
+    monkeypatch.setattr(buddy_mod, "MAX_ITEMS", 1)
+    c = boot(tmp_path)
+    payload = {"tool": "Send", "summary": "Original", "idempotency_key": "stored"}
+    item = c.post("/buddy/request", json=payload, headers=H).json()
+    assert c.post("/buddy/decide", json={"id": item["id"], "decision": "allow"}, headers=H).json()["decision"] == "allow"
+    if removal == "restart":
+        c = boot(tmp_path)
+    else:
+        c.post("/buddy/request", json={"tool": "Another"}, headers=H)
+    assert c.get("/buddy/state", params={"id": item["id"]}, headers=H).json()["decision"] == "cancel"
+    assert c.post("/buddy/request", json=payload, headers=H).json()["decision"] == "cancel"
