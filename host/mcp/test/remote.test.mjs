@@ -5,8 +5,7 @@ import { spawn } from "node:child_process";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, test } from "node:test";
-import { Client } from "@modelcontextprotocol/client";
-import { StreamableHTTPClientTransport } from "@modelcontextprotocol/client/streamableHttp";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 
 const ENTRY = join(dirname(fileURLToPath(import.meta.url)), "..", "dist", "remote.js");
 const TOKEN = "piblo-remote-integration-test-token-123456";
