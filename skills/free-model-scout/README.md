@@ -29,6 +29,24 @@ On PowerShell set the env variable only for the current session: `$env:OPENROUTE
 
 Output: `status=catalog-zero-cost`, `local-unmetered` or `unverified-account-tier`; `heuristic_score`; `source`; and errors (e.g., rate limit, no local Ollama). By default only verified-zero-price and local models are listed.
 
+## Check account quotas and model access without generating tokens
+
+A separate **read-only** command inspects the currently configured providers; it does not call chat completions or claim API listings are all free:
+
+```bash
+node skills/free-model-scout/usage.mjs --provider=openrouter --json
+node skills/free-model-scout/usage.mjs --provider=groq --json
+node skills/free-model-scout/usage.mjs --provider=nvidia --json
+node skills/free-model-scout/usage.mjs --provider=nous --json
+node skills/free-model-scout/usage.mjs --provider=all --json
+```
+
+For OpenRouter, `GET /api/v1/key` may provide `free_model_daily_requests` with `limit`/`remaining`/`used`. This is **per key**, if returned; the code does not infer an entitlement from a deposit claim. OpenRouter `:free` is normally 20 RPM and either 50/day or 1,000/day after qualifying lifetime credit purchases (at least $10, with threshold handling described by OpenRouter). Failed requests can count. Key's `limit_remaining` means **potential paid spending headroom**, not a free model balance.
+
+Groq's catalog may return response rate headers; when present, daily request and minute token counters are parsed separately. If absent, the result is **UNKNOWN**; consult your organisation's Groq limits page. NVIDIA's model catalogue does not prove account-free allowance. Nous Cloud's current account/endpoint terms must be checked via official provider/dashboard; `NOUS_API_KEY` presence is detected but no unverified endpoint is called. Local Ollama reports an unmetered local model, not free electricity or guaranteed speed. Different AI applications and agents may have separate quota and terms: a shared discovery script does not magically discover or bypass their subscription counters.
+
+**No keys are printed or cached**, no request is made to a remote chat endpoint, and status headers are not dumped. On 401/402/429, agents must stop that provider rather than send a paid fallback. `usage.mjs` is an account-information helper, not a background scheduler, monitoring service or autonomous router.
+
 ## Installation as an agent skill
 Copy or symlink **this single folder** into the agent's supported skills directory, or have the agent read `SKILL.md` directly. Read the host's native skill instructions first. The presence of files does not prove a CLI has loaded them. No global agent configuration is changed automatically. Example install:
 ```bash
