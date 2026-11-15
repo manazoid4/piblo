@@ -46,6 +46,16 @@ test("Nous and NVIDIA are not magically certified free", () => {
     assert.equal(readOnlyStatus(p, { configured: true }).remaining_requests, null);
   }
 });
+test("Nous never guesses an unverified endpoint even with a configured key", async () => {
+  let calls = 0;
+  const s = await check("nous", {
+    env: { NOUS_API_KEY: "test-placeholder" },
+    fetchImpl: async () => { calls++; throw Error("must not fetch"); },
+  });
+  assert.equal(calls, 0);
+  assert.equal(s.remaining_requests, null);
+  assert.match(s.reason, /not verified/);
+});
 test("no key means no network request", async () => {
   let calls = 0;
   const result = await check("openrouter", {
