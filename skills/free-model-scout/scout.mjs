@@ -3,7 +3,8 @@
 import { parseArgs } from "node:util";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { performance } from "node:perf_hooks";
 
 const SOURCES = Object.freeze({
@@ -43,7 +44,7 @@ export function normalize(provider, data) {
       provider, id: x.id,
       context: Number.isFinite(Number(x.context_length)) ? Number(x.context_length) : null,
       input: Array.isArray(input) ? input : ["text"],
-      status: free ? "catalog-zero-cost" : "unverified-account-tier",
+      status: free ? "catalog-zero-cost" : (provider === "openrouter" ? "paid-or-unknown" : "unverified-account-tier"),
       source: SOURCES[provider].url,
       evidence: free ? "live :free suffix AND $0 prompt/completion catalog prices"
         : "provider model list alone does not verify account free-tier entitlement",
@@ -115,7 +116,7 @@ async function probe(model, task, timeoutMs) {
     method: "POST",
     signal: AbortSignal.timeout(timeoutMs),
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + process.env.OPENROUTER_API_KEY },
-    body: JSON.stringify({ model: model.id, messages: [{ role: "user", content: t.prompt }], max_tokens: 64, temperature: 0 }),
+    body: JSON.stringify({ model: model.id, messages: [{ role: "user", content: t.prompt }], max_tokens: 64 }),
   });
   if (!response.ok) throw Error("probe HTTP " + response.status + " (no retry; stop on 402/429)");
   const json = await response.json();
@@ -176,6 +177,6 @@ async function main() {
     (output.errors.length ? "\nErrors: " + JSON.stringify(output.errors) : "") +
     (output.probe ? "\nProbe: " + JSON.stringify(output.probe) : ""));
 }
-if (process.argv[1] && import.meta.url === new URL("file://" + process.argv[1]).href) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   main().catch(err => { console.error("Scout error: " + String(err.message).slice(0, 200)); process.exitCode = 1; });
 }
