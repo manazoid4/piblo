@@ -5,6 +5,7 @@ import { parseArgs } from "node:util";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { loadSnapshot, reconcile, zeroSpend } from "./contract.mjs";
+import { State } from "./guard.mjs";
 import { fmtLocal, nextReset, parseWindow, validZone } from "./timez.mjs";
 
 const lane = (m) => m.provider_kind === "LOCAL" ? "local" : m.provider_kind === "API" ? "free-api" : "subscription";
@@ -91,7 +92,7 @@ async function main() {
   const now = values.now ? Date.parse(values.now) : Date.now();
   if (Number.isNaN(now)) throw Error("--now must be an ISO timestamp with offset");
   const meters = values.snapshot ? await loadSnapshot(values.snapshot, { now, tz: values.tz }) : [];
-  const out = plan(meters, { now, tz: values.tz, hours: Number(values.hours), reserve: Number(values.reserve) });
+  const out = plan(meters, { now, tz: values.tz, hours: Number(values.hours), reserve: Number(values.reserve), cooling: await new State().cooling(now) });
   console.log(values.json ? JSON.stringify(out, null, 2) : out.summary);
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1]))
