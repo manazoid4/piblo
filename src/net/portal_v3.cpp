@@ -272,6 +272,7 @@ String statusJson(bool unlocked) {
     String j;
     j.reserve(2100);
     j += "{\"ok\":true,\"version\":\"" NOD_FW_VERSION "\"";
+    j += ",\"kind\":\"cardputer\"";  // lets Core/MCP label the board instead of guessing from geometry
     j += ",\"token_id\":\"" + jsonEscape(tokenId()) + "\"";
     j += ",\"unlocked\":"; j += unlocked ? "true" : "false";
     j += ",\"app\":\"" + jsonEscape(shell::currentId()) + "\"";
