@@ -95,3 +95,14 @@ test("a single lucky run is not 'measured'", () => {
     [{ provider: "p", id: "a", task: "t", success: true, latency_ms: 5 }]);
   assert.deepEqual(out.map(m => m.id), ["b", "a"]);
 });
+test("CLI: a cooled provider is not contacted and the cooldown is reported", async () => {
+  const { spawnSync } = await import("node:child_process");
+  const s = await mk();
+  await s.cool("openrouter", 600, "HTTP 429");
+  const r = spawnSync(process.execPath, [join(import.meta.dirname, "..", "scout.mjs"), "--provider=openrouter", "--json", "--timeout=500"],
+    { encoding: "utf8", timeout: 8000, env: { ...process.env, PIBLO_SCOUT_CACHE: s.dir } });
+  assert.equal(r.status, 0, r.stderr);
+  const out = JSON.parse(r.stdout);
+  assert.deepEqual(out.models, []);
+  assert.match(out.errors[0].message, /cooling down/);
+});

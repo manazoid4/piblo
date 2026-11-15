@@ -47,6 +47,22 @@ Groq's catalog may return response rate headers; when present, daily request and
 
 **No keys are printed or cached**, no request is made to a remote chat endpoint, and status headers are not dumped. On 401/402/429, agents must stop that provider rather than send a paid fallback. `usage.mjs` is an account-information helper, not a background scheduler, monitoring service or autonomous router.
 
+## Meters, usage-window planner and overnight schedule (v2)
+
+Every allowance is one flat **meter** (`contract.mjs`): `provider_kind` (API | APP | LOCAL | MANUAL), `model_id`, `task`, `verified_free`, `price`, `used`, `remaining`, `limit`, `window`, `reset_at`, `checked_at`, `confidence`, `privacy`, `eligibility`, `unknown_reason`, `evidence_url`. Unknown stays unknown: stale counters, counters that disagree, missing accounts, unparseable prices and unsafe model IDs are never `eligible`.
+
+**Subscription apps (Claude, Fable, Antigravity, ChatGPT) are APP meters from an editable manual snapshot**, labelled `confidence: manual`. Scout never logs in, scrapes or reads cookies. Copy `tests/manual-snapshot.example.json`, edit the numbers from the app yourself, update `checked_at`.
+
+```bash
+node planner.mjs --snapshot my-snapshot.json                  # one-line summary
+node planner.mjs --snapshot my-snapshot.json --json --hours=8 # JSON plan
+node planner.mjs --snapshot my-snapshot.json --tz=Europe/London --now=2026-11-15T18:30:00Z --json
+```
+
+The plan answers three things: what can run now (with a bounded budget that keeps a 20% reserve), when the next window opens, and an **overnight schedule** split at every reset (resets step by their window; day/week windows keep the local wall-clock time across DST). Lanes are free API, prepaid subscription and local only; there is no paid lane. A reset time in the past is treated as an assumed refill (low confidence); a missing reset is never invented (`needs_input`).
+
+Safety state (`guard.mjs`, ideas ported from the owner's mazrouter): a zero-spend guard before any request, a cooldown after 401/402/429 (stop, no retry, no key rotation, no fallback), rate-limit-only header memory, and a **metadata-only** JSONL usage ledger (no prompts, outputs or keys). Ranking uses measured success/latency from that ledger first (needs 2+ runs), then the labelled metadata heuristic. State lives next to the model cache (`PIBLO_SCOUT_CACHE` to move it).
+
 ## Installation as an agent skill
 Copy or symlink **this single folder** into the agent's supported skills directory, or have the agent read `SKILL.md` directly. Read the host's native skill instructions first. The presence of files does not prove a CLI has loaded them. No global agent configuration is changed automatically. Example install:
 ```bash

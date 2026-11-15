@@ -21,6 +21,9 @@ Run `node scout.mjs --provider=openrouter --task=code --json` from this director
 
 Read-only `node usage.mjs --provider=all --json` returns the key's **observed** allowance when the provider exposes it. OpenRouter key-level free requests can be reported; Groq may expose daily request/minute token headers; NVIDIA and Nous free/account entitlement stays explicitly UNKNOWN unless verified with their dashboards. An app's subscription usage is a separate quota and must not be inferred from an API key. No unverified endpoint or paid chat request is made in this command.
 
+## Planning around usage windows
+`node planner.mjs --snapshot FILE --json` turns meters (API counters plus an editable manual snapshot for Claude/Fable/Antigravity/ChatGPT app subscriptions) into: runnable now, next window opens, and an overnight schedule. Free API, prepaid subscription and local lanes only; never paid. Ask the owner to refresh the snapshot if `needs_input` or stale counters appear. Never scrape or log in to an app to fill it.
+
 ## How this is different from a list
 - `mnfst/awesome-free-llm-apis` is a valuable provider/setup reference; this skill adds **live discovery, zero-price fail-closed filtering, a bounded optional functional probe, local models and machine-readable selection**.
 - `YeomanYe/free-llm-router` supplies a more general provider router with fallback; this skill intentionally avoids hidden request fan-out and billing ambiguity.
