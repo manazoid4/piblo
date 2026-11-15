@@ -72,6 +72,10 @@ The working Cardputer firmware and the PC-side Piblo Core now live in this repo.
 | `docs/UPSTREAM-NOTE.md` | Notes for a later contribution to Anthropic's Buddy repo |
 | `firmware/draft/` | Uncompiled draft of the Bluetooth Buddy module (see notice below) |
 
+## Open-source exceptions
+
+The standalone **[Piblo Free Model Scout](skills/free-model-scout/README.md)** folder (including its code, tests, documentation and agent skill) is licensed under **MIT** as stated in [that folder's licence](skills/free-model-scout/LICENSE), and may be used commercially under those terms. The MIT grant applies only to `skills/free-model-scout/`; it does not relicense other Piblo files.
+
 ## License
 
 [PolyForm Noncommercial License 1.0.0](LICENSE). The source is free to read, run and change for personal and other noncommercial use. Commercial use needs a separate licence: ask via info@piblo.co.uk. Earlier copies obtained under the MIT licence remain MIT for those copies. Third-party components keep their own licences (see [NOTICE](NOTICE)).

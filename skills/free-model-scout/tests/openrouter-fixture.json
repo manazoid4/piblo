@@ -1,0 +1,25 @@
+{
+  "data": [
+    {
+      "id": "a/coder:free",
+      "context_length": 131072,
+      "pricing": {
+        "prompt": "0",
+        "completion": "0.000"
+      },
+      "supported_parameters": [
+        "tools"
+      ]
+    },
+    {
+      "id": "b/paid",
+      "pricing": {
+        "prompt": "0.002",
+        "completion": "0.004"
+      }
+    },
+    {
+      "id": "c/unpriced:free"
+    }
+  ]
+}
