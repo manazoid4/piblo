@@ -457,7 +457,8 @@ class Buddy:
 
     def _stored_view(self, row: dict) -> dict:
         """An approval that is no longer in memory (evicted, or from before a restart). Never pending."""
-        expired = row["decision"] in (None, "expired")
+        # A stored grant has no trustworthy monotonic deadline after restart or eviction.
+        expired = row["decision"] in (None, "expired", "allow")
         return {"id": row["id"], "tool": row["tool"], "summary": row["summary"], "agent": row["agent"],
                 "decision": "cancel" if expired else row["decision"], "known": True,
                 "digest": row.get("digest", ""), **({"instruction": row["instruction"]} if row.get("instruction") else {}),
@@ -478,7 +479,7 @@ class Buddy:
                 if known in self._items:
                     if self._items[known]["digest"] != digest:
                         raise HTTPException(status_code=409, detail="idempotency key already used for a different request")
-                    return {**self._items[known], "duplicate": True}
+                    return {**self._items[known], **self.state(known), "duplicate": True}
                 row = self._db("find_approval_by_idem", idem)
                 if row:
                     if row.get("digest") != digest:
