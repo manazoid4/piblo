@@ -11,6 +11,7 @@ import { isSafeTaskName, planInstall } from './install-plan';
 import { CoreSidecar } from './sidecar';
 import { autoUpdater } from 'electron-updater';
 import { createAppUpdater, type UpdaterLike } from './updater';
+import { WindowReveal } from './window-reveal';
 
 const realFs: FsLike = {
   exists: (p) => fs.existsSync(p),
@@ -128,9 +129,9 @@ function createWindow(): BrowserWindow {
     },
   });
   w.setMenuBarVisibility(false);
-  w.once('ready-to-show', () => {
-    if (!startHidden) w.show();
-  });
+  // First paint is not guaranteed: if the renderer never becomes ready the window would stay
+  // invisible, so the gate also reveals on did-finish-load and after a failsafe timeout.
+  new WindowReveal(w, { startHidden });
   w.on('close', (e) => {
     if (!quitting && settings.closeToTray) {
       e.preventDefault();
