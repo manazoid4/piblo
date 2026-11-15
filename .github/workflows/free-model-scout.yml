@@ -1,0 +1,24 @@
+name: Free Model Scout (offline tests)
+on:
+  pull_request:
+    paths:
+      - 'skills/free-model-scout/**'
+      - '.github/workflows/free-model-scout.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'skills/free-model-scout/**'
+      - '.github/workflows/free-model-scout.yml'
+permissions:
+  contents: read
+jobs:
+  scout-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run no-network fixture tests
+        run: node --test skills/free-model-scout/tests/scout.test.mjs
