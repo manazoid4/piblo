@@ -1,5 +1,8 @@
 # Agents working on Piblo
 
+## Start every session with the maintainer's memory
+Maintainer agents: before planning or building, read the private Unified Memory (`projects/piblo/STATUS.md`, newest `work/piblo/`) and the private repo's `AGENTS.md`, which indexes saved build and research prompts. Reuse a saved prompt before researching again.
+
 ## See and drive the real device (do this before and after any UI change)
 Piblo Core on this PC (started by the Piblo app) proxies the device's screen and keys over Wi-Fi.
 No token, IP or USB is needed: the script finds Core and its token itself.
