@@ -55,17 +55,40 @@ python scripts/piblo_tool.py flash --port COM4 \
 
 ## Wireless update
 
-Serve the app image over HTTP on the same network as the board, then:
+With the board on your LAN:
 
 ```sh
-python scripts/piblo_tool.py ota --port COM4 --url http://<host>:8799/firmware.bin
+python scripts/piblo_tool.py ota --host <board-ip> \
+    --firmware .pio/build/piblo-bootstrap/firmware.bin
 ```
 
-The board pulls the image, verifies it, writes the spare slot and reboots. If the
-new image fails to boot, the bootloader rolls back to the previous slot.
+The token is cached in `~/.piblo/ota_token` after the first run, so the everyday
+command is just `piblo-ota --host <ip> --firmware firmware.bin`.
 
-There is also a web portal: join the `Piblo-Setup` AP (or the board's LAN IP),
-open `http://<ip>/`, unlock with the OTA token, then POST a file to `/do-update`.
+The board writes the spare OTA slot, verifies it and reboots. If the new image
+never marks itself valid, the bootloader rolls back to the previous slot.
+
+There is also a web portal: join the `Piblo-Setup` AP (or open the board's LAN
+IP), enter the Wi-Fi form, unlock with the OTA token, then use
+`GET /update` to upload a file.
+
+## USB serial control lines (important)
+
+This board has one USB port on the ESP32-S3 native USB pins, wired to the
+**USB-Serial/JTAG** peripheral. On that peripheral:
+
+- `DTR` = **IO0 (BOOT)** - asserted (True) forces ROM download mode
+- `RTS` = **EN (reset)** - asserted (True) holds the chip in reset
+
+So a serial script must leave both deasserted, or every open resets the board
+(and DTR low parks it in download mode). `piblo_tool.py` does this.
+
+Do **not** call `USB.begin()` / `HardwareSerial(0)` on this board: that starts
+TinyUSB on the same pins as a second USB device, and Windows fails to install
+the composite driver (Device Manager problem code 28, port disappears).
+
+If the chip is parked in ROM download mode and a software reset will not release
+it, power-cycle the board (unplug USB-C, wait 5 s, replug).
 
 ## Serial control (USB)
 
@@ -83,7 +106,7 @@ PIBLO FORGET                   wipe settings and reboot
 ```
 
 ```sh
-python scripts/piblo_tool.py setup --port COM4 --ssid "MyAP" --password "secret"
+python scripts/piblo_tool.py setup --port COM4 --ssid "MyAP" --password "..."
 python scripts/piblo_tool.py cmd  --port COM4 --cmd "PIBLO STATUS"
 ```
 
@@ -123,20 +146,28 @@ Verified on the connected board (COM4, USB-Serial/JTAG, MAC 80:45:6b:35:d7:90):
 | Setup AP | `Piblo-Setup` up at 192.168.4.1 |
 | Portal | HTTP up, OTA token generated |
 | Serial control | TOKEN / STATUS / SCAN / NET answered over USB |
+| ESP-NOW init | `ESP-NOW: ready` (needs STA+AP mode; AP-only init fails) |
+| USB recovery | power cycle returns the board from ROM download mode |
 
 Not verified yet, and why:
 
-- **Joining a real network** — the PC's only visible SSID is 5 GHz. The board's
-  own scan sees `YouFibre-45FDB7` on ch6 (2.4 GHz), so a 2.4 GHz network is
-  available; credentials still need to be supplied over USB.
-- **End-to-end OTA** — needs the board and the PC on one network (the PC cannot
-  join the board's AP while already on its own Wi-Fi).
-- **ESP-NOW handshake** — the Cardputer ADV was not connected to USB during the
+- **Joining a real network** - in progress: the board's scan sees
+  `YouFibre-45FDB7` on ch6 (2.4 GHz); credentials are being supplied through the
+  phone portal.
+- **End-to-end OTA** - needs the board and the PC on one network.
+- **ESP-NOW handshake** - the Cardputer ADV was not connected to USB during the
   session.
 
 ## Recovery
 
-If the board's COM port vanishes and Device Manager shows problem code 28
-(`CM_PROB_FAILED_INSTALL`), that was caused by a build that enabled a second USB
-CDC port. The current firmware does not do this. Unplug and re-plug the board to
-recover; then re-flash `factory.bin` over USB.
+Two distinct failure modes, both recovered on hardware:
+
+1. **COM port vanishes, Device Manager problem code 28
+   (`CM_PROB_FAILED_INSTALL`).** Caused by a build that enabled a second USB CDC
+   port (`USB.begin()`) alongside the USB-Serial/JTAG. The current firmware does
+   not do this. Hold BOOT, tap RESET, release RESET then BOOT to enter the ROM
+   download mode (which enumerates cleanly), then re-flash `factory.bin`.
+2. **Chip parked in ROM download mode** (`boot:0x1 (DOWNLOAD)`, serial shows
+   `waiting for download`, and esptool still syncs with `--before no_reset`).
+   Software resets do not release it. Power-cycle the board: unplug USB-C, wait
+   5 s, replug.
