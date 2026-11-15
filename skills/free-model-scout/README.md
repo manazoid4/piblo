@@ -56,7 +56,7 @@ cp -r skills/free-model-scout ~/.codex/skills/piblo-free-model-scout
 
 ## Test
 ```bash
-node --test skills/free-model-scout/tests/scout.test.mjs
+node --test skills/free-model-scout/tests/*.test.mjs
 ```
 Fixture-driven tests make no external API calls. The GitHub Actions workflow runs offline tests. No service credentials are needed for CI.
 
