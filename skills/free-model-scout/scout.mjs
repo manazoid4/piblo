@@ -28,7 +28,7 @@ export const verifiedZero = (model) =>
     Number.isFinite(Number(model.pricing[key])) &&
     Number(model.pricing[key]) === 0);
 
-const CLOUD_NAME = /-cloud|:cloud/i;
+const CLOUD_NAME = /[-:]cloud(:|$)/i;
 export function normalize(provider, data) {
   if (provider === "ollama") {
     return (Array.isArray(data?.models) ? data.models : []).filter(x => typeof x.name === "string")
