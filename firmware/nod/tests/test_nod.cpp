@@ -15,6 +15,8 @@
 #include "../include/pair_connect.h"
 #include "../include/fw_version.h"
 #include "../include/upload_gate.h"
+#include "../include/bench_stats.h"
+#include "../include/piblo_link.h"
 #include <map>
 #include <string>
 using namespace nod;
@@ -68,6 +70,127 @@ int main() {
         CHECK(g.begin(7)); g.abort(); CHECK(!g.busy());
         // repeated use does not wedge
         for (int i = 0; i < 200; i++) { CHECK(g.begin(i)); if (i % 3 == 0) g.abandon(); g.finish(); g.take(); CHECK(!g.busy()); }
+    }
+
+    // bench stats
+    {
+        BenchStat s; CHECK(s.mean() == 0);
+        s.add(10, 100); s.add(300, 100); s.add(5, 100);
+        CHECK(s.count == 3 && s.minV == 5 && s.maxV == 300 && s.over == 1 && s.mean() == 105);
+        char b[64]; benchFormat(b, sizeof b, "loop_ms", s);
+        CHECK(std::string(b) == "loop_ms=3/5/105/300/1");
+        s.reset(); CHECK(s.count == 0 && s.maxV == 0);
+    }
+
+    // piblo link: framed UART transport
+    {
+        using namespace nod::link;
+        const uint8_t chk[] = {'1','2','3','4','5','6','7','8','9'};
+        CHECK(crc16(chk, 9) == 0x29B1);  // CRC-16/CCITT-FALSE check value
+
+        // round trip + corrupt + partial + bad length + version mismatch
+        uint8_t buf[MAX_FRAME]; const uint8_t pl[3] = {1, 2, 3};
+        const size_t n = encode(0x10, 7, pl, 3, buf, sizeof buf);
+        CHECK(n == 11); CHECK(encode(0x10, 0, pl, MAX_PAYLOAD + 1, buf, sizeof buf) == 0);
+        Parser p; Frame f; bool got = false;
+        for (size_t i = 0; i < n; i++) got = p.feed(buf[i], f);
+        CHECK(got && f.type == 0x10 && f.seq == 7 && f.len == 3 && f.payload[2] == 3);
+
+        uint8_t bad[MAX_FRAME]; memcpy(bad, buf, n); bad[7] ^= 0x40;       // flip a payload bit
+        got = false; for (size_t i = 0; i < n; i++) got |= p.feed(bad[i], f);
+        CHECK(!got && p.crcErrors == 1);
+        got = false; for (size_t i = 0; i < n; i++) got |= p.feed(buf[i], f);  // recovers on next frame
+        CHECK(got);
+
+        got = false;                                                         // partial + garbage prefix
+        p.feed(0x00, f); p.feed(0x13, f);
+        for (size_t i = 0; i < 5; i++) got |= p.feed(buf[i], f);
+        CHECK(!got);
+        for (size_t i = 5; i < n; i++) got |= p.feed(buf[i], f);
+        CHECK(got && p.resyncBytes >= 2);
+
+        const uint8_t longHdr[] = {SOF, VERSION, 0x10, 0, (uint8_t)((MAX_PAYLOAD + 1) & 0xFF), 0};
+        for (size_t i = 0; i < sizeof longHdr; i++) p.feed(longHdr[i], f);
+        CHECK(p.badLength == 1);
+
+        // two links wired back to back; `drop` lets a test lose frames in transit
+        Link a, b; uint32_t now = 0;
+        auto pump = [&](bool cutAtoB, bool cutBtoA) {
+            uint8_t w[64]; size_t k;
+            a.tick(now); b.tick(now);
+            while ((k = a.pullTx(w, sizeof w)) > 0) if (!cutAtoB) for (size_t i = 0; i < k; i++) b.onByte(w[i], now);
+            while ((k = b.pullTx(w, sizeof w)) > 0) if (!cutBtoA) for (size_t i = 0; i < k; i++) a.onByte(w[i], now);
+        };
+        auto run = [&](int ms, bool cut) { for (int t = 0; t < ms; t += 50) { now += 50; pump(cut, cut); } };
+        CHECK(!a.useCoprocessor() && a.state() == Down);                     // fallback until handshake
+        run(1000,false);
+        CHECK(a.useCoprocessor() && b.useCoprocessor() && a.credits() == RX_SLOTS && a.reconnects == 1);
+
+        // flow control: 4 credits, 5th refused, credit returns when the peer drains
+        const uint8_t d[1] = {9};
+        for (int i = 0; i < 4; i++) CHECK(a.send(0x11, d, 1));
+        CHECK(!a.send(0x11, d, 1) && a.noCredit == 1);
+        run(100,false);
+        Frame r; int got4 = 0; while (b.recv(r)) { got4++; CHECK(r.type == 0x11 && r.payload[0] == 9); }
+        CHECK(got4 == 4);
+        run(200,false);
+        CHECK(a.credits() == RX_SLOTS && a.send(0x11, d, 1));
+        CHECK(!a.send(0x02, d, 1));                                          // control types are not app data
+        run(100,false); while (b.recv(r)) {}  run(200,false);
+
+        // seq gap: first DATA lost on the wire, second arrives
+        a.send(0x12, d, 1); pump(true, false);                               // lost
+        a.send(0x12, d, 1); pump(false,false);
+        CHECK(b.seqGaps == 1 && b.recv(r));
+        run(200,false);
+
+        // overflow: a misbehaving peer ignores credit -> bounded RX queue drops, counts, no crash
+        {
+            Link c; uint8_t w[MAX_FRAME]; uint8_t seq = 0;
+            const size_t hn = encode(HELLO, seq++, (const uint8_t*)"\x04\x01", 2, w, sizeof w);
+            for (size_t i = 0; i < hn; i++) c.onByte(w[i], 0);
+            CHECK(c.useCoprocessor());
+            for (int i = 0; i < 6; i++) {
+                const size_t m = encode(0x20, seq++, d, 1, w, sizeof w);
+                for (size_t j = 0; j < m; j++) c.onByte(w[j], 0);
+            }
+            CHECK(c.rxOverflow == 2);
+            int kept = 0; while (c.recv(r)) kept++;
+            CHECK(kept == (int)RX_SLOTS);
+        }
+        // tx overflow: big frames fill the bounded wire queue before it is drained
+        {
+            uint8_t big[MAX_PAYLOAD]; memset(big, 0x5A, sizeof big);
+            int ok = 0; for (int i = 0; i < 4; i++) ok += a.send(0x13, big, sizeof big);
+            CHECK(ok == 2 && a.txOverflow >= 1);
+            run(200,false); while (b.recv(r)) {} run(300,false);
+        }
+
+        // version mismatch: peer speaks v2 -> Incompatible -> fallback, recovers on a v1 frame
+        {
+            uint8_t w[MAX_FRAME]; const size_t m = encode(HEARTBEAT, 0, nullptr, 0, w, sizeof w);
+            w[1] = VERSION + 1;
+            const uint32_t fb = a.fallbacks;
+            for (size_t i = 0; i < m; i++) a.onByte(w[i], now);
+            CHECK(a.state() == Incompatible && !a.useCoprocessor() && a.fallbacks == fb + 1);
+            CHECK(a.parser.versionMismatch == 1 && !a.send(0x11, d, 1));
+            run(1500,false);
+            CHECK(a.useCoprocessor());                                       // re-handshakes by itself
+        }
+
+        // disconnect / reconnect: silence -> Down -> fallback; wires back -> Up again
+        const uint32_t fb2 = a.fallbacks, rc = a.reconnects;
+        run(1500, true);
+        CHECK(a.state() == Down && b.state() == Down && !a.send(0x11, d, 1));
+        CHECK(a.fallbacks == fb2 + 1 && b.fallbacks >= 1);
+        run(1500,false);
+        CHECK(a.useCoprocessor() && b.useCoprocessor() && a.reconnects == rc + 1 && a.send(0x11, d, 1));
+        run(200,false); while (b.recv(r)) {} run(200,false);
+
+        // peer reboot: fresh Link B2 says HELLO, A resets seq/credits instead of counting gaps
+        const uint32_t gaps = a.seqGaps;
+        b = Link(); run(1500,false);
+        CHECK(a.useCoprocessor() && b.useCoprocessor() && a.seqGaps == gaps && a.credits() == RX_SLOTS);
     }
 
     // battery curve
