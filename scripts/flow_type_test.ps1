@@ -66,10 +66,15 @@ while ((Get-Date) -lt $deadline -and -not $win) {
         (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ClassNameProperty, "Notepad")))
 }
 if (-not $win) { Finish 2 "SETUP ERROR: Notepad window did not appear" }
-$edit = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants,
-    (New-Object System.Windows.Automation.OrCondition(
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Document)),
-        (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)))))
+# Windows 11 Notepad builds its WinUI text box a moment after the window appears: retry.
+$editCond = New-Object System.Windows.Automation.OrCondition(
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Document)),
+    (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Edit)))
+$edit = $null; $deadline = (Get-Date).AddSeconds(10)
+while ((Get-Date) -lt $deadline -and -not $edit) {
+    $edit = $win.FindFirst([System.Windows.Automation.TreeScope]::Descendants, $editCond)
+    if (-not $edit) { Start-Sleep -Milliseconds 300 }
+}
 if (-not $edit) { Finish 2 "SETUP ERROR: Notepad text area not found" }
 function ReadText { try { $edit.GetCurrentPattern([System.Windows.Automation.TextPattern]::Pattern).DocumentRange.GetText(-1) } catch { try { $edit.GetCurrentPattern([System.Windows.Automation.ValuePattern]::Pattern).Current.Value } catch { "" } } }
 $r = $edit.Current.BoundingRectangle
