@@ -62,8 +62,18 @@ void send(WiFiClient& c, int code, const String& type, const String& body) {
 bool authorized(const String& req) {
     if (gToken.length() < 8) return false;   // no token provisioned yet -> refuse
     int i = req.indexOf("X-Piblo-Token:");
-    if (i < 0) return false;
-    int e = req.indexOf("\r\n", i);
+    if (i < 0) {
+        // Browsers cannot set headers on a file upload, so also accept ?token=
+        // in the request line (the upload form carries it).
+        int q = req.indexOf("token=");
+        if (q < 0) return false;
+        int e = req.indexOf(' ', q);
+        if (e < 0) e = req.indexOf(13, q);
+        String t = req.substring(q + 6, e < 0 ? req.length() : e);
+        t.trim();
+        return t == gToken;
+    }
+    int e = req.indexOf(13, i);
     String t = req.substring(i + 13, e < 0 ? req.length() : e);
     t.trim();
     return t == gToken;
@@ -133,7 +143,9 @@ void handleRoot(WiFiClient& c, bool auth) {
         body += F("<p class=note>OTA token (shown once, stored on device): <span class=mono>");
         body += gToken;
         body += F("</span></p>");
-        body += F("<div class=row><a href=/do-update><button class=ghost>UPLOAD FIRMWARE</button></a>"
+        body += F("<div class=row><a href=/update?token=");
+        body += gToken;
+        body += F("><button class=ghost>UPLOAD FIRMWARE</button></a>"
                   "<a href=/pair><button class=ghost>FIND CARDPUTER</button></a></div>");
         body += F("<p class=note>Status: <span class=mono>");
         body += gStatus;
@@ -164,8 +176,23 @@ void handleSave(WiFiClient& c, const String& body) {
 
 void handleLogin(WiFiClient& c, const String& body) {
     String t = formValue(body, "token");
-    if (t == gToken) { c.stop(); gClient.stop(); handleRoot(c, true); return; }
+    if (t == gToken) { handleRoot(c, true); return; }
     send(c, 401, "text/html", html("Unlock", "<p class=bad>Wrong token.</p>"));
+}
+
+// Upload page: GET /update. The form posts the file to /do-update.
+void handleUpdateGet(WiFiClient& c) {
+    String body;
+    body += F("<div class=card><form method=POST action=/do-update?token=");
+    body += gToken;
+    body += F(" enctype=multipart/form-data>"
+              "<label>Firmware file (.bin)</label><input type=file name=firmware accept=.bin>"
+              "<button>FLASH</button></form><p class=note>Written to the spare slot and "
+              "rolled back automatically if it fails to boot.</p>"
+              "<p class=note>Status: <span class=mono>");
+    body += gStatus;
+    body += F("</span></p></div>");
+    send(c, 200, "text/html; charset=utf-8", html("Firmware update", body));
 }
 
 // Streams a multipart upload into the OTA slot with a hard size cap.
@@ -281,6 +308,7 @@ void serve() {
     if (path == "/" || path == "/index.html") handleRoot(gClient, auth);
     else if (path == "/save" && method == "POST") handleSave(gClient, body);
     else if (path == "/login" && method == "POST") handleLogin(gClient, body);
+    else if (path == "/update" && method == "GET") handleUpdateGet(gClient);
     else if (path == "/do-update" && method == "POST") handleDoUpdate(gClient, req, len);
     else if (path == "/pair") handlePair(gClient);
     else if (path == "/screen") shot::serve(gClient);

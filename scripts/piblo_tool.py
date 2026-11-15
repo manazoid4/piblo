@@ -2,41 +2,52 @@
 """piblo-flash / piblo-ota - USB flash and wireless OTA for the Piblo bootstrap board.
 
 Usage:
-  piblo-flash --port COM4 --firmware factory.bin     USB flash (first install / recovery)
-  piblo-ota   --port COM4 --url http://host/fw.bin    pull-and-flash over the board's own Wi-Fi
-  piblo-setup --port COM4                            send Wi-Fi credentials over USB
-  piblo-cmd   --port COM4 --cmd "PIBLO STATUS"       raw control command
+  piblo-flash --port COM4 --firmware factory.bin
+      USB flash. First install, or recovery when Wi-Fi is not up.
 
-Wi-Fi credentials are passed to the device over USB and stored in NVS. They are
-never written to the image, and never printed. COM3 is refused because Piblo
-Core uses it.
+  piblo-ota --host 192.168.1.50 --firmware firmware.bin [--token TOKEN]
+      Push a firmware image to the board over its own HTTP OTA endpoint. The
+      token is cached in ~/.piblo/ota_token after the first use, so the
+      everyday command is just:
+
+          piblo-ota --host <ip> --firmware firmware.bin
+
+  piblo-setup --port COM4 --ssid YouFibre-45FDB7 --password ...
+      Send Wi-Fi credentials over USB. Stored in device NVS only; never
+      written to the image and never printed.
+
+  piblo-cmd --port COM4 --cmd "PIBLO STATUS"
+
+COM3 is refused because Piblo Core uses it.
 """
 import argparse
-import json
+import os
+import re
+import subprocess
 import sys
 import time
-
-try:
-    import serial
-    from serial.tools import list_ports
-except ImportError:
-    sys.exit("pyserial is required: python -m pip install pyserial")
+import urllib.error
+import urllib.request
 
 RESERVED = {"COM3"}
 BAUD = 115200
+TOKEN_FILE = os.path.join(os.path.expanduser("~"), ".piblo", "ota_token")
 
 
 def safe(port):
     return port.strip().upper() not in RESERVED
 
 
+# ---------------------------------------------------------------- serial ----
 def open_board(port):
+    import serial
     s = serial.Serial()
     s.port = port
     s.baudrate = BAUD
     s.timeout = 2
     s.write_timeout = 3
-    # USB-Serial-JTAG: asserting DTR/RTS resets the chip. Keep both deasserted.
+    # USB-Serial-JTAG: DTR = IO0 (BOOT), RTS = EN. Asserting either resets the
+    # chip (DTR low forces ROM download mode), so keep both deasserted.
     s.dtr = False
     s.rts = False
     s.open()
@@ -60,14 +71,11 @@ def cmd(port, line, wait=1.5):
         return drain(s, 0.5)
 
 
-def list_ports_safe():
-    return [p for p in list_ports.comports() if safe(p.device)]
-
-
 def pick_port(requested):
     if requested:
         return requested
-    ports = list_ports_safe()
+    from serial.tools import list_ports
+    ports = [p for p in list_ports.comports() if safe(p.device)]
     if not ports:
         sys.exit("No board port found (COM3 is reserved for Piblo Core).")
     for i, p in enumerate(ports, 1):
@@ -78,16 +86,98 @@ def pick_port(requested):
         sys.exit("Invalid port selection.")
 
 
+# ------------------------------------------------------------- firmware ----
+def find_esptool():
+    """Return an argv prefix that runs esptool, or None."""
+    try:
+        import esptool  # noqa: F401
+        return [sys.executable, "-m", "esptool"]
+    except ImportError:
+        pass
+    from shutil import which
+    if which("esptool"):
+        return ["esptool"]
+    return None
+
+
+def flash_usb(port, firmware):
+    prefix = find_esptool()
+    if not prefix:
+        sys.exit("esptool not found. Run: pip install esptool")
+    args = prefix + ["--chip", "esp32s3", "--port", port,
+                     "--before", "default_reset", "--after", "hard_reset",
+                     "--no-stub", "write-flash", "-z",
+                     "--flash-mode", "keep", "--flash-freq", "keep",
+                     "--flash-size", "detect", "0x0", firmware]
+    print("Flashing", firmware, "to", port)
+    raise SystemExit(subprocess.call(args))
+
+
+# ----------------------------------------------------------------- OTA -----
+def load_token():
+    try:
+        return open(TOKEN_FILE).read().strip()
+    except OSError:
+        return ""
+
+
+def save_token(token):
+    os.makedirs(os.path.dirname(TOKEN_FILE), exist_ok=True)
+    open(TOKEN_FILE, "w").write(token)
+
+
+def ota(host, firmware, token):
+    if not token:
+        token = load_token()
+    if not token:
+        sys.exit("No OTA token. Run once with --token <token> (printed by the "
+                 "board on the serial console, or shown in the portal).")
+    if not re.fullmatch(r"[A-Za-z0-9_-]{8,128}", token):
+        sys.exit("Token looks malformed.")
+    url = f"http://{host}/do-update?token={token}"
+
+    data = open(firmware, "rb").read()
+    boundary = "piblopiblo1234567890"
+    body = b"".join([
+        f"--{boundary}\r\n".encode(),
+        b'Content-Disposition: form-data; name="firmware"; filename="fw.bin"\r\n',
+        b"Content-Type: application/octet-stream\r\n\r\n",
+        data,
+        f"\r\n--{boundary}--\r\n".encode(),
+    ])
+    req = urllib.request.Request(url, data=body, method="POST")
+    req.add_header("Content-Type", f"multipart/form-data; boundary={boundary}")
+
+    print(f"POST {url}  ({len(data)} bytes)")
+    try:
+        with urllib.request.urlopen(req, timeout=120) as r:
+            print("HTTP", r.status, r.read(300).decode("utf-8", "replace"))
+    except urllib.error.HTTPError as e:
+        print("HTTP", e.code, e.read(300).decode("utf-8", "replace"))
+        if e.code == 401:
+            print("Token rejected. Re-run with a fresh --token.")
+        raise SystemExit(1)
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+        # The board reboots as soon as the image is accepted, cutting the
+        # response - that is success, not failure.
+        print(f"connection ended while flashing: {e}")
+    save_token(token)
+    print("Image accepted. Board is rebooting into the new firmware.")
+    print("Wait ~10s, then: piblo-cmd --port COM4 --cmd 'PIBLO STATUS'")
+
+
 def main():
     ap = argparse.ArgumentParser(description="Piblo bootstrap board tooling")
-    ap.add_argument("--port", help="serial port, e.g. COM4")
+    ap.add_argument("--port", help="serial port, e.g. COM4 (not needed for ota)")
     sub = ap.add_subparsers(dest="action", required=True)
 
     f = sub.add_parser("flash", help="USB flash a factory image")
     f.add_argument("--firmware", required=True)
 
-    o = sub.add_parser("ota", help="fetch a firmware URL and flash it on-device")
-    o.add_argument("--url", required=True)
+    o = sub.add_parser("ota", help="push a firmware image over Wi-Fi")
+    o.add_argument("--host", required=True, help="board IP on your LAN")
+    o.add_argument("--firmware", required=True)
+    o.add_argument("--token", help="OTA token (cached after first use)")
 
     st = sub.add_parser("setup", help="send Wi-Fi credentials over USB")
     st.add_argument("--ssid", required=True)
@@ -97,27 +187,21 @@ def main():
     c.add_argument("--cmd", required=True)
 
     a = ap.parse_args()
+
+    if a.action == "ota":
+        ota(a.host, a.firmware, a.token or "")
+        return
+
     port = pick_port(a.port)
     if not safe(port):
         sys.exit(f"{port} is reserved for Piblo Core; refusing.")
 
     if a.action == "flash":
-        import esptool  # provided by PlatformIO's tool-esptoolpy
-        args = ["--chip", "esp32s3", "--port", port, "--before", "default_reset",
-                "--after", "hard_reset", "--no-stub", "write-flash", "-z",
-                "--flash-mode", "keep", "--flash-freq", "keep",
-                "--flash-size", "detect", "0x0", a.firmware]
-        print("Flashing", a.firmware, "to", port)
-        raise SystemExit(esptool.main(args))
-
-    if a.action == "ota":
-        print(cmd(port, f"PIBLO OTA {a.url}", wait=8.0))
-
-    if a.action == "setup":
+        flash_usb(port, a.firmware)
+    elif a.action == "setup":
         line = "PIBLO WIFI " + a.ssid + (" " + a.password if a.password else "")
         print(cmd(port, line, wait=2.5))
-
-    if a.action == "cmd":
+    elif a.action == "cmd":
         print(cmd(port, a.cmd))
 
 
