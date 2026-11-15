@@ -8,6 +8,7 @@
 #include "core/ambient.h"
 #include "core/field.h"
 #include "core/health.h"
+#include "core/bench.h"
 #include "core/notify.h"
 #include "core/settings.h"
 #include "core/launcher.h"
@@ -74,6 +75,7 @@ void setup() {
     Serial.println("[boot] shell");
 
     health::begin();
+    PIBLO_BENCH_BOOT();
 
     Serial.printf("Piblo %s READY board=%d keyboard=%s storage=%s\n",
                   NOD_FW_VERSION, (int)M5.getBoard(),
@@ -102,6 +104,8 @@ void loop() {
     host::linkIdle();  // WiFi power saving back on 20 s after the last voice request, from any screen
 
     health::observeLoop(millis() - loopStarted);
+    PIBLO_BENCH_LOOP(millis() - loopStarted);
     health::update();
+    PIBLO_BENCH_REPORT();
     delay(2);
 }

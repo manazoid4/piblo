@@ -9,6 +9,7 @@
 #include <utility>
 #include <vector>
 
+#include "../core/bench.h"
 #include "../core/settings.h"
 #include "../core/sys.h"
 #include "../storage/store.h"
@@ -118,7 +119,9 @@ Reply upload(const char* path, const std::string& wavPath,
         http.addHeader("Content-Type", "audio/wav");
         for (const auto& header : headers)
             http.addHeader(header.first.c_str(), header.second.c_str());
+        const uint32_t sentAt = millis();
         const int status = http.sendRequest("POST", &file, file.size());
+        PIBLO_BENCH_NET(millis() - sentAt);
         Serial.printf("[upload] %s%s size=%u status=%d\n", base.first.c_str(), path,
                       static_cast<unsigned>(file.size()), status);
         if (status <= 0) {

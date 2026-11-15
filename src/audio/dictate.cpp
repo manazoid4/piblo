@@ -5,6 +5,7 @@
 #include <freertos/task.h>
 #include <upload_gate.h>  // firmware/nod/include (pure upload state machine)
 
+#include "../core/bench.h"
 #include "../core/sys.h"
 #include "../net/mazhost.h"
 #include "../storage/store.h"
@@ -49,6 +50,7 @@ std::string         gPcOutcome;
 bool                gToPc   = false;
 bool                gReady  = false;
 uint32_t            gWorkAt = 0;
+uint32_t            gStopAt = 0;  // key release, for the voice-response benchmark
 
 void discard() {
     if (!gPath.empty()) {
@@ -106,6 +108,7 @@ void stop() {
         delete gSink;
         gSink = nullptr;
     }
+    gStopAt = millis();
     sfx::recStop();
     if (gPath.empty()) {
         fail("nothing was recorded");
@@ -184,6 +187,7 @@ void update() {
         fail("nothing was recognised");
         return;
     }
+    PIBLO_BENCH_VOICE(millis() - gStopAt);
     gText  = reply.transcript;
     gPcOutcome = gToPc ? reply.text : "";
     gReady = true;
