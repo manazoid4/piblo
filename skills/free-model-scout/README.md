@@ -1,0 +1,54 @@
+# Piblo Free Model Scout
+
+**A free, open-source, no-dependency, safety-first AI model discovery skill for coding agents.** The scripts and skill in this folder are MIT licensed, separately from the parent Piblo repository's PolyForm Noncommercial licence (see local `LICENSE`). It can be copied and used commercially under this directory's MIT licence; other Piblo source files retain their own licences.
+
+## What it actually does
+- Queries the **live OpenRouter catalog**, selecting only model IDs ending `:free` **and** containing $0 prompt and completion token prices. This is a catalog guarantee, not a promise the API request succeeds or that free quota remains.
+- Checks local Ollama on `127.0.0.1` for no-provider-bill models.
+- Optionally lists Groq and NVIDIA model IDs using the caller's key, **flagging those account free-tier terms as unverified**. Their `/models` endpoints do not establish zero price.
+- Sorts candidates using a transparent task heuristic (`code`, `reasoning`, `quick`, `tools`, `vision`). This is not an independent quality leaderboard. An optional **single** OpenRouter free model check measures a real round-trip and one simple correctness test.
+- Uses a five-minute on-disk model-list cache (no secrets). Does not install packages, run received model code, make inference calls on discovery, rotate keys, scrape account pages or spend paid tokens.
+
+## Quick start
+Requires Node.js 20+.
+
+```bash
+cd skills/free-model-scout
+node scout.mjs --provider=openrouter --task=code --json
+node scout.mjs --provider=ollama --task=quick
+node scout.mjs --provider=all --task=reasoning --json
+# Strictly optional single network completion:
+export OPENROUTER_API_KEY="set-this-in-your-own-shell-or-secret-manager"
+node scout.mjs --provider=openrouter --task=quick --probe="PROVIDER/MODEL:free" --confirm-free-probe --json
+# Authenticated catalog discovery, not zero-cost verification:
+node scout.mjs --provider=groq --include-unverified --json
+node scout.mjs --provider=nvidia --include-unverified --json
+```
+
+On PowerShell set the env variable only for the current session: `$env:OPENROUTER_API_KEY="..."`. Do not paste secrets into GitHub, command arguments, AI chat, screenshots or logs. For a real product, use the supported OS credential store.
+
+Output: `status=catalog-zero-cost`, `local-unmetered` or `unverified-account-tier`; `heuristic_score`; `source`; and errors (e.g., rate limit, no local Ollama). By default only verified-zero-price and local models are listed.
+
+## Installation as an agent skill
+Copy or symlink **this single folder** into the agent's supported skills directory, or have the agent read `SKILL.md` directly. Read the host's native skill instructions first. The presence of files does not prove a CLI has loaded them. No global agent configuration is changed automatically. Example install:
+```bash
+# example only — check the active agent's supported skill directory first
+cp -r skills/free-model-scout ~/.codex/skills/piblo-free-model-scout
+```
+
+## Test
+```bash
+node --test skills/free-model-scout/tests/scout.test.mjs
+```
+Fixture-driven tests make no external API calls. The GitHub Actions workflow runs offline tests. No service credentials are needed for CI.
+
+## Limits and privacy
+- Free availability and terms vary, API listing != quota and $0 != unlimited. Read <https://openrouter.ai/collections/free-models>, <https://console.groq.com/docs/rate-limits> and <https://docs.api.nvidia.com/nim/docs/product>.
+- The per-task ranking is based on public metadata and name hints; accuracy, tool correctness and coding reliability require controlled task benchmarks. One arithmetic probe cannot prove general quality.
+- This tool does not authenticate SSH, launch subagents, install their model providers, use secrets files or write to Piblo's application state.
+- Optional remote requests can transmit synthetic text only. For sensitive code/data, use local inference or a personally approved data-processing provider.
+
+## Why this exists
+Inspired by, but does not copy code from, <https://github.com/mnfst/awesome-free-llm-apis> (CC0) and <https://github.com/YeomanYe/free-llm-router>. Their directories teach provider selection and routing; Piblo adds explicit fail-closed free model eligibility, opt-in probes and a small agent-friendly JSON interface. No claim is made that this is independently better than every existing repo; evaluate against the acceptance plan before saying so.
+
+MIT licence applies only to `skills/free-model-scout/`. The rest of Piblo remains under its existing licence.
