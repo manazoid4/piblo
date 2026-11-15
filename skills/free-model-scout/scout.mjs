@@ -34,7 +34,7 @@ export function normalize(provider, data) {
   if (provider === "ollama") {
     return (Array.isArray(data?.models) ? data.models : []).filter(x => typeof x.name === "string" && SAFE_ID.test(x.name))
       .map(x => {
-        // Ported from mazrouter: *-cloud / :cloud models run remotely (account quota, not local/private/free).
+        // Ported from the owner's private router: *-cloud / :cloud models run remotely (account quota, not local/private/free).
         const cloud = CLOUD_NAME.test(x.name) || typeof x.remote_host === "string";
         return {
           provider, id: x.name, context: null, input: ["text"],

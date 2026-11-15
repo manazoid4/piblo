@@ -1,6 +1,6 @@
 // Zero-spend guard, cooldown state and metadata-only usage ledger.
-// Ported in spirit from the owner's mazrouter (router/mazrouter.py): State.cool/limits/record, Router.candidates ordering.
-// Deliberately NOT ported: mazrouter's budget knob. Scout has no paid lane, so there is nothing to unlock.
+// Ported in spirit from the owner's private router: State.cool/limits/record, Router.candidates ordering.
+// Deliberately NOT ported: the private router's budget knob. Scout has no paid lane, so there is nothing to unlock.
 import { readFile, writeFile, appendFile, mkdir, rename, stat } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join } from "node:path";
