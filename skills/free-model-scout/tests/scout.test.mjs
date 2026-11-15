@@ -20,7 +20,12 @@ test("free zero-price classifier fails closed", () => {
 test("paid/unverified default cannot be accidentally selected", () => {
   const models = normalize("openrouter", { data: fake });
   assert.deepEqual(eligible(models).map(x => x.id), ["a/coder:free"]);
-  assert.equal(eligible(models, { includeUnverified: true }).length, 4);
+  assert.equal(eligible(models, { includeUnverified: true }).length, 1);
+});
+test("OpenRouter paid choices never become eligible under include-unverified", () => {
+  const models = normalize("openrouter", { data: fake });
+  assert.ok(models.slice(1).every(x => x.status === "paid-or-unknown"));
+  assert.deepEqual(eligible(models, { includeUnverified: true }).map(x => x.id), ["a/coder:free"]);
 });
 test("Groq and NVIDIA catalog cannot claim user has a free account", () => {
   for (const provider of ["groq", "nvidia"]) {
