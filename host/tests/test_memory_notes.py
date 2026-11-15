@@ -181,3 +181,10 @@ def test_non_utf8_daily_note_is_skipped_without_breaking_voice_memory(tmp_path):
     current.write_bytes(b"\xff\xfe current bad note")
     assert asyncio.run(brain.command("remember another idea")) == "Sorry, I couldn't save that."
     assert current.read_bytes() == b"\xff\xfe current bad note"
+
+
+def test_secret_filter_allows_bus_pass_and_secret_santa():
+    from mazhost import memory_notes as m
+    assert not m.is_sensitive("pick up my bus pass")
+    assert not m.is_sensitive("secret santa is friday")
+    assert m.is_sensitive("my wifi password is hunter2")

@@ -19,6 +19,9 @@ uint32_t gBackoff      = 5000;
 bool     gWasConnected = false;
 bool     gSetupAp      = false;
 uint8_t  gFailCycles   = 0;
+bool     gTrySecond    = false;  // auto-retry alternates the two saved networks
+uint32_t gClockDeadline = 0;     // non-zero while an SNTP answer is awaited
+
 
 constexpr const char* SETUP_SSID = "Piblo-Setup";
 constexpr const char* SETUP_PASS = "piblosetup";
@@ -136,12 +139,25 @@ void update() {
         Sys.wifiSsid = WiFi.SSID().c_str();
         if (!gWasConnected) {
             notify::post(Note::Success, "Wi-Fi connected", Sys.wifiSsid + " / piblo.local");
-            syncClock();
+            // Async: the old blocking syncClock() froze the UI loop for up to 6 s on every (re)connect.
+            configTime(Cfg.tzMinutesOffset * 15 * 60, 0, "pool.ntp.org", "time.nist.gov");
+            gClockDeadline = millis() + 15000;
         }
         gWasConnected = true;
         gBackoff = 5000;
         gFailCycles = 0;
         if (gSetupAp) stopSetupAp();
+        if (gClockDeadline) {
+            const time_t t = time(nullptr);
+            if (t > 1700000000) {
+                Sys.timeValid = true;
+                Cfg.lastKnownEpoch = static_cast<uint32_t>(t);
+                Cfg.save();
+                gClockDeadline = 0;
+            } else if (static_cast<int32_t>(millis() - gClockDeadline) >= 0) {
+                gClockDeadline = 0;
+            }
+        }
         return;
     }
 
@@ -163,12 +179,19 @@ void update() {
     }
 
     if (millis() >= gNextRetry) {
-        if (!connectSaved()) {
-            gFailCycles++;
-            gBackoff = gBackoff < 60000 ? std::min<uint32_t>(60000, gBackoff * 2) : 60000;
-            gNextRetry = millis() + gBackoff;
-            if (gFailCycles >= 2 && !gSetupAp) startSetupAp();
-        }
+        // Non-blocking: connect() polled for up to 12 s per SSID (24 s with two) on the UI loop each
+        // retry. WiFi.begin() returns at once; success is picked up by the connected() check above.
+        const bool two = !Cfg.wifiSsid.empty() && !Cfg.wifiSsid2.empty();
+        const bool useSecond = Cfg.wifiSsid.empty() || (two && gTrySecond);
+        gTrySecond = two && !gTrySecond;
+        const std::string& ssid = useSecond ? Cfg.wifiSsid2 : Cfg.wifiSsid;
+        const std::string& pass = useSecond ? Cfg.wifiPass2 : Cfg.wifiPass;
+        WiFi.mode(gSetupAp ? WIFI_AP_STA : WIFI_STA);
+        WiFi.begin(ssid.c_str(), pass.c_str());
+        gFailCycles++;
+        gNextRetry = millis() + std::max<uint32_t>(gBackoff, 12000);
+        gBackoff = gBackoff < 60000 ? std::min<uint32_t>(60000, gBackoff * 2) : 60000;
+        if (gFailCycles >= 2 && !gSetupAp) startSetupAp();
     }
 }
 

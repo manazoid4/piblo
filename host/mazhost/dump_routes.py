@@ -79,6 +79,10 @@ def build_dump_router(cfg: Settings, model_router) -> APIRouter:
               project: str | None = None):
         return {"dumps": dumps.list_dumps(inbox, status, project)}
 
+    @router.get("/catch-up")
+    def catch_up():
+        return call(dumps.catch_up)
+
     @router.get("/{dump_id}")
     def get(dump_id: str):
         return call(dumps.get_dump, dump_id)

@@ -223,7 +223,7 @@ def test_prefs_export_reset_need_token_and_export_has_no_secrets(tmp_path):
     assert h["alerts"] == [] and h["approvals"] == [] and "keep me" not in c.get("/buddy/export", headers=H).text
     assert c.get("/buddy/prefs", headers=H).json()["shortcuts"] == sc           # prefs survive a history reset
     c.post("/buddy/event", json={"kind": "done", "text": "next"}, headers=H)     # ids still rise
-    assert c.get("/buddy/events?since=0", headers=H).json()["events"][-1]["id"] >= 2
+    assert c.get("/buddy/events", headers=H).json()["events"][-1]["id"] >= 2
 
 
 def test_connect_info_has_ready_configs_without_a_token(tmp_path):
@@ -277,9 +277,94 @@ def test_approved_idempotency_key_rejects_changed_action_even_after_restart(tmp_
     payload = {'tool': 'Send', 'summary': 'Original', 'idempotency_key': 'bound'}
     item = c.post('/buddy/request', json=payload, headers=H).json()
     assert c.post('/buddy/decide', json={'id': item['id'], 'decision': 'allow'}, headers=H).json()['decision'] == 'allow'
-    for client in (c, boot(tmp_path)):
-        assert client.post('/buddy/request', json=payload, headers=H).json()['decision'] == 'allow'
+    for client, expected in ((c, 'allow'), (boot(tmp_path), 'cancel')):
+        assert client.post('/buddy/request', json=payload, headers=H).json()['decision'] == expected
         changed = client.post('/buddy/request', json={**payload, 'summary': 'Different'}, headers=H)
         assert changed.status_code == 409
         assert 'idempotency' in changed.text.lower()
         assert client.post('/buddy/request', json={**payload, 'nod': True}, headers=H).status_code == 409
+
+
+def _alerts(c):
+    return [a for a in c.get("/buddy/alerts", headers=H).json()["alerts"] if a["fired"]]
+
+
+def test_pending_reminder_survives_restart_and_fires_once(tmp_path):
+    c1 = boot(tmp_path)
+    c1.post("/buddy/alert", headers=H, json={"title": "later", "kind": "reminder", "delay_seconds": 4})
+    c1.post("/buddy/alert", headers=H, json={"title": "now", "kind": "reminder"})
+    assert [a["title"] for a in _alerts(c1)] == ["now"]
+    c2 = boot(tmp_path)   # restart before 'later' is due
+    assert [a["title"] for a in _alerts(c2)] == ["now"]   # fired history is not re-notified
+    time.sleep(4.5)
+    assert sorted(a["title"] for a in _alerts(c2)) == ["later", "now"]
+    def later_notifications():   # durable history: one row per time it actually fired
+        db = sqlite3.connect(tmp_path / "buddy.sqlite3")
+        return db.execute("SELECT COUNT(*) FROM notifications WHERE data LIKE '%\"later\"%'").fetchone()[0]
+    assert later_notifications() == 1
+    c3 = boot(tmp_path)   # restart after it fired: no replay
+    assert sorted(a["title"] for a in _alerts(c3)) == ["later", "now"]
+    assert later_notifications() == 1
+
+
+def test_reminder_missed_during_downtime_fires_late_not_lost(tmp_path):
+    boot(tmp_path).post("/buddy/alert", headers=H, json={"title": "missed", "kind": "reminder", "delay_seconds": 1})
+    time.sleep(1.2)   # Core is down while it comes due
+    assert [a["title"] for a in _alerts(boot(tmp_path))] == ["missed"]
+
+
+def test_pending_reminder_survives_a_flood_of_newer_alerts(tmp_path):
+    c1 = boot(tmp_path)
+    c1.post("/buddy/alert", headers=H, json={"title": "far", "kind": "reminder", "delay_seconds": 3600})
+    for i in range(buddy_mod.MAX_ALERTS + 5):
+        c1.post("/buddy/alert", headers=H, json={"title": f"info{i}", "kind": "info"})
+    c2 = boot(tmp_path)
+    assert "far" in [a["title"] for a in c2.get("/buddy/alerts", headers=H).json()["alerts"]]
+
+
+def test_snoozed_alert_stays_snoozed_across_restart(tmp_path):
+    c1 = boot(tmp_path)
+    aid = c1.post("/buddy/alert", headers=H, json={"title": "nap", "kind": "reminder", "actions": ["ack", "snooze"]}).json()["id"]
+    assert c1.post(f"/buddy/alert/{aid}/snooze", headers=H, json={"minutes": 60}).status_code == 200
+    rec = next(a for a in boot(tmp_path).get("/buddy/alerts", headers=H).json()["alerts"] if a["id"] == aid)
+    assert rec["outcome"] == "snoozed" and rec["snooze_until"] > time.time() + 3000
+
+
+def test_expired_snooze_does_not_renag_on_every_restart(tmp_path, monkeypatch):
+    c1 = boot(tmp_path)
+    aid = c1.post("/buddy/alert", headers=H, json={"title": "nap", "kind": "reminder", "actions": ["ack", "snooze"]}).json()["id"]
+    assert c1.post(f"/buddy/alert/{aid}/snooze", headers=H, json={"minutes": 1}).status_code == 200
+    real = time.time
+    monkeypatch.setattr(time, "time", lambda: real() + 120)   # the snooze has run out
+    c1.get("/buddy/alerts", headers=H)                         # poll: the alert re-fires once
+    import sqlite3
+    row = sqlite3.connect(str(tmp_path / "buddy.sqlite3")).execute("SELECT outcome FROM alerts WHERE id=?", (aid,)).fetchone()
+    assert row[0] is None   # the persisted row no longer says "snoozed", so a restart cannot re-nag
+
+
+def test_approved_idempotent_request_expires_in_memory_and_after_restart(tmp_path, monkeypatch):
+    c = boot(tmp_path)
+    payload = {"tool": "Send", "summary": "Original", "idempotency_key": "expiry"}
+    item = c.post("/buddy/request", json=payload, headers=H).json()
+    assert c.post("/buddy/decide", json={"id": item["id"], "decision": "allow"}, headers=H).json()["decision"] == "allow"
+    real = buddy_mod.time.monotonic
+    monkeypatch.setattr(buddy_mod.time, "monotonic", lambda: real() + buddy_mod.TIMEOUT_S + 1)
+    assert c.post("/buddy/request", json=payload, headers=H).json()["decision"] == "cancel"
+    restarted = boot(tmp_path)
+    assert restarted.get("/buddy/state", params={"id": item["id"]}, headers=H).json()["decision"] == "cancel"
+    assert restarted.post("/buddy/request", json=payload, headers=H).json()["decision"] == "cancel"
+
+
+@pytest.mark.parametrize("removal", ["restart", "eviction"])
+def test_stored_allow_cannot_be_used_without_live_deadline(tmp_path, monkeypatch, removal):
+    monkeypatch.setattr(buddy_mod, "MAX_ITEMS", 1)
+    c = boot(tmp_path)
+    payload = {"tool": "Send", "summary": "Original", "idempotency_key": "stored"}
+    item = c.post("/buddy/request", json=payload, headers=H).json()
+    assert c.post("/buddy/decide", json={"id": item["id"], "decision": "allow"}, headers=H).json()["decision"] == "allow"
+    if removal == "restart":
+        c = boot(tmp_path)
+    else:
+        c.post("/buddy/request", json={"tool": "Another"}, headers=H)
+    assert c.get("/buddy/state", params={"id": item["id"]}, headers=H).json()["decision"] == "cancel"
+    assert c.post("/buddy/request", json=payload, headers=H).json()["decision"] == "cancel"

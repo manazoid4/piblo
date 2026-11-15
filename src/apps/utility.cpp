@@ -109,7 +109,7 @@ public:
     const char* id() const override { return "calc"; }
     const char* title() const override { return "Calculator"; }
     const char* hints() const override {
-        return "ENTER evaluate   A use answer   del clear";
+        return "ENTER =  A use answer  del";
     }
 
     bool onKey(const KeyEvent& e) override {
@@ -133,7 +133,7 @@ public:
     void render(M5Canvas& g) override {
         g.fillScreen(BG);
         ui::header(g, "Calculator");
-        _field.draw(g, PAD, BODY_Y + 24, SCREEN_W - PAD * 2, "1250*0.2");
+        _field.draw(g, PAD, BODY_Y + 24, SCREEN_W - PAD * 2, "e.g. 1250*0.2");
 
         g.setTextDatum(top_right);
         g.setFont(&fonts::Font4);
@@ -327,8 +327,7 @@ public:
 
         ui::header(g, "Text Viewer", store::backendName());
         if (_files.empty()) {
-            ui::emptyState(g, "No .txt or .md files",
-                           "put some in /maz/notes on the card");
+            ui::emptyState(g, "No notes yet", "Save one from Notes.");
             return;
         }
         const int rows =
@@ -371,7 +370,7 @@ public:
     const char* id() const override { return "gen"; }
     const char* title() const override { return "Generator"; }
     const char* hints() const override {
-        return "up/down type  ENTER make  S snippet";
+        return "UP/DOWN type  ENTER make";
     }
 
     void onEnter() override { generate(); }

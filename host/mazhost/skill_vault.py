@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 
 from .config import Settings
+from .errors import RouteError
 from .llm import Models, Route
 
 
@@ -84,10 +85,12 @@ class SkillVault:
         }
 
     @staticmethod
-    def _fallback(session_id: str, transcript: str) -> dict[str, Any]:
+    def _fallback(session_id: str, transcript: str, events: list[dict[str, Any]]) -> dict[str, Any]:
         text = " ".join(transcript.split()).strip()
         sentences = [x.strip() for x in re.split(r"(?<=[.!?])\s+", text) if x.strip()]
-        steps = sentences[:12] or ["Review the Teach demonstration and repeat the demonstrated workflow."]
+        marks = [str(e.get("note") or "").strip() for e in events if e.get("type") == "mark"]
+        marks = [note for note in marks if note and note != "primary user mark"]
+        steps = (sentences or marks)[:12] or ["Review the recording; no narrated or named steps were captured."]
         return {
             "name": f"Teach workflow {session_id[-6:]}",
             "description": "Repeat a workflow captured through Piblo Teach-by-Demonstration.",
@@ -99,6 +102,8 @@ class SkillVault:
 
     def draft_from_teach(self, session_id: str, route: Route = "auto") -> dict[str, Any]:
         source = self._teach_source(session_id)
+        if source["manifest"].get("state") not in {"ready", "ready_partial"}:
+            raise SkillError("teach_session_not_ready")
         transcript = source["transcript"]
         prompt = (
             "Turn this Piblo Teach-by-Demonstration evidence into one reusable procedural skill. "
@@ -121,8 +126,8 @@ class SkillVault:
             data = json.loads(reply)
             if not isinstance(data, dict):
                 raise ValueError("not_object")
-        except (RuntimeError, json.JSONDecodeError, ValueError):
-            data = self._fallback(session_id, transcript)
+        except (RuntimeError, RouteError, json.JSONDecodeError, ValueError):
+            data = self._fallback(session_id, transcript, source["events"])
 
         name = str(data.get("name") or "MAZ taught skill")[:100]
         slug = _slug(name)

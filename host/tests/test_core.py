@@ -85,3 +85,17 @@ def test_jobs_are_allowlisted_and_unknown_actions_rejected(tmp_path: Path):
     jobs = CoreJobs(core)
     with pytest.raises(CoreError, match="action_not_allowed"):
         jobs.start("shell", "demo")
+
+
+def test_invalidate_serves_stale_then_refreshes_in_background(tmp_path: Path, monkeypatch):
+    import time
+    core, _ = make_core(tmp_path)
+    version = {"n": 1}
+    monkeypatch.setattr(core, "_project_summary", lambda path: {"name": path.name, "behind": version["n"]})
+    assert core.projects()[0]["behind"] == 1
+    version["n"] = 2  # e.g. a git pull changed the branch counts
+    core._invalidate_project_cache()
+    deadline = time.monotonic() + 5
+    while core.projects()[0]["behind"] != 2 and time.monotonic() < deadline:
+        time.sleep(0.02)  # reads never block: they return the cached list while the rescan runs
+    assert core.projects()[0]["behind"] == 2

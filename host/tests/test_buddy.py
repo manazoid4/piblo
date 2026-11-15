@@ -382,6 +382,19 @@ def test_today_agent_cap_and_no_automatic_decision(monkeypatch):
     rid = c.post("/buddy/request", json={"tool": "Bash"}, headers=H).json()["id"]
     assert c.get(f"/buddy/state?id={rid}", headers=H).json()["decision"] is None
 
+
+def test_saved_catch_up_keeps_buddy_activity_separate(tmp_path):
+    from mazhost import dumps
+
+    inbox = tmp_path / "inbox"
+    c = TestClient(create_app(Settings(token=TOKEN, _env_file=None, dumps_dir=str(inbox))))
+    dump_id = dumps.save_dump(inbox, "Bring the folder", {"actions": ["Bring the folder"]}, source="web")["id"]
+    before = c.get("/buddy/today", headers=H).json()
+    assert c.get("/dumps/catch-up", headers=H).json()["actions"][0]["id"] == dump_id
+    c.post(f"/dumps/{dump_id}/done", headers=H, json={"agent": "web"})
+    assert c.get("/dumps/catch-up", headers=H).json()["actions"] == []
+    assert c.get("/buddy/today", headers=H).json() == before
+
 def test_halt_immediately_denies_and_never_auto_allows():
     c = api()
     a = c.post("/buddy/request", json={"tool": "Bash"}, headers=H).json()["id"]

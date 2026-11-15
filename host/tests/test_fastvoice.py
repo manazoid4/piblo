@@ -85,6 +85,23 @@ def test_planner_orders_parts_and_records_timings():
         planner.part("nope", 0)
 
 
+def test_part_zero_always_renders_before_later_parts():
+    done = []
+
+    def synth(text):
+        from pathlib import Path
+        time.sleep(0.3 if text.startswith("Do it") else 0.0)  # part 0 slow, part 1 instant
+        done.append(text[:5])
+        return Path("x.wav")
+
+    planner = SpeakPlanner(synth, TimingLog(20))
+    pid, n = planner.start("Do it now. Then check the logs and report back to me when you finish all of it.", {})
+    assert n == 2
+    planner.part(pid, 1)
+    planner.part(pid, 0)
+    assert done == ["Do it", "Then "]
+
+
 def test_phrase_cache_serves_second_call_without_fish(tmp_path, fish):
     out = SpeechOut(_settings(tmp_path))
     a = out.synthesize("Sorry, my brain is offline, try again")

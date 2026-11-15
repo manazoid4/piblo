@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import io
 import json
+from pathlib import Path
+import shutil
+import subprocess
 import wave
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from fastapi.testclient import TestClient
@@ -93,6 +97,9 @@ class Models:
         return {}
 
     def chat(self, messages, route):
+        if self.fail == "route":  # what the real router raises with no model at all
+            from mazhost.errors import ErrorCode, RouteError
+            raise RouteError(ErrorCode.ROUTE_UNAVAILABLE, "degraded")
         if self.fail:
             raise RuntimeError("llm down")
         return json.dumps(STRUCT), "local"
@@ -148,9 +155,12 @@ def test_braindump_save_failure_does_not_break_reply(tmp_path, monkeypatch):
     assert r.status_code == 200 and r.json()["dump_id"] is None
 
 
-def test_llm_failure_still_saves_transcript(tmp_path):
-    client, inbox = make(tmp_path, Models(fail=True))
-    assert post_dump(client).status_code == 503
+@pytest.mark.parametrize("fail", [True, "route"])
+def test_llm_failure_still_saves_transcript(tmp_path, fail):
+    client, inbox = make(tmp_path, Models(fail=fail))
+    r = post_dump(client)  # no brain must not look like "Core is off" on the device
+    assert r.status_code == 200, r.text
+    assert r.json()["provider"].startswith("none") and r.json()["dump_id"]
     [m] = dumps.list_dumps(inbox)
     assert "spoken words for the dump." in dumps.get_dump(inbox, m["id"])["body"]
 
@@ -179,3 +189,193 @@ def test_get_dump_returns_parsed_sections(tmp_path):
     assert got["ideas"] == ["idea ## b"]
     assert got["questions"] == []
     assert got["transcript"] == "line one\n## not a heading\nline two"
+
+
+def test_recall_sources_survive_new_app_instance(tmp_path):
+    client, inbox = make(tmp_path)
+    ids = [dumps.save_dump(inbox, text, None, source="web")["id"] for text in
+           ("Amberkite: bring the blue folder.", "Amberkite: book a quiet room.")]
+    restarted, _ = make(tmp_path)
+    listed = restarted.get("/dumps", headers=AUTH).json()["dumps"]
+    assert {d["id"] for d in listed} == set(ids)
+    for meta in listed:
+        original = restarted.get(f"/dumps/{meta['id']}", headers=AUTH).json()
+        assert original["created"] == meta["created"]
+        assert "Amberkite:" in original["transcript"]
+        assert "nonexistent-term" not in original["body"]
+
+
+@pytest.mark.parametrize("created", [None, "invalid", 42, [], {}, "2026-11-13T10:00:00"])
+def test_recall_and_catch_up_with_invalid_created(tmp_path, created):
+    client, inbox = make(tmp_path)
+    valid = dumps.save_dump(inbox, "Valid capture", {"actions": ["Keep this"]}, source="web")
+    invalid = dumps.save_dump(inbox, "Undated capture", {"actions": ["Skip this"]}, source="web")
+    path = inbox / (invalid["id"] + ".md")
+    body = path.read_text(encoding="utf-8")
+    path.write_text(body.replace(json.dumps(invalid["created"]), json.dumps(created)), encoding="utf-8")
+
+    listed = client.get("/dumps", headers=AUTH).json()["dumps"]
+    assert [m["id"] for m in listed] == [valid["id"], invalid["id"]]
+    assert listed[1]["created"] == ""
+    recalled = client.get(f"/dumps/{invalid['id']}", headers=AUTH).json()
+    assert recalled["created"] == "" and recalled["transcript"] == "Undated capture"
+    result = dumps.catch_up(inbox, now=datetime.fromisoformat(valid["created"]))
+    assert [m["id"] for m in result["dumps"]] == [valid["id"]]
+    assert [a["text"] for a in result["actions"]] == ["Keep this"]
+    assert result["skipped"] == 1
+
+
+def test_console_recall_limit_sources_empty_and_failure():
+    if not shutil.which("node"):
+        pytest.skip("Node is required for the console JavaScript check")
+    html = (Path(__file__).parents[1] / "mazhost/static/ui.html").read_text(encoding="utf-8")
+    script = html.split("/* ---- source-backed recall:", 1)[1].split("/* ---- list ---- */", 1)[0]
+    script = script[script.index("function sourceButton"):]
+    check = r'''
+const assert = require('node:assert/strict');
+const el = (tag, text, cls) => ({tag, text, cls, children: [], append(...xs) { this.children.push(...xs); }, replaceChildren(...xs) { this.children = xs; }});
+const nodes = Object.fromEntries(['recall', 'recallq', 'recallresults'].map(id => [id, el('div')]));
+const $ = id => nodes[id], arr = x => x, str = x => x || '', fail = e => e.message;
+let opened, view, calls = 0;
+const select = id => { opened = id; }, showView = v => { view = v; };
+const records = Array.from({length: 5}, (_, i) => ({id: 'source-' + i, created: '2026-11-13T10:00:00Z', source: 'web', body: 'Exact Amberkite <script> text ' + i}));
+const API = {list: async () => ({dumps: records}), get: async id => { calls++; return records.find(d => d.id === id); }};
+'''
+    assertions = r'''
+(async () => {
+  const button = {};
+  const submit = () => nodes.recall.onsubmit({preventDefault() {}, submitter: button});
+  nodes.recallq.value = 'AMBERKITE';
+  await submit();
+  assert.equal(calls, 3);
+  assert.equal(button.disabled, false);
+  assert.equal(nodes.recallresults.children.length, 3);
+  const card = nodes.recallresults.children[0];
+  assert.match(card.children[0].text, /2026-11-13T10:00:00Z.*Source ID: source-0/);
+  assert.equal(card.children[1].text, records[0].body);
+  card.children[2].onclick();
+  assert.equal(opened, 'source-0'); assert.equal(view, 'inbox');
+  nodes.recallq.value = 'nonexistent-term'; await submit();
+  assert.match(nodes.recallresults.children[0].text, /No saved captures match/);
+  API.get = async () => { throw {status: 404}; };
+  await submit(); assert.match(nodes.recallresults.children[0].text, /No saved captures match/);
+  API.get = async () => { throw new Error('offline'); };
+  await submit(); assert.match(nodes.recallresults.children[0].text, /Recall unavailable: offline/);
+  assert.equal(button.disabled, false);
+})().catch(error => { console.error(error); process.exit(1); });
+'''
+    result = subprocess.run(["node", "-"], input=check + script + assertions, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_saved_catch_up_window_and_unfinished_actions(tmp_path):
+    now = datetime(2026, 11, 13, 12, tzinfo=timezone.utc)
+
+    def saved(label, offset, status="new", actions=None):
+        meta = dumps.save_dump(tmp_path, label, {"summary": label, "actions": actions or [label]}, source="web")
+        path = tmp_path / (meta["id"] + ".md")
+        content = path.read_text(encoding="utf-8")
+        content = content.replace(meta["created"], (now + offset).isoformat())
+        path.write_text(content, encoding="utf-8")
+        if status == "done":
+            dumps.finish_dump(tmp_path, meta["id"], "tester")
+        elif status == "claimed":
+            dumps.claim_dump(tmp_path, meta["id"], "tester")
+        return meta["id"]
+
+    old = saved("old", -timedelta(days=1, seconds=1))
+    boundary = saved("boundary", -timedelta(days=1))
+    claimed = saved("claimed", -timedelta(hours=1), "claimed", ["Call the room", "Bring the folder"])
+    done = saved("finished", -timedelta(minutes=10), "done")
+    newest = saved("latest", timedelta(0), actions=["Send the agenda"])
+    future = saved("future", timedelta(seconds=1))
+    result = dumps.catch_up(tmp_path, now=now)
+    assert result["window_start"] == (now - timedelta(days=1)).isoformat()
+    assert result["window_end"] == now.isoformat()
+    assert [d["id"] for d in result["dumps"]] == [newest, done, claimed, boundary]
+    assert [a["text"] for a in result["actions"]] == ["Send the agenda", "Call the room", "Bring the folder"]
+    assert [a["id"] for a in result["actions"]] == [newest, claimed, claimed]
+    assert all(a["id"] not in (done, old, future) for a in result["actions"])
+    dumps.finish_dump(tmp_path, newest, "tester")
+    assert [a["id"] for a in dumps.catch_up(tmp_path, now=now)["actions"]] == [claimed, claimed, boundary]
+
+
+def test_saved_catch_up_empty_bad_date_and_checked_actions(tmp_path):
+    assert dumps.catch_up(tmp_path)["dumps"] == []
+    assert dumps.catch_up(tmp_path)["actions"] == []
+    meta = dumps.save_dump(tmp_path, "neutral", {"actions": ["Keep", "Completed"]}, source="web")
+    path = tmp_path / (meta["id"] + ".md")
+    body = path.read_text(encoding="utf-8").replace("- [ ] Completed", "- [x] Completed")
+    path.write_text(body, encoding="utf-8")
+    assert [a["text"] for a in dumps.catch_up(tmp_path)["actions"]] == ["Keep"]
+    path.write_text(body.replace(meta["created"], "invalid"), encoding="utf-8")
+    result = dumps.catch_up(tmp_path)
+    assert result["dumps"] == [] and result["actions"] == [] and result["skipped"] == 1
+
+
+def test_saved_catch_up_authenticated_route_and_done_refresh(tmp_path):
+    client, inbox = make(tmp_path, Models(fail=True))
+    assert client.get("/dumps/catch-up").status_code == 401
+    dump_id = dumps.save_dump(inbox, "Bring folder", {"actions": ["Bring folder"]}, source="web")["id"]
+    result = client.get("/dumps/catch-up", headers=AUTH)
+    assert result.status_code == 200
+    assert result.json()["actions"][0]["id"] == dump_id
+    client.post(f"/dumps/{dump_id}/done", headers=AUTH, json={"agent": "web"})
+    assert client.get("/dumps/catch-up", headers=AUTH).json()["actions"] == []
+    assert client.get("/dumps/catch-up", headers=AUTH).json()["dumps"][0]["id"] == dump_id
+
+
+def test_console_catch_up_rendering_empty_failure_and_script_syntax():
+    if not shutil.which("node"):
+        pytest.skip("Node is required for the console JavaScript check")
+    html = (Path(__file__).parents[1] / "mazhost/static/ui.html").read_text(encoding="utf-8")
+    script = html.split("<script>", 1)[1].split("</script>", 1)[0]
+    parsed = subprocess.run(["node", "--check", "-"], input=script, text=True, capture_output=True)
+    assert parsed.returncode == 0, parsed.stderr
+    render = script.split("/* ---- saved-capture catch-up ---- */", 1)[1].split('$("catchuprefresh").onclick', 1)[0]
+    navigation = "function showView(v)" + script.split("function showView(v)", 1)[1].split("async function needAct", 1)[0]
+    check = r'''
+const assert = require('node:assert/strict');
+const el = (tag, text, cls) => ({tag, text, cls, children: [], append(...xs) { this.children.push(...xs); }, replaceChildren(...xs) { this.children = xs; }});
+const nodes = {catchupcontent: el('div'), catchuprefresh: {}};
+const $ = id => nodes[id], arr = x => x, str = x => x || '', fail = e => e.message;
+const sourceMeta = d => el('span', d.id), sourceButton = d => el('button', d.id);
+const API = {};
+for (const id of ['catchup', 'needs', 'device', 'tab-inbox', 'tab-catchup', 'tab-needs', 'tab-device', 'rec']) {
+  nodes[id] = {hidden: true, style: {}, attributes: {}, setAttribute(k, v) { this.attributes[k] = v; }};
+}
+const N = {}, D = {}, document = {body: {classList: {toggle() {}}, style: {setProperty() {}}}};
+const refreshNeeds = () => {}, refreshDevice = () => {}, liveLoop = () => {};
+'''
+    assertions = r'''
+(async () => {
+  const empty = {window_start: 'START', window_end: 'END', skipped: 1, actions: [], dumps: []};
+  renderCatchup(empty);
+  const text = nodes.catchupcontent.children.map(n => n.text || '').join(' ');
+  assert.match(text, /Coverage: START to END/);
+  assert.match(text, /1 saved captures could not be included/);
+  assert.match(text, /No saved captures in this window/);
+  assert.match(text, /No stored actions from unfinished captures/);
+  renderCatchup({...empty, skipped: 0, actions: [{id: 'a', text: '<script>action'}], dumps: [{id: 'a', summary: '<script>summary', status: 'new'}]});
+  const cards = nodes.catchupcontent.children.filter(n => n.tag === 'article');
+  assert.equal(cards.length, 2);
+  assert.equal(cards[0].children[0].text, '<script>action');
+  assert.equal(cards[1].children[0].text, '<script>summary');
+  assert.equal(cards[0].children.at(-1).text, 'a');
+  assert.equal(cards[1].children.at(-1).text, 'a');
+  API.catchup = async () => empty;
+  nodes['tab-catchup'].onclick();
+  await new Promise(setImmediate);
+  assert.equal(C.on, true);
+  assert.equal(nodes.catchup.hidden, false);
+  assert.equal(nodes['tab-catchup'].attributes['aria-pressed'], 'true');
+  nodes['tab-inbox'].onclick();
+  assert.equal(C.on, false); assert.equal(nodes.catchup.hidden, true);
+  API.catchup = async () => { throw new Error('offline'); };
+  await refreshCatchup();
+  assert.match(nodes.catchupcontent.children[0].text, /Catch-up unavailable: offline/);
+  assert.equal(nodes.catchuprefresh.disabled, false);
+})().catch(error => { console.error(error); process.exit(1); });
+'''
+    result = subprocess.run(["node", "-"], input=check + render + navigation + assertions, text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr

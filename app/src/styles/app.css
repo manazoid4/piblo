@@ -134,6 +134,13 @@ p {
   margin-left: auto;
   font: var(--text-xs) var(--font-ui);
   color: var(--text-3);
+  opacity: 0.55;
+  transition: opacity var(--dur-fast) var(--ease);
+}
+.rail-item:hover kbd,
+.rail-item:focus-visible kbd,
+.rail-item:focus-within kbd {
+  opacity: 1;
 }
 .rail-badge {
   margin-left: auto;
@@ -233,22 +240,22 @@ p {
   gap: var(--s-2);
   height: 36px;
   padding: 0 var(--s-4);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-pill);
   border: var(--btn-stroke);
   background: var(--surface);
-  box-shadow: var(--btn-shadow);
-  margin-bottom: 3px;
+  box-shadow: var(--btn-shadow-soft);
+  margin-bottom: 0;
   cursor: pointer;
   font-weight: var(--weight-medium);
   font-size: var(--text-sm);
-  transition: background var(--dur-fast) var(--ease), transform var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
+  transition: background var(--dur-fast) var(--ease), box-shadow var(--dur-fast) var(--ease);
 }
 .btn:hover:not(:disabled) {
   background: var(--surface-2);
 }
 .btn:active:not(:disabled) {
-  transform: translateY(3px);
-  box-shadow: var(--btn-shadow-pressed);
+  transform: translateY(1px);
+  box-shadow: var(--btn-shadow-soft-pressed);
 }
 .btn:disabled {
   opacity: 0.5;
@@ -276,8 +283,8 @@ p {
   color: var(--danger);
 }
 .btn.sm {
-  box-shadow: 0 2px 0 var(--ink);
-  margin-bottom: 2px;
+  box-shadow: var(--btn-shadow-soft);
+  margin-bottom: 0;
   height: 30px;
   padding: 0 var(--s-3);
 }
@@ -515,7 +522,7 @@ textarea.input {
 }
 .screen {
   width: 100%;
-  max-width: 960px;
+  max-width: 640px;
   height: auto; /* the img height="135" attribute would otherwise squash it to a strip */
   aspect-ratio: 240 / 135;
   image-rendering: pixelated;

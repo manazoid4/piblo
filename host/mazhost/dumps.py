@@ -10,7 +10,7 @@ import os
 import re
 import time
 from contextlib import contextmanager
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
@@ -99,6 +99,12 @@ def _parse(text: str) -> tuple[dict, str]:
             meta[key] = json.loads(raw)
         except json.JSONDecodeError:
             meta[key] = raw
+    if "created" in meta:
+        try:
+            if datetime.fromisoformat(meta["created"]).tzinfo is None:
+                raise ValueError("missing timezone")
+        except (TypeError, ValueError):
+            meta["created"] = ""
     return meta, body
 
 
@@ -194,6 +200,38 @@ def get_dump(inbox: Path, dump_id: str) -> dict:
         "transcript": tail.partition("\n\n## Done (")[0].strip(),
         "body": body,
     }
+
+
+def catch_up(inbox: Path, *, now: datetime | None = None) -> dict:
+    """Last 24 h of saved captures, with stored actions from unfinished captures only."""
+    end = now or datetime.now(timezone.utc)
+    start = end - timedelta(hours=24)
+    recent, skipped = [], 0
+    for meta in list_dumps(inbox):
+        try:
+            created = datetime.fromisoformat(meta.get("created", ""))
+            if created.tzinfo is None:
+                raise ValueError("missing timezone")
+        except (TypeError, ValueError):
+            skipped += 1
+            continue
+        if start <= created <= end:
+            recent.append((created, meta))
+    summaries, actions = [], []
+    for _, meta in sorted(recent, key=lambda item: (item[0], item[1]["id"]), reverse=True):
+        try:
+            original = get_dump(inbox, meta["id"])
+        except (DumpError, OSError):
+            skipped += 1
+            continue
+        summaries.append(meta)
+        if original.get("status") not in ("new", "claimed"):
+            continue
+        for text in original["actions"]:
+            if len(actions) < 3 and text.strip() and not text.lower().startswith("[x] "):
+                actions.append({"id": meta["id"], "created": meta["created"], "source": meta.get("source", ""), "text": text})
+    return {"window_start": start.isoformat(), "window_end": end.isoformat(),
+            "dumps": summaries, "actions": actions, "skipped": skipped}
 
 
 def _update(inbox: Path, dump_id: str, change: Callable[[dict, str], str | None]) -> dict:

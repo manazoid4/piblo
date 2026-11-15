@@ -212,9 +212,19 @@ class Buddy:
 
     def _reload_alerts(self) -> None:
         """History only: reloaded alerts are marked fired and expired so a restart never re-notifies."""
-        for row in reversed(self.store.alerts(MAX_ALERTS)):
-            rec = {**row["data"], "due": row["created"], "fired": True, "snooze_until": 0.0, "_exp": 0.0,
-                   "outcome": "acked" if row["outcome"] == "acked" else None}
+        rows = {r["id"]: r for r in [*self.store.pending_alerts(), *self.store.alerts(MAX_ALERTS)]}
+        for row in sorted(rows.values(), key=lambda r: r["created"]):
+            data = row["data"]
+            # A reminder that never fired before the restart stays pending (late, not lost); legacy rows have no _due.
+            pending = "_due" in data and not data.get("_fired") and row["outcome"] is None
+            snoozed = row["outcome"] == "snoozed" and data.get("_snooze") is not None
+            rec = {**{k: v for k, v in data.items() if k not in ("_due", "_fired", "_snooze")},
+                   "due": data["_due"] if pending else row["created"], "fired": not pending,
+                   "snooze_until": data["_snooze"] if snoozed else 0.0,
+                   "_exp": (row["expires"] or float("inf")) if pending else 0.0,
+                   "outcome": "acked" if row["outcome"] == "acked" else "snoozed" if snoozed else None}
+            if snoozed:
+                rec["_exp"] = row["expires"] or float("inf")
             self._alerts[rec["id"]] = rec
 
     def _halted_locked(self) -> bool:
@@ -325,7 +335,7 @@ class Buddy:
                 rec["expires_at"] = datetime.fromtimestamp(rec["_exp"], timezone.utc).isoformat()
             self._alerts[aid] = rec
             self._db("add_alert", {"id": aid, "agent": a.agent or a.source, "created": now, "_exp": rec.get("_exp"),
-                                   "public": {k: v for k, v in rec.items() if k not in _PRIVATE}},
+                                   "public": {**{k: v for k, v in rec.items() if k not in _PRIVATE}, "_due": rec["due"]}},
                      a.idempotency_key or None)
             self._fire_due_locked()
             return {"ok": True, "routed": "alert", "id": aid, "scheduled": not rec["fired"]}
@@ -344,6 +354,9 @@ class Buddy:
             if not rec["fired"] and now < rec["due"]:
                 continue
             rec["fired"], rec["outcome"] = True, None   # (re)fire: an expired snooze nags again
+            if snoozed:
+                self._db("set_alert_outcome", rec["id"], None)   # persist the cleared snooze or every restart re-nags
+            self._db("mark_alert_fired", rec["id"])
             self._event_id += 1
             self._db("record_event_id", self._event_id)
             public = {k: v for k, v in rec.items() if k not in _PRIVATE}
@@ -361,9 +374,9 @@ class Buddy:
                 raise ValueError("action_not_offered")
             rec["outcome"] = "acked" if action == "ack" else "snoozed"
             rec["outcome_at"] = time.time()
-            self._db("set_alert_outcome", aid, rec["outcome"])
             if action == "snooze":
                 rec["snooze_until"] = rec["outcome_at"] + minutes * 60
+            self._db("set_alert_outcome", aid, rec["outcome"], rec["snooze_until"] if action == "snooze" else None)
             return {"ok": True, "id": aid, "outcome": rec["outcome"]}
 
     def alerts(self) -> dict:
@@ -444,7 +457,8 @@ class Buddy:
 
     def _stored_view(self, row: dict) -> dict:
         """An approval that is no longer in memory (evicted, or from before a restart). Never pending."""
-        expired = row["decision"] in (None, "expired")
+        # A stored grant has no trustworthy monotonic deadline after restart or eviction.
+        expired = row["decision"] in (None, "expired", "allow")
         return {"id": row["id"], "tool": row["tool"], "summary": row["summary"], "agent": row["agent"],
                 "decision": "cancel" if expired else row["decision"], "known": True,
                 "digest": row.get("digest", ""), **({"instruction": row["instruction"]} if row.get("instruction") else {}),
@@ -465,7 +479,7 @@ class Buddy:
                 if known in self._items:
                     if self._items[known]["digest"] != digest:
                         raise HTTPException(status_code=409, detail="idempotency key already used for a different request")
-                    return {**self._items[known], "duplicate": True}
+                    return {**self._items[known], **self.state(known), "duplicate": True}
                 row = self._db("find_approval_by_idem", idem)
                 if row:
                     if row.get("digest") != digest:

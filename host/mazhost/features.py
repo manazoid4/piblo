@@ -67,6 +67,9 @@ CATALOGUE = {
     'utilities': ('everyday', 'src/apps/utility.cpp', 'Piblo'),
     'charging-screen': ('everyday', 'src/apps/charging.cpp', 'Piblo and a charger'),
     'dictation': ('everyday', 'src/audio/dictate.cpp', 'Piblo and configured speech recognition'),
+    'hey-piblo': ('everyday', 'host/mazhost/wakeword.py', 'Open Live session, PC detector and optional model; hardware accuracy and model rights unconfirmed'),
+    'voice-shortcuts': ('workflows', 'host/mazhost/shortcuts.py', 'Configured target, physical approval; commands also require signed PC authority'),
+    'fetch-from-home': ('connect', 'host/mazhost/file_vault.py', 'Explicit home folder, paired Core; remote use needs home Tailscale URL/token'),
 }
 
 EXTRA_FEATURES = [
@@ -79,9 +82,9 @@ EXTRA_FEATURES = [
     {'id': 'voice-conversation', 'name': 'Talk to Piblo', 'summary': 'Ask a question by voice and hear a reply.',
      'steps': ['Start a voice turn on Piblo.', 'Ask a question.', 'Check the answer and audio.']},
     {'id': 'capture-thoughts', 'name': 'Capture a thought', 'summary': 'Save a thought to the inbox.',
-     'steps': ['Capture a short thought on Piblo.', 'Find the saved thought in the inbox.']},
+     'steps': ['Capture a thought on Piblo.', 'Find it in Windows Memory.', 'Choose Read and verify the full original text, including its last sentence.']},
     {'id': 'focus-timer', 'name': 'Focus timer', 'summary': 'Start and finish a timed focus session.',
-     'steps': ['Start a focus session.', 'Check the remaining time.', 'End the session.']},
+     'steps': ['Start a focus session in Windows Actions.', 'After expiry, check Finish and Stop remain available.', 'Choose Finish and verify the timer returns to idle.', 'Start another session, choose Stop and verify it ends without marking the task done.']},
     {'id': 'needs-you', 'name': 'Needs you', 'summary': 'See the items waiting for your attention.',
      'steps': ['Create an item that needs attention.', 'Open Actions and find the item.']},
     {'id': 'saved-library', 'name': 'Saved library', 'summary': 'Search items saved to your library.',
@@ -95,7 +98,7 @@ EXTRA_FEATURES = [
     {'id': 'agent-jobs', 'name': 'Agent jobs', 'summary': 'Start approved agent work and see its progress.',
      'steps': ['Request approval for an agent task.', 'Approve it on the phone.', 'Start and inspect the job.']},
     {'id': 'screen-teaching', 'name': 'Teach a workflow', 'summary': 'Capture a workflow for later review.',
-     'steps': ['Start a teaching capture.', 'Complete a short workflow.', 'Review the captured result.']},
+     'steps': ['Record a narrated PC workflow.', 'Open Show me once on the PC and create a draft.', 'Review against the recording and explicitly save the workflow; this does not replay it.']},
     {'id': 'device-updates', 'name': 'Piblo updates', 'summary': 'Check for and stage a device update.',
      'steps': ['Check for an update.', 'Review the offered version before installation.']},
     {'id': 'buddy-alerts', 'name': 'Buddy alerts', 'summary': 'See reminders and alerts on Piblo.',
@@ -118,6 +121,12 @@ EXTRA_FEATURES = [
      'steps': ['Connect a charger.', 'Check the charging screen.']},
     {'id': 'dictation', 'name': 'Dictation', 'summary': 'Turn spoken words into text.',
      'steps': ['Open dictation.', 'Speak a short phrase.', 'Check the resulting text.']},
+    {'id': 'hey-piblo', 'name': 'Hey Piblo (experimental)', 'summary': 'Arm a local wake-word gate in an open Live session.',
+     'steps': ['Install and configure the optional PC detector model.', 'Open Live, say Hey Piblo, pause, then speak a command.', 'Verify unrelated speech is ignored and playback re-arms the gate.']},
+    {'id': 'voice-shortcuts', 'name': 'Approved voice shortcuts', 'summary': 'Run one configured webhook or authorised PC command.',
+     'steps': ['Configure a fixed named target on the PC.', 'Ask for that shortcut and verify it waits for device approval.', 'Deny and verify no execution; allow a fresh request and verify one execution and its result.']},
+    {'id': 'fetch-from-home', 'name': 'Fetch from Home', 'summary': 'Fetch an original document from a selected local or Tailscale home folder.',
+     'steps': ['Opt in one home folder; configure the travelling PC connection if needed.', 'Ask for a document by name.', 'Fetch it in Windows Memory and verify original bytes; verify files outside the chosen folder stay unavailable.']},
 ]
 
 HARDWARE_EVIDENCE = {

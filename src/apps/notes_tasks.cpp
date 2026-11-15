@@ -399,7 +399,7 @@ public:
     const char* title() const override { return "Snippets"; }
     const char* hints() const override {
         if (_adding) return "ENTER next/save   ESC cancel";
-        return "A add   ENTER show   D delete";
+        return _items.empty() ? "A add" : "A add  ENTER show  D delete";
     }
 
     void onEnter() override {

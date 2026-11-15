@@ -5,7 +5,7 @@ const invoke = <T>(channel: string, ...args: unknown[]) => ipcRenderer.invoke(ch
 
 const bridge: PibloBridge = {
   platform: process.platform,
-  version: process.argv.find((a) => a.startsWith('--piblo-version='))?.slice(15) ?? '',
+  version: process.argv.find((a) => a.startsWith('--piblo-version='))?.slice('--piblo-version='.length) ?? '',
   core: {
     state: () => invoke('core:state'),
     ensure: () => invoke('core:ensure'),

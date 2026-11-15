@@ -31,7 +31,7 @@ void scheduleReminder(store::Record& reminder, uint32_t delaySeconds) {
 namespace {
 
 void drawRecords(M5Canvas& g, const std::vector<store::Record>& rows, const ListCursor& cursor) {
-    if (rows.empty()) { ui::emptyState(g, "Nothing here", "use the keyboard shortcut to add one"); return; }
+    if (rows.empty()) { ui::emptyState(g, "Nothing here", "press A to add one"); return; }
     const int visible = std::min<int>(ROWS_VISIBLE - 1, rows.size());
     for (int row = 0; row < visible; ++row) {
         const int idx = cursor.first + row;
@@ -224,7 +224,7 @@ void updateProductServices() {
 
             store::Record answer;
             answer.kind="inbox"; answer.status="open";
-            answer.title=item.source == "talk" ? "Piblo answer" : "BrainDump processed";
+            answer.title=item.source == "talk" ? "Piblo answer" : "Brain Dump processed";
             answer.body=result.text; answer.source=result.provider; answer.ref=item.ref;
             if (!store::addRecord(answer)) break;
 

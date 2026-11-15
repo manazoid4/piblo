@@ -104,7 +104,7 @@ void pullHaltState(const std::string& base, bool remote, BeamMessage& out) {
         out.haltCheckFailed = true;
         return;
     }
-    http.setTimeout(3500);
+    http.setTimeout(1200);
     const int status = http.GET();
     String body;
     const bool read = status == 200 && readBoundedBody(http, body, 768) == BodyReadResult::Ok;
@@ -265,7 +265,7 @@ bool haltNow(bool on) {
     for (const auto& base : fieldBases()) {
         NodHttp http;
         if (!beginField(http, base.first, "/buddy/halt", base.second)) continue;
-        http.setTimeout(3500);
+        http.setTimeout(1500);  // runs on the UI thread (Fn+H)
         http.addHeader("Content-Type", "application/json");
         const int status = http.POST(on ? "{\"on\":true}" : "{\"on\":false}");
         String body;
@@ -442,9 +442,10 @@ WorkSummary workSummary() {
         }
         int i = 0;
         for (JsonObject t : tracks) {
-            const char* id = t["track_id"] | nullptr;
-            const char* label = t["short_label"] | nullptr;
-            const char* primary = t["primary_event_type_id"] | nullptr;
+            // `| nullptr` never yields the string (nullptr_t default wins), so every track looked malformed.
+            const char* id = t["track_id"].as<const char*>();
+            const char* label = t["short_label"].as<const char*>();
+            const char* primary = t["primary_event_type_id"].as<const char*>();
             if (!id || !label || !id[0] || !label[0] || strlen(id) > 80 ||
                 strlen(label) > 16 || !primary || !primary[0] || strlen(primary) > 120 ||
                 !t["today_total"].is<float>()) {

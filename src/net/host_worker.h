@@ -84,6 +84,8 @@ bool takeWorkSummaryResult(host::WorkSummary& result);
 bool takeWorkIncrementResult(WorkIncrementResult& result);
 bool takeWorkflowResult(WorkflowResult& result);
 bool takeTeachResult(TeachResult& result);
+// Collects a Done result nobody took (see host_worker.cpp). Call from the main loop.
+void reapStale(uint32_t ms = 25000);
 
 State state();
 JobKind jobKind();

@@ -22,6 +22,8 @@ voice::WavFileSink* gSink  = nullptr;
 std::string         gPath;
 std::string         gText;
 std::string         gError;
+std::string         gPcOutcome;
+bool                gToPc   = false;
 bool                gReady  = false;
 uint32_t            gWorkAt = 0;
 
@@ -43,7 +45,7 @@ void fail(const char* why) {
 
 }  // namespace
 
-bool start(const void* owner) {
+bool start(const void* owner, bool toPc) {
     if (gState == State::Listening || gState == State::Working) return false;
     if (!store::ready()) {
         fail("no storage for the recording");
@@ -51,6 +53,8 @@ bool start(const void* owner) {
     }
     gText.clear();
     gError.clear();
+    gPcOutcome.clear();
+    gToPc  = toPc;
     gReady = false;
     discard();
 
@@ -111,7 +115,7 @@ void update() {
         fail("no host - connect Wi-Fi to dictate");
         return;
     }
-    const auto reply = host::transcribe(gPath);
+    const auto reply = gToPc ? host::flowPaste(gPath) : host::transcribe(gPath);
     discard();
     if (!reply.ok) {
         fail(reply.error.empty() ? "host could not transcribe"
@@ -123,6 +127,7 @@ void update() {
         return;
     }
     gText  = reply.transcript;
+    gPcOutcome = gToPc ? reply.text : "";
     gReady = true;
     gState = State::Idle;
     sfx::confirm();
@@ -136,6 +141,7 @@ bool active(const void* owner) {
 }
 
 const char* error() { return gError.c_str(); }
+const char* pcOutcome() { return gPcOutcome.c_str(); }
 float       level() { return voice::level(); }
 uint32_t    elapsedSeconds() { return voice::elapsedSeconds(); }
 

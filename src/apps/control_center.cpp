@@ -32,8 +32,8 @@ struct ControlItem {
 constexpr ControlItem CONTROL_ITEMS[] = {
     {"OVERVIEW",    "live state",      nullptr},
     {"WI-FI",       "scan / connect",  "network"},
-    {"HUB",    "HUB / AI bridge",  nullptr},
-    {"HUB COMMANDS", "media / lock",    "talk"},
+    {"PC",    "PC / AI bridge",  nullptr},
+    {"PC COMMANDS", "media / lock",    "talk"},
     {"LIVE SCREEN", "piblo.local", nullptr},
     {"STORAGE",     "SD / flash",      nullptr},
     {"DIAGNOSTICS", "hardware tests",  "tools"},
@@ -135,7 +135,7 @@ private:
             return;
         }
         if (idx == 2) {
-            ui::header(g, "HUB", host::linkName());
+            ui::header(g, "PC", host::linkName());
             draw(g, 0, "Local hub brain + tools");
             draw(g, 1, "AI: LFM2.5 8B via Ollama");
             draw(g, 2, Sys.hostOnline ? "Host reachable" : "Host offline / not paired");

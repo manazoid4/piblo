@@ -57,6 +57,7 @@ class VoiceService:
         self._lock = threading.Lock()
         self._search_cache: dict[str, tuple[float, list[dict[str, Any]]]] = {}
         self._warned: set[str] = set()
+        self.fallback: Callable[[str], Path] | None = None  # local TTS when Fish is unavailable
         self._synth = synth  # (text, path, reference_id) -> writes wav; set by SpeechOut
 
     @property
@@ -244,7 +245,14 @@ def install_voice_routes(app: FastAPI, svc: VoiceService, *, prefix: str = "", d
         try:
             svc._synth(text, path, voice)  # same single free-model Fish call as previews
         except (RuntimeError, httpx.HTTPError) as error:
-            raise HTTPException(503, str(error)[:120]) from error
+            if svc.fallback is None:
+                raise HTTPException(503, str(error)[:120]) from error
+            try:  # Fish unavailable (no key/offline): local Kokoro, same path as /speak
+                local = svc.fallback(text)
+            except Exception as local_error:
+                raise HTTPException(503, str(local_error)[:120]) from local_error
+            background_tasks.add_task(local.unlink, missing_ok=True)
+            return FileResponse(local, media_type="audio/wav", filename="say.wav")
         return FileResponse(path, media_type="audio/wav", filename="say.wav")
 
     app.include_router(router)

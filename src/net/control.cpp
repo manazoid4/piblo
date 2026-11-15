@@ -3,6 +3,7 @@
 #include <M5Unified.h>
 #include <WiFi.h>
 
+#include "../audio/kokoro_stream.h"
 #include "../audio/voice.h"
 #include "../core/launcher.h"
 #include <esp_ota_ops.h>
@@ -142,6 +143,9 @@ String handleLine(const String& raw, bool trusted) {
         if (!voice::speakerTest(true)) return "MAZSPK ERR busy";
         return "[spk] test done";
     }
+
+    if (line.startsWith("MAZKOKORO	"))
+        return kokoro::speak(line.substring(10)) ? "MAZKOKORO OK" : "MAZKOKORO ERR";
 
     if (line == "MAZSTATUS") {
         // Status is a snapshot, not a network operation. Older builds called

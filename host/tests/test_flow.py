@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import io
+import json
+import sys
+import time
 import wave
 
 import pytest
@@ -48,7 +51,8 @@ def test_dictionary_default(tmp_path):
 class Stt:
     prompts: list = []
     def available(self): return True
-    def transcribe(self, p): return ""
+    def transcribe(self, p): return "um so note uh buy the the cables for cardputer"
+    def transcribe_local(self, p): return self.transcribe(p), "parakeet"
     def transcribe_prompted(self, path, prompt):
         Stt.prompts.append(prompt)
         return "um so note uh buy the the cables for cardputer"
@@ -62,7 +66,8 @@ class Models:
 
 
 def test_dictate_endpoint(tmp_path):
-    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path), groq_api_key="")
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path), groq_api_key="",
+                   flow_cleanup_llm=True, stt_provider="whisper", flow_cloud=True)
     client = TestClient(create_app(cfg, stt=Stt(), models=Models()))
     r = client.post("/dictate?target=text", content=_wav(),
                     headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
@@ -73,6 +78,46 @@ def test_dictate_endpoint(tmp_path):
     assert j["ms"]["total"] >= 0
     assert "buy the cables" in (tmp_path / "inbox.md").read_text()
     assert "dictate" in (tmp_path / "latency.log").read_text()
+
+
+@pytest.mark.parametrize("mode,intent,press_enter,outcome", [
+    ("paste", "claude", False, "clipboard"),
+    ("type", "paste", True, "pasted"),
+])
+def test_dictate_pc_paste_keeps_focus_guard_and_settings(tmp_path, monkeypatch, mode, intent, press_enter, outcome):
+    from mazhost import app as app_module
+    from mazhost.flow import Flow
+
+    (tmp_path / "settings.json").write_text(json.dumps({
+        "input_mode": mode, "press_enter": press_enter, "cleanup": "auto", "stt": "auto",
+    }), encoding="utf-8")
+    monkeypatch.setattr(Flow, "dictate", lambda self, path: {"intent": intent, "text": "Hello."})
+    monkeypatch.setattr(app_module, "flow_foreground", lambda: 42)
+    seen = {}
+
+    def fake_safe_paste(text, enter, armed, paste_fn):
+        seen.update(text=text, enter=enter, armed=armed, paste_fn=paste_fn)
+        if paste_fn:
+            paste_fn(text, enter)
+        return outcome
+
+    typed = []
+    monkeypatch.setattr(app_module, "flow_safe_paste", fake_safe_paste)
+    monkeypatch.setattr(app_module, "insert_text", lambda text, enter, flow: typed.append((text, enter)))
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path), groq_api_key="",
+                   flow_cleanup_llm=False, stt_provider="whisper", flow_cloud=False)
+    client = TestClient(create_app(cfg, stt=Stt(), models=Models()))
+    response = client.post("/dictate?target=pc-paste", content=_wav(),
+                           headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
+
+    assert response.status_code == 200, response.text
+    assert response.json()["pc"] == response.json()["reply"] == outcome
+    assert seen["text"] == "Hello." and seen["armed"] == 42
+    assert seen["enter"] is (intent == "claude" or press_enter)
+    if mode == "type":
+        assert typed == [("Hello.", True)]
+    else:
+        assert seen["paste_fn"] is None and typed == []
 
 
 def test_one_release_one_paste(monkeypatch):
@@ -91,3 +136,344 @@ def test_one_release_one_paste(monkeypatch):
     calls = []
     nodflow.send(C(), b"x", 0.0, paste_fn=lambda t, enter=False: calls.append((t, enter)))
     assert calls == [("hello", True)]
+
+
+def test_cleanup_is_local_by_default(tmp_path):
+    from mazhost.flow import Flow
+
+    class Boom:
+        def chat(self, *a, **k): raise AssertionError("network route called")
+
+    f = Flow(Settings(token="t" * 40, flow_dir=str(tmp_path), groq_api_key=""), Stt(), Boom())
+    assert f._cleanup("um hello there") == ("Hello there.", "rules")
+
+
+def _stt(tmp_path, **kw):
+    from mazhost.stt import SpeechToText
+    return SpeechToText(Settings(token="t" * 40, flow_dir=str(tmp_path), **kw))
+
+
+def test_groq_key_keeps_parakeet_dictation_local(tmp_path):
+    from mazhost.flow import Flow
+
+    class Spy(Stt):
+        def transcribe_prompted(self, *a): raise AssertionError("dictation audio sent to Groq")
+
+    class Boom:
+        def chat(self, *a, **k): raise AssertionError("network route called")
+
+    class NoNet:
+        def post(self, *a, **k): raise AssertionError("text sent to Groq")
+
+    f = Flow(Settings(token="t" * 40, flow_dir=str(tmp_path), groq_api_key="k"), Spy(), Boom(), client=NoNet())
+    out = f.dictate(tmp_path / "a.wav")
+    assert out["text"] and "stt_via=parakeet" in (tmp_path / "latency.log").read_text()
+
+
+def test_failed_parakeet_load_not_retried_and_logs_once(tmp_path, monkeypatch, caplog):
+    import builtins
+    s = _stt(tmp_path)
+    calls = []
+    real = builtins.__import__
+
+    def imp(name, *a, **k):
+        if name == "onnx_asr":
+            calls.append(1)
+            raise ImportError("nope")
+        return real(name, *a, **k)
+
+    monkeypatch.setattr(builtins, "__import__", imp)
+    monkeypatch.setattr(s, "_transcribe_with", lambda *a: "whisper text")
+    for _ in range(3):
+        assert s.transcribe_local(tmp_path / "a.wav") == ("whisper text", "whisper")
+    # request path never marks failure (no download attempted there); only warm() does
+    assert calls and not s._onnx_failed
+    monkeypatch.setattr(s, "_get_model", lambda *a: None)
+    s.warm()
+    n = len(calls)
+    assert s._onnx_failed
+    for _ in range(3):
+        assert s.transcribe_local(tmp_path / "a.wav") == ("whisper text", "whisper")
+    assert len(calls) == n
+    assert sum("parakeet load failed" in r.message for r in caplog.records) == 1
+
+
+def test_transcribe_local_engine_and_other_paths_stay_whisper(tmp_path, monkeypatch):
+    s = _stt(tmp_path)
+
+    class Fake:
+        def recognize(self, p): return " Hello world. "
+
+    s._onnx = Fake()
+    assert s.transcribe_local(tmp_path / "a.wav") == ("Hello world.", "parakeet")
+    monkeypatch.setattr(s, "_transcribe_with", lambda *a: "whisper text")
+    assert s.transcribe(tmp_path / "a.wav") == "whisper text"  # turns/BrainDump/teach unchanged
+
+
+def test_warm_downloads_once_request_path_does_not(tmp_path, monkeypatch):
+    s = _stt(tmp_path)
+    seen = []
+    monkeypatch.setattr(s, "_get_model", lambda *a: None)
+
+    def fake(download=False):
+        seen.append(download)
+        raise RuntimeError("x")
+
+    monkeypatch.setattr(s, "_get_onnx", fake)
+    s.warm()
+    assert seen == [True]
+    monkeypatch.setattr(s, "_transcribe_with", lambda *a: "w")
+    s.transcribe_local(tmp_path / "a.wav")
+    assert seen == [True, False]
+
+
+def test_whisper_not_blocked_by_onnx_lock(tmp_path, monkeypatch):
+    import threading
+    s = _stt(tmp_path)
+    import sys, types
+    monkeypatch.setitem(sys.modules, "faster_whisper", types.SimpleNamespace(WhisperModel=lambda *a, **k: "m"))
+    done = []
+    with s._onnx_lock:
+        t = threading.Thread(target=lambda: done.append(s._get_model("base.en", "cpu", "int8")))
+        t.start(); t.join(5)
+    assert done == ["m"]
+
+
+def test_custom_model_refused_on_request_path(tmp_path, monkeypatch):
+    s = _stt(tmp_path, stt_local_model="moonshine-base-en")
+    monkeypatch.setattr(s, "_transcribe_with", lambda *a: "w")
+    assert s.transcribe_local(tmp_path / "a.wav") == ("w", "whisper")
+    assert not s._onnx_failed
+
+
+def test_request_does_not_wait_for_warm_download(tmp_path, monkeypatch):
+    import time
+    s = _stt(tmp_path)
+    monkeypatch.setattr(s, "_transcribe_with", lambda *a: "w")
+    with s._onnx_lock:  # warm() is mid-download
+        t0 = time.perf_counter()
+        assert s.transcribe_local(tmp_path / "a.wav") == ("w", "whisper")
+        assert time.perf_counter() - t0 < 1
+    assert not s._onnx_failed
+
+
+def test_warm_loads_whisper_first(tmp_path, monkeypatch):
+    s = _stt(tmp_path)
+    order = []
+    monkeypatch.setattr(s, "_get_model", lambda *a: order.append("whisper"))
+    monkeypatch.setattr(s, "_get_onnx", lambda download=False: order.append("parakeet"))
+    s.warm()
+    assert order == ["whisper", "parakeet"]
+
+
+def test_safe_paste_pastes_into_armed_window():
+    from mazhost.flow import safe_paste
+    got = []
+    out = safe_paste("hi.", False, 42, paste_fn=lambda t, enter=False: got.append((t, enter)),
+                     fg_fn=lambda: 42, copy_fn=lambda t: got.append(("copy", t)), typable_fn=lambda h: True)
+    assert out == "pasted" and got == [("hi.", False)]
+
+
+def test_safe_paste_keeps_text_on_clipboard_when_focus_moved():
+    from mazhost.flow import safe_paste
+    got = []
+    out = safe_paste("hi.", True, 42, paste_fn=lambda t, enter=False: got.append("PASTED"),
+                     fg_fn=lambda: 99, copy_fn=lambda t: got.append(("copy", t)))
+    assert out == "clipboard" and got == [("copy", "hi.")]
+
+
+def test_safe_paste_never_types_when_locked():
+    from mazhost.flow import safe_paste
+    got = []
+    out = safe_paste("hi.", False, 0, paste_fn=lambda t, enter=False: got.append("PASTED"),
+                     fg_fn=lambda: 0, copy_fn=lambda t: got.append("copy"))
+    assert out == "clipboard" and "PASTED" not in got
+
+
+def test_dictionary_fixes_what_parakeet_hears():
+    from mazhost.flow import apply_dictionary
+    got = apply_dictionary("So this is a test of Pebloflow on the card Puter.", ["Piblo", "Cardputer"])
+    assert got == "So this is a test of Piblo Flow on the Cardputer."
+
+
+def test_dictionary_user_aliases_and_no_false_join():
+    from mazhost.flow import apply_dictionary
+    assert apply_dictionary("ask graw queue", ["Groq: graw queue"]) == "ask Groq"
+    assert apply_dictionary("a fish dish", ["Fish"]) == "a Fish dish"
+    # ordinary word pairs are never glued into a term (no automatic splitting)
+    assert apply_dictionary("come out look at this", ["Outlook"]) == "come out look at this"
+
+
+def test_safe_paste_admin_window_goes_to_clipboard():
+    from mazhost.flow import safe_paste
+    got = []
+    out = safe_paste("hi.", False, 42, paste_fn=lambda t, enter=False: got.append("PASTED"),
+                         fg_fn=lambda: 42, copy_fn=lambda t: got.append("copy"), typable_fn=lambda h: False)
+    assert out == "clipboard" and got == ["copy"]
+
+
+import threading
+
+
+class _SlowStt:
+    """STT that blocks until released, for concurrency & timeout tests."""
+    ready: threading.Event
+    released: threading.Event
+
+    def available(self):
+        return True
+
+    def transcribe(self, p):
+        self.ready.set()
+        self.released.wait()
+        return "hello world"
+
+    def transcribe_local(self, p):
+        return self.transcribe(p), "whisper"
+
+    def transcribe_prompted(self, path, prompt):
+        return self.transcribe(path)
+
+
+class _NoopModels:
+    def chat(self, msgs, route):
+        return "hello world", "fake"
+
+
+def test_slow_stt_does_not_block_health_check(tmp_path, monkeypatch):
+    """(a) A slow STT call on /dictate must not block /health."""
+    slow = _SlowStt()
+    slow.ready = threading.Event()
+    slow.released = threading.Event()
+
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path),
+                   groq_api_key="", flow_cleanup_llm=False, stt_provider="whisper", flow_cloud=False)
+    client = TestClient(create_app(cfg, stt=slow, models=_NoopModels()))
+
+    responses = []
+
+    def fire_dictate():
+        try:
+            r = client.post("/dictate?target=text", content=_wav(),
+                            headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
+            responses.append(r)
+        except Exception as e:
+            responses.append(e)
+
+    t = threading.Thread(target=fire_dictate, daemon=True)
+    t.start()
+    assert slow.ready.wait(timeout=5), "STT never called"
+    h = client.get("/health")
+    assert h.status_code == 200, f"/health blocked: {h.status_code}"
+    slow.released.set()
+    t.join(timeout=10)
+    assert len(responses) == 1
+    if isinstance(responses[0], Exception):
+        raise responses[0]
+    assert responses[0].status_code == 200
+
+
+def test_stt_timeout_returns_error_not_hang(tmp_path, monkeypatch):
+    """(b) If STT exceeds the dictate_timeout, /dictate returns 504 stt_timeout quickly."""
+    slow = _SlowStt()
+    slow.ready = threading.Event()
+    slow.released = threading.Event()  # never set -> will timeout
+
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path),
+                   groq_api_key="", flow_cleanup_llm=False, stt_provider="whisper", flow_cloud=False)
+    client = TestClient(create_app(cfg, stt=slow, models=_NoopModels()))
+    client.app.state._flow.dictate_timeout = 0.2  # fast timeout for the test
+
+    responses = []
+    start = time.perf_counter()
+
+    def fire_dictate():
+        try:
+            r = client.post("/dictate?target=text", content=_wav(),
+                            headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
+            responses.append(r)
+        except Exception as e:
+            responses.append(e)
+
+    t = threading.Thread(target=fire_dictate, daemon=True)
+    t.start()
+    assert slow.ready.wait(timeout=5), "STT never called"
+    try:
+        t.join(timeout=5)
+        assert len(responses) == 1, f"expected 1 response, got {len(responses)}"
+        resp = responses[0]
+        if isinstance(resp, Exception):
+            raise resp
+        assert resp.status_code == 504, f"expected 504, got {resp.status_code}: {resp.text}"
+        assert resp.json()["detail"] == "stt_timeout", resp.text
+        elapsed = time.perf_counter() - start
+        assert elapsed < 5, f"timeout test took {elapsed:.2f}s"
+    finally:
+        slow.released.set()
+
+
+def test_paste_restores_clipboard(monkeypatch):
+    """(c) paste() saves old clipboard and restores it after Ctrl+V (Windows only)."""
+    import pyperclip
+    from mazhost.flow import paste
+
+    if sys.platform != "win32":
+        pytest.skip("paste() is Windows-only")
+
+    calls = []
+    monkeypatch.setattr(pyperclip, "paste", lambda: "original text")
+    monkeypatch.setattr(pyperclip, "copy", lambda t: calls.append(t))
+
+    import ctypes
+    monkeypatch.setattr(ctypes.windll.user32, "keybd_event", lambda *a: None)
+    monkeypatch.setattr(ctypes.windll.user32, "GetForegroundWindow", lambda *a: 0)
+    monkeypatch.setattr(ctypes.windll.user32, "GetAncestor", lambda *a: 0)
+
+    result = paste("new text")
+    assert calls == ["new text", "original text"], f"expected copy+restore order, got {calls}"
+    assert result == "pasted", f"expected 'pasted', got {result!r}"
+
+
+def test_paste_copy_failure_returns_failed(monkeypatch):
+    """(c) paste() returns 'failed' when clipboard copy fails; nothing is pasted."""
+    import pyperclip
+    from mazhost.flow import paste
+
+    if sys.platform != "win32":
+        pytest.skip("paste() is Windows-only")
+
+    calls = []
+    monkeypatch.setattr(pyperclip, "paste", lambda: "original text")
+    monkeypatch.setattr(pyperclip, "copy", lambda t: (_ for _ in ()).throw(RuntimeError("busy")))
+
+    import ctypes
+    monkeypatch.setattr(ctypes.windll.user32, "keybd_event", lambda *a: None)
+    monkeypatch.setattr(ctypes.windll.user32, "GetForegroundWindow", lambda *a: 0)
+    monkeypatch.setattr(ctypes.windll.user32, "GetAncestor", lambda *a: 0)
+
+    result = paste("new text")
+    assert calls == [], f"no copy should have succeeded, got {calls}"
+    assert result == "failed", f"expected 'failed', got {result!r}"
+
+
+def test_paste_restore_failure_returns_restore_failed(monkeypatch):
+    """(c) paste() returns 'restore_failed' when text pasted but old clipboard not restored."""
+    import pyperclip
+    from mazhost.flow import paste
+
+    if sys.platform != "win32":
+        pytest.skip("paste() is Windows-only")
+
+    calls = []
+    monkeypatch.setattr(pyperclip, "paste", lambda: "original text")
+    monkeypatch.setattr(pyperclip, "copy", lambda t: calls.append(t) if t != "original text"
+                        else (_ for _ in ()).throw(RuntimeError("restore failed")))
+
+    import ctypes
+    monkeypatch.setattr(ctypes.windll.user32, "keybd_event", lambda *a: None)
+    monkeypatch.setattr(ctypes.windll.user32, "GetForegroundWindow", lambda *a: 0)
+    monkeypatch.setattr(ctypes.windll.user32, "GetAncestor", lambda *a: 0)
+
+    result = paste("new text")
+    assert calls == ["new text"], f"expected only the new-text copy, got {calls}"
+    assert result == "restore_failed", f"expected 'restore_failed', got {result!r}"

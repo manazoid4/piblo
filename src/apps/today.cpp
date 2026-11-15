@@ -20,7 +20,7 @@ class TodayApp : public App {
 public:
     const char* id() const override { return "today"; }
     const char* title() const override { return "Today"; }
-    const char* hints() const override { return "R refresh   ESC back"; }
+    const char* hints() const override { return "R refresh"; }
 
     void onEnter() override { refresh(); }
 

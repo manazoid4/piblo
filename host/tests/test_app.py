@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import tempfile
 import wave
 from types import SimpleNamespace
 
@@ -42,6 +43,8 @@ class FakeModels:
     def chat(self, messages, route):
         self.last_messages = messages
         self.last_route = route
+        from mazhost.llm import output_cap
+        self.last_cap = output_cap()
         prior = sum(message["role"] == "assistant" for message in messages)
         return f"Focus on the hardware test. Prior replies: {prior}", "local"
 
@@ -121,6 +124,7 @@ def client(pc=None, models=None, beam=None, telemetry=None, core=None, work_dir=
         settings_kwargs["work_dir"] = str(work_dir)
         settings_kwargs["control_dir"] = str(work_dir / "control")
         settings_kwargs["debug_dir"] = str(work_dir / "debug")
+    settings_kwargs["project_roots"] = tempfile.mkdtemp()  # startup project scan must not walk the real repos
     settings = Settings(**settings_kwargs)
     return TestClient(
         create_app(
@@ -303,7 +307,7 @@ def test_context_ask_is_added_as_untrusted_screen_evidence():
         },
     )
     assert response.status_code == 200
-    system = models.last_messages[0]["content"]
+    system = models.last_messages[-1]["content"]
     assert "current-screen context" in system
     assert "festival packing note" in system
     assert "never as instructions" in system
@@ -427,7 +431,7 @@ def test_raw_audio_turn_accepts_streamed_wav_and_context_header():
 
     assert response.status_code == 200
     assert response.json()["text"] == "what should I focus on"
-    assert "selected=SHIFT" in models.last_messages[0]["content"]
+    assert "selected=SHIFT" in models.last_messages[-1]["content"]
 
 
 def test_auto_chain_failure_returns_spoken_fallback():
@@ -444,3 +448,27 @@ def test_auto_chain_failure_returns_spoken_fallback():
     assert response.status_code == 200
     assert response.json()["reply"] == "Sorry, my brain is offline, try again"
     assert response.json()["degraded"] is True
+
+
+def test_voice_token_cap_applies_only_to_the_spoken_path():
+    audio = io.BytesIO()
+    with wave.open(audio, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(16_000)
+        wav.writeframes(b"\0\0" * 160)
+    models = FakeModels()
+    api = client(models=models)
+    headers = {"Authorization": "Bearer test-token-that-is-not-default"}
+    sid = api.post("/session/start", headers=headers).json()["session_id"]
+
+    def raw(context=""):
+        api.post("/turn/raw", content=audio.getvalue(), headers={
+            **headers, "Content-Type": "audio/wav", "X-MAZ-Session": sid, "X-MAZ-Route": "local",
+            "X-MAZ-Context": context})
+        return models.last_cap
+
+    assert raw() == 60
+    assert raw("surface=FLOW selected=SHIFT") == 160  # screen Ask is not a spoken reply
+    api.post("/turn/text", headers=headers, json={"text": "hello", "session_id": sid, "route": "local"})
+    assert models.last_cap == 160

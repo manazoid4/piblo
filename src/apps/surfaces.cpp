@@ -34,7 +34,7 @@ public:
 
     const char* id() const override { return _id; }
     const char* title() const override { return _heading; }
-    const char* hints() const override { return "UP/DOWN choose   ENTER open   ESC home"; }
+    const char* hints() const override { return "UP/DOWN choose  ENTER open"; }
 
     bool onKey(const KeyEvent& e) override {
         if (!e.down) return false;
@@ -62,7 +62,7 @@ public:
         ui::header(g, _heading, _status);
 
         constexpr int visible = 5;
-        constexpr int pitch = 18;
+        constexpr int pitch = 17;
         if (_cursor.sel < _cursor.first) _cursor.first = _cursor.sel;
         if (_cursor.sel >= _cursor.first + visible)
             _cursor.first = _cursor.sel - visible + 1;
@@ -72,13 +72,13 @@ public:
         for (int row = 0; row < visible; ++row) {
             const int idx = _cursor.first + row;
             if (idx >= _count) break;
-            const int y = BODY_Y + 15 + row * pitch;
+            const int y = BELOW_RULE + row * pitch;
             const bool selected = idx == _cursor.sel;
             const uint16_t fill = selected ? ACCENT : PANEL;
             const uint16_t fg = selected ? BG : TEXT;
 
-            g.fillRoundRect(PAD, y, SCREEN_W - PAD * 2, 15, 4, fill);
-            g.drawRoundRect(PAD, y, SCREEN_W - PAD * 2, 15, 4, selected ? TEXT : LINE);
+            g.fillRoundRect(PAD, y, SCREEN_W - PAD * 2, 14, 4, fill);
+            g.drawRoundRect(PAD, y, SCREEN_W - PAD * 2, 14, 4, selected ? TEXT : LINE);
             g.setTextDatum(top_left);
             g.setFont(&fonts::Font0);
             g.setTextColor(fg, fill);
@@ -112,9 +112,9 @@ constexpr HubItem AGENT_ITEMS[] = {
 constexpr HubItem CONTROL_ITEMS[] = {
     {"CONNECT TO COMPUTER", "code + Allow", "connect_pc"},
     {"PAIRING + PHONE", "token / approvals", "pairing"},
-    {"HUB STATUS", "CPU / GPU / AI", "laptop"},
+    {"PC STATUS", "CPU / GPU / AI", "laptop"},
     {"PROJECTS + BUILDS", "git / tests", "core"},
-    {"SEND TO HUB", "text / links", "beam"},
+    {"SEND TO PC", "text / links", "beam"},
     {"WI-FI", "scan / connect", "network"},
     {"DEVICE TESTS", "hardware checks", "tools"},
     {"SETTINGS", "device + AI", "settings"},
@@ -125,7 +125,7 @@ constexpr HubItem RECALL_ITEMS[] = {
     {"RESULTS INBOX", "AI + agent outputs", "inbox"},
     {"PROMPT DECK", "build prompts", "prompts"},
     {"NOTES", "saved text", "notes"},
-    {"SEND TO HUB", "received / sent", "beam"},
+    {"SEND TO PC", "received / sent", "beam"},
     {"SNIPPETS", "quick reuse", "snippets"},
     {"TEXT VIEWER", "txt / md", "viewer"},
 };
@@ -150,7 +150,7 @@ public:
     const char* title() const override { return "WORK"; }
     const char* hints() const override { return "UP/DOWN track  ENTER +1  P tools"; }
 
-    void onEnter() override { poll(); }
+    void onEnter() override { _openedAt = millis(); _lastPollMs = millis() - workPollIntervalMs() + 80; }
 
     void update() override {
         const uint32_t pollInterval = workPollIntervalMs();
@@ -159,6 +159,7 @@ public:
         const bool nowStale = Sys.workLoaded &&
                               (millis() - Sys.workReceivedAt > pollInterval * 3u);
         if (nowStale != _lastStale) { _lastStale = nowStale; invalidate(); }
+        if (!Sys.workLoaded && millis() - _openedAt > 8000 && millis() - _openedAt < 8300) invalidate();
     }
 
     bool onKey(const KeyEvent& e) override {
@@ -208,7 +209,9 @@ public:
             g.setTextDatum(top_left);
             g.setFont(&fonts::Font0);
             g.setTextColor(DIM, BG);
-            g.drawString("Loading...", PAD, BODY_Y + 15);
+            const bool timedOut = millis() - _openedAt > 8000;
+            g.setTextColor(timedOut ? WARN : DIM, BG);
+            g.drawString(timedOut ? "Can't reach hub. Check Wi-Fi/Core." : "Loading...", PAD, BELOW_RULE + 3);
             return;
         }
 
@@ -257,6 +260,7 @@ public:
 
 private:
     uint32_t _lastPollMs = 0;
+    uint32_t _openedAt = 0;
     bool _lastStale = false;
     int _selected = 0;
 
@@ -274,7 +278,7 @@ App* makeAgentsHub() {
 }
 
 App* makeDesk() {
-    return new SurfaceHub("desk", "CONTROL", "HUB + DEVICE",
+    return new SurfaceHub("desk", "CONTROL", "PC + DEVICE",
                           CONTROL_ITEMS, sizeof(CONTROL_ITEMS) / sizeof(CONTROL_ITEMS[0]));
 }
 

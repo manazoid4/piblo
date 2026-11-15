@@ -23,6 +23,7 @@ function make(over: Partial<SidecarDeps> & { loc?: CoreLocation } = {}) {
     hasSystemPython: () => true,
     sleep: async () => {},
     startTimeoutMs: 2000,
+    retryDelays: [], // tests opt in, so a failure never schedules background work
     ...over,
   };
   return { sc: new CoreSidecar(deps), spawn, child };
@@ -55,6 +56,66 @@ describe('CoreSidecar', () => {
     expect(args).toEqual(['-m', 'mazhost']);
     expect(opts.cwd).toBe('I');
     expect(opts.env.PYTHONPATH).toBe('BUNDLED');
+  });
+
+  it('recheck() starts Core again when a Core it did not launch disappears', async () => {
+    let up = true;
+    const { sc, spawn } = make({ probe: async () => up, sleep: async () => { up = true; } });
+    expect((await sc.ensure()).managed).toBe(false);
+    await sc.recheck(); // still answering: nothing to do
+    expect(spawn).not.toHaveBeenCalled();
+    up = false; // the external Core was killed
+    await sc.recheck();
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(sc.state.phase).toBe('running');
+    expect(sc.state.managed).toBe(true);
+  });
+
+  it('recheck() kills a hung Core it launched, and its late exit does not clobber the new one', async () => {
+    const kids: { kill: ReturnType<typeof vi.fn>; exitCb: null | ((c: number | null) => void) }[] = [];
+    const spawn = vi.fn(() => {
+      const k = { pid: kids.length + 1, kill: vi.fn(() => true), exitCb: null as null | ((c: number | null) => void), once(_e: 'exit', cb: (c: number | null) => void) { k.exitCb = cb; } };
+      kids.push(k);
+      return k as ChildLike;
+    });
+    let up = false;
+    const { sc } = make({ probe: async () => up, sleep: async () => { up = true; }, spawn: spawn as unknown as SidecarDeps['spawn'] });
+    expect((await sc.ensure()).managed).toBe(true);
+    up = false; // first Core hangs: alive but silent
+    await sc.recheck();
+    await sc.recheck(); // two misses = maybe just busy: leave it alone
+    expect(spawn).toHaveBeenCalledTimes(1);
+    expect(kids[0].kill).not.toHaveBeenCalled();
+    await sc.recheck(); // third miss in a row = hung
+    expect(spawn).toHaveBeenCalledTimes(2);
+    expect(kids[0].kill).toHaveBeenCalled();
+    kids[0].exitCb?.(1); // the hung one finally exits
+    expect(sc.state.phase).toBe('running');
+    expect(sc.isManaged).toBe(true);
+  });
+
+  it('restarts a Core it launched that crashes after being healthy', async () => {
+    let up = false;
+    const exits: ((c: number | null) => void)[] = [];
+    const spawn = vi.fn(() => {
+      up = true; // Core answers once launched
+      return { pid: 1, kill: () => true, once: (_e: 'exit', cb: (c: number | null) => void) => exits.push(cb) } as ChildLike;
+    });
+    const { sc } = make({ probe: async () => up, spawn: spawn as unknown as SidecarDeps['spawn'] });
+    expect((await sc.ensure()).phase).toBe('running');
+    up = false;
+    exits[0](1); // killed mid-session
+    for (let i = 0; i < 20 && sc.state.phase !== 'running'; i++) await new Promise((r) => setTimeout(r, 0));
+    expect(spawn).toHaveBeenCalledTimes(2);
+    expect(sc.state.phase).toBe('running');
+  });
+
+  it('recheck() leaves non-running states for the owner to retry', async () => {
+    const { sc, spawn } = make({ hasToken: () => false });
+    expect((await sc.ensure()).phase).toBe('needs-setup');
+    await sc.recheck();
+    expect(spawn).not.toHaveBeenCalled();
+    expect(sc.state.phase).toBe('needs-setup');
   });
 
   it('shares one attempt between concurrent ensure() calls', async () => {
@@ -93,6 +154,55 @@ describe('CoreSidecar', () => {
     expect(s.phase).toBe('failed');
     expect(s.detail).toContain('fastapi');
     expect(child.kill).toHaveBeenCalled();
+  });
+
+  it('tries a Core that would not start again on a growing gap, then leaves it to the user', async () => {
+    const waits: number[] = [];
+    const { sc, spawn } = make({
+      probe: async () => false,
+      startTimeoutMs: 600,
+      retryDelays: [5, 10],
+      sleep: async (ms) => {
+        waits.push(ms);
+      },
+    });
+    expect((await sc.ensure()).phase).toBe('failed');
+    await vi.waitFor(() => expect(spawn).toHaveBeenCalledTimes(3));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(waits).toContain(5);
+    expect(waits).toContain(10);
+    expect(spawn).toHaveBeenCalledTimes(3); // the budget is spent: no endless restart
+    expect(sc.state.phase).toBe('failed');
+  });
+
+  it('comes back up on a retry and stops retrying once it is running', async () => {
+    let up = false;
+    const waits: number[] = [];
+    const { sc, spawn } = make({
+      probe: async () => up,
+      startTimeoutMs: 600,
+      retryDelays: [5, 10],
+      sleep: async (ms) => {
+        waits.push(ms);
+        if (ms === 500 && spawn.mock.calls.length >= 2) up = true; // the second launch is the one that makes it
+      },
+    });
+    expect((await sc.ensure()).phase).toBe('failed');
+    await vi.waitFor(() => expect(sc.state.phase).toBe('running'));
+    expect(spawn).toHaveBeenCalledTimes(2);
+    expect(waits).not.toContain(10); // the second gap was never needed
+  });
+
+  it('never auto-retries a Core that is not installed or not set up', async () => {
+    const retries: number[] = [];
+    const notReady = make({ loc: { installDir: 'I', sourceDir: '', python: '', envFile: '', bundledDir: '' }, retryDelays: [5] });
+    retries.push(notReady.sc.state.managed ? 1 : 0);
+    expect((await notReady.sc.ensure()).phase).toBe('not-installed');
+    const noToken = make({ hasToken: () => false, retryDelays: [5] });
+    expect((await noToken.sc.ensure()).phase).toBe('needs-setup');
+    await new Promise((r) => setTimeout(r, 20));
+    expect(noToken.spawn).not.toHaveBeenCalled();
+    expect(retries).toEqual([0]);
   });
 
   it('detects a crash right after launch', async () => {

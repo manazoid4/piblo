@@ -218,8 +218,20 @@ class BuddyStore:
                   (rec["id"], idem, rec.get("agent", ""), rec["created"], json.dumps(rec["public"]),
                    rec.get("_exp")))
 
-    def set_alert_outcome(self, aid: str, outcome: str) -> None:
-        self._run("UPDATE alerts SET outcome=?, outcome_at=? WHERE id=?", (outcome, time.time(), aid))
+    def set_alert_outcome(self, aid: str, outcome: str, snooze_until: float | None = None) -> None:
+        self._run("UPDATE alerts SET outcome=?, outcome_at=?, data=json_set(data, '$._snooze', ?) WHERE id=?",
+                  (outcome, time.time(), snooze_until, aid))
+
+    def pending_alerts(self) -> list[dict]:
+        """Reminders that never fired, however old: they must survive a flood of newer alerts."""
+        rows = self._all("SELECT * FROM alerts WHERE outcome IS NULL AND json_extract(data,'$._due') IS NOT NULL "
+                         "AND json_extract(data,'$._fired') IS NULL")
+        for r in rows:
+            r["data"] = json.loads(r["data"])
+        return rows
+
+    def mark_alert_fired(self, aid: str) -> None:
+        self._run("UPDATE alerts SET data=json_set(data, '$._fired', json('true')) WHERE id=?", (aid,))
 
     def alerts(self, limit: int = 100) -> list[dict]:
         rows = self._all("SELECT * FROM alerts ORDER BY created DESC LIMIT ?", (limit,))

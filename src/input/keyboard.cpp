@@ -216,6 +216,7 @@ void Keyboard::decode(uint8_t raw) {
     e.down  = down;
     e.mods  = _mods;
     e.isMod = modBit != 0;
+    e.physical = true;
 
     if (_fn && k.fnCode != KEY_NONE) {
         e.code = k.fnCode;

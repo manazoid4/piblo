@@ -346,8 +346,8 @@ ActionResult runAction(const String& body) {
     if (action == "update") {  // hub's "Update device" button: same path as U on Home, run from the main loop
         if (voice::state() == voice::State::Listening) return {409, "Piblo is recording; try again after."};
         if (gUpdateAt) return {202, "Update already queued."};
-        gUpdateAt = millis() + 800;  // let this reply leave before the blocking download starts
-        return {202, "Update starting on Piblo."};
+        gUpdateAt = millis() + 800;  // let this reply leave before opening the confirmation
+        return {202, "Confirm the update on Piblo."};
     }
     if (action.startsWith("key:")) {  // key:<hid code>,<ascii>,<mods> from the hub's live view
         const String rest = action.substring(4);
@@ -714,8 +714,7 @@ void update() {
     if (gUpdateAt && static_cast<int32_t>(millis() - gUpdateAt) >= 0) {
         gUpdateAt = 0;
         if (gClient) closeClient();
-        notify::post(Note::Info, "Update", "started from the hub");
-        host::fwUpdate();  // reboots on success; shows and reports its own error otherwise
+        shell::confirmFwUpdate();
         shell::invalidate();
     }
     if (WiFi.status() != WL_CONNECTED) {

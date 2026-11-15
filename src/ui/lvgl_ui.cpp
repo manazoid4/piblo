@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <string>
 
+#include "character.h"
 #include "theme.h"
 
 namespace maz {
@@ -18,8 +19,10 @@ void drawStatus(M5Canvas& g, const Status& st) {
     g.fillRect(0, BODY_Y, SCREEN_W, HOME_STATUS_H, BG);
     g.setTextDatum(top_left);
     constexpr int GLYPH = 22;
-    constexpr int TEXT_X = PAD + GLYPH + 6;
-    ui::glyph(g, PAD, BODY_Y + 3, GLYPH, st.phase);
+    const bool ready = st.phase == ui::Phase::Ready;  // all is well: Piblo himself instead of the dot
+    const int TEXT_X = PAD + (ready ? ui::CHAR_SMALL_W : GLYPH) + 6;
+    if (ready) ui::characterSmall(g, PAD, BODY_Y + 1, millis());
+    else ui::glyph(g, PAD, BODY_Y + 3, GLYPH, st.phase);
     g.setFont(&fonts::Font4);
     // Long agent/outbox phrases drop to the smaller font instead of clipping.
     if (g.textWidth(st.line) > SCREEN_W - TEXT_X - PAD) g.setFont(&fonts::Font2);

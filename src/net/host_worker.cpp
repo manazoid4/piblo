@@ -2,10 +2,14 @@
 
 #include <Arduino.h>
 #include <atomic>
+#include <cstring>
 #include <utility>
 
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+
+#include "../core/shell.h"
+#include "../storage/store.h"
 
 namespace maz {
 namespace host_worker {
@@ -41,6 +45,7 @@ WorkIncrementResult gWorkIncrementResult;
 WorkflowResult gWorkflowResult;
 TeachResult gTeachResult;
 std::atomic<uint32_t> gStackHighWater{0};
+uint32_t gDoneAt = 0;  // millis() when the result was left in Done
 
 void resetToIdle() {
     gSession.clear(); gPath.clear(); gSpeechPath.clear(); gAction.clear(); gContext.clear();
@@ -200,7 +205,7 @@ void worker(void*) {
 
         finishMeasurement();
         if (kind == JobKind::PcAction && !gRetainPcResult.load(std::memory_order_acquire)) resetToIdle();
-        else gState.store(State::Done, std::memory_order_release);
+        else { gDoneAt = millis(); gState.store(State::Done, std::memory_order_release); }
     }
 }
 
@@ -314,6 +319,40 @@ bool takeTodayResult(host::TodayStatus& result) { if (state()!=State::Done||jobK
 bool takeWorkSummaryResult(host::WorkSummary& result) { if (state()!=State::Done||jobKind()!=JobKind::WorkSummary)return false; result=std::move(gWorkResult); resetToIdle(); return true; }
 bool takeWorkIncrementResult(WorkIncrementResult& result) { if (state()!=State::Done||jobKind()!=JobKind::WorkIncrement)return false; result=std::move(gWorkIncrementResult); resetToIdle(); return true; }
 bool takeWorkflowResult(WorkflowResult& result) { if (state()!=State::Done||jobKind()!=JobKind::Workflow)return false; result=std::move(gWorkflowResult); resetToIdle(); return true; }
+// A result nobody collected (the Call screen was left mid-reply) would block every
+// background poll forever. Adopt it: a reply goes to the inbox, a failed recording
+// goes back to the outbox, anything else is dropped.
+void reapStale(uint32_t ms) {
+    if (state() != State::Done) return;
+    const JobKind kind = jobKind();
+    const char* screen = shell::currentId();
+    const bool orphanCall = (kind == JobKind::TalkAudio || kind == JobKind::PcAction) &&
+                            (!screen || strcmp(screen, "talk") != 0);
+    if (!orphanCall && millis() - gDoneAt < ms) return;
+    if (kind == JobKind::TalkAudio) {
+        TalkResult r;
+        if (!takeTalkResult(r)) return;
+        if (r.reply.ok) {
+            store::Record answer;
+            answer.kind = "inbox"; answer.status = "open"; answer.title = "Piblo replied";
+            answer.body = r.reply.text; answer.source = r.reply.provider; answer.ref = r.wavPath;
+            store::addRecord(answer);
+            if (!r.wavPath.empty()) store::remove(r.wavPath);
+            for (uint8_t p = 0; p < r.speechParts; ++p) store::remove(speechPartPath(r.speechPath, p));
+        } else if (!r.wavPath.empty()) {
+            store::Record queued;
+            queued.kind = "outbox"; queued.status = "queued";
+            queued.title = r.context.empty() ? "Call Piblo voice turn" : "Ask Screen voice turn";
+            queued.body = r.context.empty() ? (r.reply.error.empty() ? "PC unavailable" : r.reply.error) : r.context;
+            queued.source = r.context.empty() ? "talk" : "talk-context";
+            queued.ref = r.wavPath;
+            store::addRecord(queued);  // recording kept, as CommApp does
+        }
+        return;
+    }
+    resetToIdle();
+}
+
 bool takeTeachResult(TeachResult& result) { if (state()!=State::Done||jobKind()!=JobKind::Teach)return false; result=std::move(gTeachResult); resetToIdle(); return true; }
 
 State state() { return gState.load(std::memory_order_acquire); }

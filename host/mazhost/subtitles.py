@@ -196,7 +196,7 @@ class WhisperTranscriber:
         self.stt = stt
 
     def transcribe(self, media: Path, language: str | None) -> tuple[Iterable[Any], float, str]:
-        if not self.stt.available():
+        if not self.stt.whisper_available():
             raise SubtitleError("faster_whisper_not_installed")
         model = self.stt._get_model(
             self.settings.subtitle_model, self.settings.whisper_device, self.settings.whisper_compute

@@ -81,7 +81,7 @@ def test_auto_prefers_mazlatest_when_healthy(monkeypatch):
 
 
 def test_auto_falls_back_to_cloud_when_mazlatest_down(monkeypatch):
-    models = Models(settings(mazlatest_key="m"))
+    models = Models(settings(mazlatest_key="m", cloud_key="c"))
     monkeypatch.setattr(models, "_mazlatest", _unavailable)
     monkeypatch.setattr(models, "_cloud", lambda _messages, timeout=None: ("cloud ok", "cloud"))
     monkeypatch.setattr(models, "_local_stage", lambda *a, **k: (_ for _ in ()).throw(AssertionError("local used")))
@@ -357,3 +357,21 @@ def test_explicit_mazlatest_failure_is_loud_and_never_falls_back(monkeypatch):
     with pytest.raises(RouteError) as raised:
         models.chat([{"role": "user", "content": "hi"}], "mazlatest")
     assert raised.value.code == ErrorCode.UPSTREAM_UNAVAILABLE
+
+
+def test_warm_is_one_token_skips_without_engine_and_keeps_route_status(monkeypatch):
+    m = Models(settings())
+    m._last_route = {"requested": "auto", "active": "groq", "ok": True}
+    seen = []
+    monkeypatch.setattr(m, "status", lambda: {"local": False})
+    monkeypatch.setattr(m, "_dispatch_one", lambda *a, **k: seen.append(a) or ("", "local"))
+    m.warm([{"role": "user", "content": "hi"}])
+    assert seen == [], "no local engine: warm-up must not run"
+
+    from mazhost.llm import output_cap
+    caps = []
+    monkeypatch.setattr(m, "status", lambda: {"local": True})
+    monkeypatch.setattr(m, "_dispatch_one", lambda *a, **k: caps.append(output_cap()) or ("", "local"))
+    m.warm([{"role": "user", "content": "hi"}])
+    assert caps == [1] and output_cap() == 160
+    assert m._last_route["active"] == "groq"

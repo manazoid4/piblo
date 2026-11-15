@@ -115,7 +115,7 @@ class SpeakPlanner:
         self._lock = threading.Lock()
         self._max = max_plans
 
-    def start(self, text: str, row: dict[str, Any]) -> tuple[str, int]:
+    def start(self, text: str, row: dict[str, Any], synth: Callable[[str], Path] | None = None) -> tuple[str, int]:
         parts = plan_parts(spoken_reply(text))
         if not parts:
             return "", 0
@@ -123,10 +123,13 @@ class SpeakPlanner:
         pid = uuid.uuid4().hex[:16]
         remaining = {"n": len(parts)}
         lock = threading.Lock()
+        first_done = threading.Event()  # Kokoro's lock isn't FIFO: later parts wait so part 0 renders first
 
         def run(index: int, part_text: str) -> Path:
             try:
-                return self._synth(part_text)
+                if index:
+                    first_done.wait(40)
+                return (synth or self._synth)(part_text)
             finally:
                 done_ms = round((time.perf_counter() - began) * 1000)
                 with lock:
@@ -140,6 +143,7 @@ class SpeakPlanner:
                         log.info(TimingLog.line(row))
 
         futures = [self._pool.submit(run, i, p) for i, p in enumerate(parts)]
+        futures[0].add_done_callback(lambda _f: first_done.set())  # fires on finish, error or cancel/eviction
         row["parts"] = len(parts)
         with self._lock:
             self._plans[pid] = futures

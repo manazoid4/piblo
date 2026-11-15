@@ -180,3 +180,22 @@ def test_say_on_phone_page(tmp_path, calls):
     c.headers.update({"X-MAZ-Control": "1"})
     assert c.post("api/say", json={"text": "hello"}).content[:4] == b"RIFF"
     assert 'id="sayText"' in c.get("").text
+
+
+def test_say_falls_back_to_local_tts_when_fish_fails(tmp_path):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from mazhost.voices import VoiceService, install_voice_routes
+
+    def no_fish(text, path, voice):
+        raise RuntimeError("no_fish_key")
+
+    local = tmp_path / "local.wav"
+    local.write_bytes(b"RIFFlocal")
+    svc = VoiceService.__new__(VoiceService)
+    svc._synth, svc.fallback = no_fish, lambda text: local
+    svc.current = lambda: "a" * 32
+    app = FastAPI()
+    install_voice_routes(app, svc)
+    r = TestClient(app).post("/say", json={"text": "hello"})
+    assert r.status_code == 200 and r.content[:4] == b"RIFF"

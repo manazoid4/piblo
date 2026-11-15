@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Empty, Icon, PageHead } from '../components/ui';
 import { useAct, usePoll } from '../lib/store';
+import { FileVault } from '../components/FileVault';
 
 interface Dump {
   id: string;
@@ -22,6 +23,33 @@ interface Hit {
 }
 
 const text = (v: unknown): string => (v == null ? '' : typeof v === 'string' ? v : typeof v === 'object' ? String((v as Record<string, unknown>).text ?? (v as Record<string, unknown>).title ?? (v as Record<string, unknown>).summary ?? '') : String(v));
+
+function ReadThought({ id, summary }: { id: string; summary: string }) {
+  const [open, setOpen] = useState(false);
+  const [transcript, setTranscript] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const act = useAct();
+  const read = async () => {
+    if (open) { setOpen(false); return; }
+    setOpen(true);
+    if (transcript !== null) return;
+    setLoading(true);
+    setError('');
+    const r = await act<{ transcript: string }>('GET', `/dumps/${encodeURIComponent(id)}`);
+    if (r.ok) setTranscript(r.data.transcript);
+    else setError(r.message);
+    setLoading(false);
+  };
+  return <div>
+    {!open && <div className="title selectable">{summary}</div>}
+    <button className="btn sm ghost" aria-expanded={open} aria-controls={`thought-${id}`} onClick={() => void read()} disabled={loading}>{open ? 'Close' : 'Read'}</button>
+    {open && <div id={`thought-${id}`} className="selectable" style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+      <strong>Full thought</strong>
+      {loading ? <p role="status">Loading thought...</p> : error ? <p role="alert">{error} Close and choose Read to try again.</p> : <p>{transcript || 'No transcript saved.'}</p>}
+    </div>}
+  </div>;
+}
 
 function Inbox() {
   const [status, setStatus] = useState('');
@@ -62,7 +90,7 @@ function Inbox() {
         {list.map((d) => (
           <div className="list-item" key={d.id}>
             <div className="grow">
-              <div className="title selectable">{text(d.summary) || '(no summary)'}</div>
+              <ReadThought id={d.id} summary={text(d.summary) || '(no summary)'} />
               <div className="detail">{[d.project || 'no project', d.source, d.claimed_by && `claimed by ${d.claimed_by}`].filter(Boolean).join(' / ')}</div>
             </div>
             <span className="tag">{d.status ?? 'new'}</span>
@@ -132,6 +160,7 @@ export function Memory() {
       <PageHead title="Memory" sub="Everything your Piblo heard and everything you saved, in one place." />
       <Inbox />
       <Library />
+      <FileVault />
     </div>
   );
 }

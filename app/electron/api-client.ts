@@ -53,7 +53,7 @@ export function createApiClient(deps: ApiClientDeps) {
       headers['Content-Type'] = 'application/json';
       payload = JSON.stringify(body);
     }
-    return doFetch(deps.baseUrl() + path, { method, headers, body: payload, signal: AbortSignal.timeout(timeoutMs), cache: 'no-store' });
+    return doFetch(deps.baseUrl() + path, { method, headers, body: payload, signal: AbortSignal.timeout(path === '/skills/draft/from-teach' ? 120_000 : timeoutMs), cache: 'no-store' });
   }
 
   async function run<T>(method: string, path: string, body: unknown, raw: boolean): Promise<ApiResult<T>> {

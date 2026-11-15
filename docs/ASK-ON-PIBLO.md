@@ -22,6 +22,8 @@ curl -X POST "$PIBLO_CORE/buddy/request" -H "Authorization: Bearer $PIBLO_TOKEN"
 
 Poll `GET /buddy/state?id=...` for the result. `GET /buddy/summary` and `/buddy/pending` provide the nonce and digest for the device. `POST /buddy/decide` accepts `allow`, `deny`, `cancel`, `edit` (with `instruction`), or `undo`. An edit is terminal and needs a new request and proof. Declare `undo` as a short description to offer a 30-second recording window after allow; undo records `undone`, it does not reverse an action. `POST /ask/pause` with `{"on":true}` denies current and future requests until resumed or the halt expires; it cannot stop already running actions. Non-urgent requests are held during Focus, while urgent requests pass. A client with a shorter wait can still cancel a held request; it must not treat that as approval.
 
+An approval returned from the live request expires at its deadline. After Core restarts or evicts a request from memory, its stored `allow` is returned as expired, including on an idempotent retry; the audit history still records the original decision. An idempotency key prevents creating another request, but does not make a live `allow` a single-use execution token. Consumers must enforce their own one-time execution and exact-operation binding.
+
 ## MCP example
 
 Call the existing `piblo_request_approval` MCP tool with:

@@ -165,30 +165,32 @@ function TodayCard() {
   );
 }
 
-function FocusCard() {
+export function FocusCard() {
   const focus = usePoll<Focus>('/focus/state', 2000);
   const act = useAct();
   const [task, setTask] = useState('');
   const f = focus.data;
   const running = f?.state === 'running';
+  const awaitingDone = f?.state === 'awaiting_done';
   const start = async (minutes: number) => {
     const r = await act('POST', '/focus/start', { minutes, task }, `Focus started for ${minutes} min`);
     if (r.ok) focus.reload();
   };
-  const end = async () => {
-    const r = await act('POST', '/focus/end', { done: true }, 'Nice work');
+  const end = async (done: boolean) => {
+    const r = await act('POST', '/focus/end', { done }, done ? 'Nice work' : 'Focus stopped');
     if (r.ok) focus.reload();
   };
   return (
     <section className="card stack" aria-labelledby="focus-h">
       <h2 id="focus-h">Focus sprint</h2>
-      {running ? (
+      {running || awaitingDone ? (
         <div className="row">
           <div className="grow">
             <div className="title">{f?.task || 'Focus'}</div>
-            <div className="detail">{Math.floor((f?.remaining_s ?? 0) / 60)} min left</div>
+            <div className="detail">{awaitingDone ? 'Time is up. Did you finish?' : `${Math.floor((f?.remaining_s ?? 0) / 60)} min left`}</div>
           </div>
-          <button className="btn primary" onClick={() => void end()}>Finish</button>
+          <button className="btn" onClick={() => void end(false)}>Stop</button>
+          <button className="btn primary" onClick={() => void end(true)}>Finish</button>
         </div>
       ) : (
         <>

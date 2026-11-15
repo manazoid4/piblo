@@ -28,7 +28,7 @@ public:
             case TeachView::Displays: return "UP/DOWN screen   ENTER start";
             case TeachView::Recording: return "M mark important   ENTER stop";
             case TeachView::Result: return "ENTER save transcript   N new";
-            case TeachView::Error: return "R retry   ESC back";
+            case TeachView::Error: return "R retry";
             default: return "hub working   ESC safe";
         }
     }

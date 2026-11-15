@@ -24,6 +24,9 @@ def main() -> None:
     sys.stdout = sys.stderr = open(log, "a", encoding="utf-8", buffering=1)
     logging.getLogger("uvicorn.access").addFilter(_Quiet())
     s = Settings()
+    if s.kokoro_pcm_port:
+        from .kokoro_pcm import serve_in_thread
+        serve_in_thread(s)
     uvicorn.run("mazhost.app:app", host=s.bind, port=s.port)
 
 

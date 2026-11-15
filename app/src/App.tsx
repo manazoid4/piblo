@@ -14,7 +14,9 @@ import { Memory } from './pages/Memory';
 import { Onboarding } from './pages/Onboarding';
 import { PibloDev, type DevTab } from './pages/PibloDev';
 import { Settings } from './pages/Settings';
+import { Teach } from './pages/Teach';
 import { StoreProvider, usePoll, useStore } from './lib/store';
+import { useUpdate } from './lib/useUpdate';
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -70,7 +72,9 @@ function useTheme() {
 
 export { useTheme };
 
-type Section = 'home' | 'live' | 'ask' | 'memory' | 'actions' | 'settings' | 'dev';
+type Section = 'home' | 'live' | 'ask' | 'memory' | 'actions' | 'settings' | 'teach' | 'dev';
+
+const isDev = import.meta.env.DEV;
 const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'home', label: 'Home', icon: 'device' },
   { id: 'live', label: 'Live View', icon: 'screen' },
@@ -78,7 +82,8 @@ const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'memory', label: 'Memory', icon: 'memory' },
   { id: 'actions', label: 'Actions', icon: 'actions' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
-  { id: 'dev', label: 'Piblo Dev', icon: 'dev' },
+  ...(isDev ? [{ id: 'dev' as const, label: 'Piblo Dev', icon: 'dev' }] : []),
+  { id: 'teach', label: 'Show me once', icon: 'screen' },
 ];
 
 function DevicePillView() {
@@ -105,6 +110,7 @@ function Shell() {
   const running = core?.phase === 'running';
   // Pending pairing requests, polled every 2 s while this window is open.
   const pairing = usePairing({ active: running });
+  const update = useUpdate();
   const [notice, setNotice] = useState<string | null>(null);
   const showPairing = !welcome && pairing.requests.length > 0;
 
@@ -143,16 +149,16 @@ function Shell() {
   }, []);
 
   const runPaletteCommand = (cmd: PaletteCommand) => {
-    setWelcome(false);
-    if (cmd.id.startsWith('nav:')) {
-      const target = cmd.id.slice(4) as Section;
-      setSection(target);
-    } else if (cmd.id.startsWith('dev:')) {
-      const targetTab = cmd.id.slice(4) as DevTab;
-      setDevTab(targetTab);
-      setSection('dev');
-    }
-  };
+      setWelcome(false);
+      if (cmd.id.startsWith('nav:')) {
+        const target = cmd.id.slice(4) as Section;
+        setSection(target);
+      } else if (cmd.id.startsWith('dev:') && isDev) {
+        const targetTab = cmd.id.slice(4) as DevTab;
+        setDevTab(targetTab);
+        setSection('dev');
+      }
+    };
 
   const decide = async (requestId: string, decision: 'allow' | 'deny') => {
     const out = await pairing.decide(requestId, decision);
@@ -165,7 +171,7 @@ function Shell() {
   };
 
   const needsCore = section !== 'settings' && !running;
-  const Page = { home: Home, live: LiveView, ask: Ask, memory: Memory, actions: Actions, settings: Settings }[section === 'dev' ? 'home' : section];
+  const Page = { home: Home, live: LiveView, ask: Ask, memory: Memory, actions: Actions, settings: Settings, teach: Teach }[section === 'dev' ? 'home' : section];
 
   return (
     <div className="shell">
@@ -196,9 +202,18 @@ function Shell() {
             {n.id === 'actions' && badge > 0 ? <span className="rail-badge" aria-label={`${badge} waiting`}>{badge}</span> : <kbd>Ctrl+{i + 1}</kbd>}
           </button>
         ))}
-        <div className="rail-foot meta">{running ? (core?.managed ? 'Piblo on this PC: running' : 'Piblo on this PC: already running') : ''}</div>
+        <div className="rail-foot meta">{running ? (core?.managed ? 'Running' : 'Ready') : ''}</div>
       </nav>
       <main className="content">
+        {update.status?.state === 'ready' && !welcome && (
+          <div className="banner ok" role="status" style={{ marginBottom: 'var(--s-4)' }}>
+            <div className="grow">
+              <strong>Piblo {update.status.version} is ready.</strong>
+              <span>Downloaded in the background. Restart to finish — nothing is lost.</span>
+            </div>
+            <button className="btn sm" onClick={() => void update.install()}>Restart to update</button>
+          </div>
+        )}
         {welcome === null ? null : welcome ? (
           <Onboarding onDone={() => { setWelcome(false); location.hash = ''; setSection('live'); }} />
         ) : needsCore ? (

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from contextvars import ContextVar
 import time
 from typing import Any, Literal
 
@@ -44,6 +45,13 @@ GROQ_TIMEOUT_SECONDS = 3.0
 # prevents a verbose local model from making the user wait for text that cannot
 # usefully fit on the Pocket screen. Both local engines honour the same bound.
 MAX_OUTPUT_TOKENS = 160
+# Spoken turns: ~60 tokens is one or two short sentences, and decode is the slow part on CPU.
+VOICE_MAX_TOKENS = 60
+_output_cap: ContextVar[int] = ContextVar("output_cap", default=MAX_OUTPUT_TOKENS)
+
+
+def output_cap() -> int:
+    return _output_cap.get()
 
 
 class Models:
@@ -186,7 +194,7 @@ class Models:
             "top_p": 0.85,
             "repeat_penalty": 1.05,
             "num_ctx": self._context_size(messages),
-            "num_predict": MAX_OUTPUT_TOKENS,
+            "num_predict": output_cap(),
         }
         if model == self.settings.ollama_backup_model:
             options.update({"temperature": 0.30, "top_p": 0.90, "top_k": 30})
@@ -216,7 +224,7 @@ class Models:
                 "temperature": 0.15,
                 "top_p": 0.85,
                 "repeat_penalty": 1.05,
-                "max_tokens": MAX_OUTPUT_TOKENS,
+                "max_tokens": output_cap(),
                 # Reusing the cached prefix is what keeps a second Pocket turn
                 # from re-evaluating the whole grounded prompt.
                 "cache_prompt": True,
@@ -408,7 +416,7 @@ class Models:
             key=self.settings.groq_key,
             model=model,
             messages=messages,
-            max_tokens=400 if reasoning else MAX_OUTPUT_TOKENS,
+            max_tokens=400 if reasoning else output_cap(),
             timeout=GROQ_TIMEOUT_SECONDS if timeout is None else min(timeout, GROQ_TIMEOUT_SECONDS),
             extra={"reasoning_effort": "low"} if reasoning else None,
         )
@@ -421,7 +429,7 @@ class Models:
             raise RouteError(ErrorCode.AUTH_FAILED, "openrouter", retryable=False)
         text, resolved = self._openai_completion(
             route="openrouter", url="https://openrouter.ai/api/v1", key=self.settings.openrouter_api_key,
-            model=self.settings.openrouter_free_model, messages=messages, max_tokens=MAX_OUTPUT_TOKENS,
+            model=self.settings.openrouter_free_model, messages=messages, max_tokens=output_cap(),
             timeout=min(timeout or 5.0, 5.0),
         )
         return text, f"openrouter:{resolved}"
@@ -433,7 +441,7 @@ class Models:
             key=self.settings.mazlatest_key,
             model=self.settings.mazlatest_model,
             messages=messages,
-            max_tokens=MAX_OUTPUT_TOKENS,
+            max_tokens=output_cap(),
             timeout=timeout,
         )
         provider = f"mazlatest:{self.settings.mazlatest_model}"
@@ -458,6 +466,21 @@ class Models:
         if stage == "local":
             return self._local(messages)
         raise ValueError(f"unknown route stage: {stage}")
+
+    def warm(self, messages: list[dict[str, str]]) -> None:
+        """Load the local model and prime its prompt cache with a 1-token completion.
+
+        Skipped when no local engine is up; leaves last_route/last_usage untouched so
+        diagnostics never show a warm-up as a user turn."""
+        if not self.status()["local"]:
+            return
+        usage = dict(self._last_usage)
+        token = _output_cap.set(1)
+        try:
+            self._dispatch_one("local", messages)
+        finally:
+            _output_cap.reset(token)
+            self._last_usage = usage
 
     def _dispatch_one_bounded(self, stage: Route, messages: list[dict[str, str]]) -> tuple[str, str]:
         if self.settings.brain_order == "local_first" and stage in ("local_fast", "local_smart"):
@@ -518,6 +541,8 @@ class Models:
         return tuple(stage for stage in chain if stage != "cloud")
 
     def _drop_unkeyed(self, chain: tuple[Route, ...]) -> tuple[Route, ...]:
+        if not self.settings.cloud_key:
+            chain = tuple(stage for stage in chain if stage != "cloud")
         if not self.settings.groq_key:
             chain = tuple(stage for stage in chain if not stage.startswith("groq"))
         if not self.settings.mazlatest_key:  # keyless 9router stage only burns ~2 s before local
