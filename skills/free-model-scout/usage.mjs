@@ -9,10 +9,10 @@ export const PROVIDERS = Object.freeze({
   openrouter: { env: "OPENROUTER_API_KEY", url: "https://openrouter.ai/api/v1/key" },
   groq: { env: "GROQ_API_KEY", url: "https://api.groq.com/openai/v1/models" },
   nvidia: { env: "NVIDIA_API_KEY", url: "https://integrate.api.nvidia.com/v1/models" },
-  nous: { env: "NOUS_API_KEY", url: "https://inference-api.nousresearch.com/v1/models" },
+  nous: { env: "NOUS_API_KEY", url: null }, // Exact Nous Cloud endpoint/account tier must be verified
   ollama: { env: null, url: "http://127.0.0.1:11434/api/tags" },
 });
-const MAX_READ = 128 * 1024;
+const MAX_READ = 2 * 1024 * 1024; // read-only catalogs can be large
 
 function quantity(value) {
   const n = Number(value);
@@ -82,6 +82,7 @@ export async function check(provider, { fetchImpl = fetch, timeoutMs = 7000, env
   const p = PROVIDERS[provider];
   if (!p) throw Error("unsupported provider");
   if (p.env && !env[p.env]) return { ...readOnlyStatus(provider), reason: "API key env var not set" };
+  if (!p.url) return { ...readOnlyStatus(provider, { configured: true }), reason: "provider account API URL not verified; no network request attempted" };
   const controller = AbortSignal.timeout(timeoutMs);
   try {
     const response = await fetchImpl(p.url, {
