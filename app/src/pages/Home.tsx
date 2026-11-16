@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Empty, Icon, PageHead } from '../components/ui';
+import { Empty, Icon, PageHead, Spinner, Switch } from '../components/ui';
 import { TodayPromises } from '../components/TodayPromises';
 import { ago } from '../lib/logic';
 import { useAct, usePoll, useStore } from '../lib/store';
@@ -99,6 +99,8 @@ export function Home() {
 
       <TodayPromises />
 
+      <HomeReminders />
+
       <section className="card stack" aria-labelledby="beam-h">
         <h2 id="beam-h">Send to Piblo</h2>
         <p className="sub">Send a note or a link. It appears the next time Piblo checks in.</p>
@@ -126,5 +128,128 @@ export function Home() {
         </div>
       </section>
     </div>
+  );
+}
+
+/** Home reminders: the next 14 days of bin days and home dates, with add / edit / delete. */
+interface ReminderRule {
+  id: string;
+  kind: string;
+  title: string;
+  next_due: string | null;
+  shift: boolean;
+}
+
+interface UpcomingResponse {
+  ok: boolean;
+  by_date: Record<string, ReminderRule[]>;
+  days: number;
+}
+
+function dayLabel(iso: string): string {
+  const d = new Date(iso + 'T00:00:00');
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const tomorrow = new Date(today);
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  if (d.getTime() === today.getTime()) return 'Today';
+  if (d.getTime() === tomorrow.getTime()) return 'Tomorrow';
+  return d.toLocaleDateString(undefined, { weekday: 'short', day: 'numeric', month: 'short' });
+}
+
+export function HomeReminders() {
+  const { toast } = useStore();
+  const { core } = useStore();
+  const act = useAct();
+  const running = core?.phase === 'running';
+  const upcoming = usePoll<UpcomingResponse>('/promises/upcoming?days=14', running ? 30000 : 0);
+  const [text, setText] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const rows = Object.entries(upcoming.data?.by_date ?? {}).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+
+  const add = async () => {
+    if (!text.trim()) return;
+    setAdding(true);
+    const r = await act('POST', '/promises/rules', { text: text.trim(), confirmed: true }, 'Reminder added');
+    setAdding(false);
+    if (r.ok) {
+      setText('');
+      upcoming.reload();
+    }
+  };
+
+  const remove = async (id: string) => {
+    if (!window.confirm('Remove this reminder?')) return;
+    const r = await act('DELETE', `/promises/rules/${id}`, undefined, 'Removed');
+    if (r.ok) upcoming.reload();
+  };
+
+  const toggleShift = async (id: string, shift: boolean) => {
+    const r = await act('PATCH', `/promises/rules/${id}`, { shift: !shift }, undefined);
+    if (!r.ok) toast(r.message, true);
+    else upcoming.reload();
+  };
+
+  if (upcoming.loading) return <div className="card"><Spinner /></div>;
+  if (upcoming.error) return <Empty title="Could not load reminders"><p>{upcoming.error}</p></Empty>;
+
+  return (
+    <section className="card stack" aria-labelledby="reminders-h">
+      <div className="row page-head">
+        <h2 id="reminders-h">Home reminders</h2>
+      </div>
+      <p className="sub">
+        Bin days, home dates and anything else you set up by voice (“black bin every other Tuesday”) or here.
+      </p>
+      <div className="row wrap">
+        <input
+          className="input"
+          placeholder="e.g. black bin every other Tuesday, next one 18 Nov"
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && void add()}
+          maxLength={200}
+          aria-label="New home reminder"
+        />
+        <button className="btn primary" onClick={add} disabled={adding || !text.trim()}>
+          {adding ? <Spinner /> : (<><Icon name="check" size={16} /> Add</>)}
+        </button>
+      </div>
+      {rows.length === 0 && (
+        <Empty title="No home reminders yet">
+          <p>Say “black bin every other Tuesday” to Piblo, or add one above.</p>
+        </Empty>
+      )}
+      <div className="list">
+        {rows.map(([iso, items]) => (
+          <div key={iso} className="list-group">
+            <div className="row"><span className="meta">{dayLabel(iso)}</span></div>
+            {items.map((item) => (
+              <div key={item.id} className="list-item">
+                <div className="grow">
+                  <div className="row">
+                    <span className="tag">{item.kind === 'bin' ? 'bin' : 'home'}</span>
+                    {item.shift && <span className="tag meta">shifts after bank holidays</span>}
+                    <span className="meta selectable" title={item.title}>{item.title}</span>
+                  </div>
+                  {item.next_due && <div className="detail meta">Next: {dayLabel(item.next_due)}</div>}
+                </div>
+                <div className="row wrap" style={{ gap: 'var(--s-2)' }}>
+                  <Switch
+                    checked={item.shift}
+                    onChange={(v: boolean) => void toggleShift(item.id, v)}
+                    label="Move collection after bank holidays"
+                  />
+                  <button className="btn sm danger" onClick={() => void remove(item.id)}>
+                    <Icon name="bin" size={14} /> Remove
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }

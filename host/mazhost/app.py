@@ -337,6 +337,7 @@ def create_app(
     @api.on_event("shutdown")
     def stop_bridge() -> None:
         bridge_worker.stop()
+        promises_engine.stop()
 
     def versioned_core_status() -> dict:
         status = dict(core_service.status())
@@ -366,6 +367,11 @@ def create_app(
                 "\"and after that\" or \"what did I just ask\".\n"
             )
         context += maths_line(text) + ("" if local_only else weather_line(text)) + priorities_line(text, cfg.now_path)
+        try:
+            if any(word in text.lower() for word in ("bin", "recycling", "reminder")):
+                context += "\nUpcoming home reminders: " + promises_engine.next_spoken() + "."
+        except Exception:
+            pass
         try:
             saved = memory_notes.context(text) if not pocket_context else ""
             if saved:
@@ -499,6 +505,16 @@ def create_app(
             sessions.add_turn(session_id, refined.text, feature_reply)
             return {'text': refined.text, 'reply': feature_reply, 'provider': 'piblo-local',
                     'actions': refined.actions, 'timings': {'llm_ms': 0}}
+        setup_reply = None if pocket_context else promises_engine.try_setup(refined.text)
+        if setup_reply is not None:
+            sessions.add_turn(session_id, refined.text, setup_reply)
+            return {"text": refined.text, "reply": setup_reply, "provider": "promises-local",
+                    "actions": [], "timings": {"llm_ms": 0}}
+        reminder_reply = None if pocket_context else promises_engine.answer_question(refined.text)
+        if reminder_reply is not None:
+            sessions.add_turn(session_id, refined.text, reminder_reply)
+            return {"text": refined.text, "reply": reminder_reply, "provider": "promises-local",
+                    "actions": [], "timings": {"llm_ms": 0}}
         started = time.perf_counter()
         try:
             token = _output_cap.set(max_tokens) if max_tokens else None  # spoken path only
@@ -1175,6 +1191,9 @@ def create_app(
     buddy_store = None if cfg.buddy_db == "off" else BuddyStore(
         cfg.buddy_db or resolve_data_dir(cfg) / "buddy.sqlite3")
     buddy = install_buddy_routes(api, Buddy(store=buddy_store, focus=focus, device_keys=device_keys))
+    promises_engine = Promises(buddy, model_router=model_router, settings=cfg)
+    promises_engine.start()
+    buddy.on_ack = promises_engine.on_alert_acked
     if cfg.vault_dir and cfg.vault_remote_url:
         raise ValueError('Choose a local vault folder or a remote home vault, not both')
     vault = (RemoteFileVault(cfg.vault_remote_url, cfg.vault_remote_token)
@@ -1251,7 +1270,7 @@ def create_app(
     onboarding = Onboarding(resolve_data_dir(cfg))
     catchup = Catchup(resolve_data_dir(cfg), buddy, inbox_dir(cfg) / "library")
     api.include_router(build_catchup_router(catchup))
-    api.include_router(build_promises_router(Promises(buddy)))
+    api.include_router(build_promises_router(promises_engine))
     api.include_router(build_share_router(cfg, model_router))
     api.include_router(build_onboarding_router(onboarding))
     api.include_router(build_buddy_forms_router(onboarding=onboarding))

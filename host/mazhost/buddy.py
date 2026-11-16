@@ -175,10 +175,12 @@ class HaltBody(BaseModel):
 
 class Buddy:
     def __init__(self, today: Callable[[], str] | None = None, store: BuddyStore | None = None,
-                 focus=None, device_keys: dict[str, str] | None = None) -> None:
+                 focus=None, device_keys: dict[str, str] | None = None,
+                 on_ack: Callable[[str], None] | None = None) -> None:
         self.store = store
         self.focus = focus
         self.device_keys = device_keys if device_keys is not None else {}
+        self.on_ack = on_ack
         self._today = today or _local_today
         self._idem: dict[str, str] = {}     # idempotency key -> approval id (this process)
         self._clients: dict[str, dict] = {}
@@ -831,7 +833,10 @@ def install_buddy_routes(api: FastAPI, buddy: Buddy | None = None) -> Buddy:
     @api.post("/buddy/alert/{aid}/{action}")
     def buddy_alert_action(aid: str, action: Literal["ack", "snooze"], body: SnoozeBody | None = None):
         try:
-            return buddy.alert_outcome(aid, action, (body or SnoozeBody()).minutes)
+            result = buddy.alert_outcome(aid, action, (body or SnoozeBody()).minutes)
+            if action == "ack" and getattr(buddy, "on_ack", None):
+                buddy.on_ack(aid)
+            return result
         except KeyError:
             raise HTTPException(404, "alert_not_found")
         except ValueError as error:
