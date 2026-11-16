@@ -133,6 +133,9 @@ class ProtoTest {
 
     @Test fun normalizeBase() {
         assertEquals("http://192.168.1.20:8787", CoreClient.normalizeBase("192.168.1.20"))
+        assertEquals("http://100.101.102.103:8787", CoreClient.normalizeBase("100.101.102.103"))
+        assertEquals("http://laptop.tail1234.ts.net:8787", CoreClient.normalizeBase("laptop.tail1234.ts.net"))
+        assertNull(CoreClient.normalizeBase("8.8.8.8"))
         assertEquals("http://pc:9000", CoreClient.normalizeBase(" pc:9000/ "))
         assertEquals("https://core.example.net", CoreClient.normalizeBase("https://core.example.net"))
         assertNull(CoreClient.normalizeBase("")); assertNull(CoreClient.normalizeBase("ftp://x")); assertNull(CoreClient.normalizeBase("a b"))

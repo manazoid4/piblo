@@ -15,6 +15,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
@@ -38,8 +39,11 @@ import uk.mazworks.piblo.hub.LinkState
 import uk.mazworks.piblo.hub.Origin
 import uk.mazworks.piblo.hub.shouldDrainShares
 import uk.mazworks.piblo.hub.Transport
+import uk.mazworks.piblo.proto.Api
 import uk.mazworks.piblo.proto.CoreClient
 import uk.mazworks.piblo.proto.CoreHttpException
+import uk.mazworks.piblo.proto.DeviceStatus
+import uk.mazworks.piblo.proto.Health
 import uk.mazworks.piblo.proto.Priority
 import uk.mazworks.piblo.proto.Proto
 import uk.mazworks.piblo.system.FindPhone
@@ -59,6 +63,11 @@ class PibloApp : Application() {
     private var lastForwardKey = ""
     private var netCbRegistered = false
     @Volatile private var shareDrainRequested = false
+
+    /** Live device/ Core facts for the screens. Polled off the main thread; null when Core is unreachable. */
+    val deviceStatus = MutableStateFlow<DeviceStatus?>(null)
+    val health = MutableStateFlow<Health?>(null)
+    val deviceError = MutableStateFlow<String?>(null)
 
     /** Call after enqueuing a share: it is sent on the next online cycle. */
     fun requestShareDrain() { shareDrainRequested = true }
@@ -92,6 +101,7 @@ class PibloApp : Application() {
             override fun onActivityDestroyed(a: Activity) {}
         })
         scope.launch { while (isActive) { delay(1000); hub.tick() } }
+        scope.launch { while (isActive) { delay(5000); refreshDevice() } }
         scope.launch {
             settings.prefs.map { it.copy(forwardNotifications = false, forwardPackages = emptySet()) }.distinctUntilChanged().collectLatest(::applyMode)
         }
@@ -124,8 +134,13 @@ class PibloApp : Application() {
     private fun applyMode(p: Prefs) {
         linkJob?.cancel()
         transport = null
+        deviceStatus.value = null
+        health.value = null
+        deviceError.value = null
         WatchService.set(this, p.mode == Prefs.Mode.COMPUTER && p.hasComputer && p.watchInBackground)
-        if (p.mode != Prefs.Mode.COMPUTER || !p.hasComputer) { hub.setLink(LinkState.SIMULATOR); return }
+        // Normal use is always the real Core. The built-in simulator is a Settings > Developer tool.
+        if (p.useSimulator) { hub.setLink(LinkState.SIMULATOR); return }
+        if (p.mode != Prefs.Mode.COMPUTER || !p.hasComputer) { hub.setLink(LinkState.OFFLINE); return }
         val token = SecretBox.decrypt(p.tokenBlob)
         if (token == null) { hub.setLink(LinkState.AUTH_FAILED); hub.log("Saved pairing can't be read. Connect again."); return }
         val t = CoreTransport(CoreClient(p.coreUrl, token, BuildConfig.VERSION_NAME))
@@ -200,6 +215,30 @@ class PibloApp : Application() {
                 }
                 continue
             }
+        }
+    }
+
+    /** One device/health refresh, off the main thread. Failures leave the last good values and record why. */
+    fun refreshDevice() {
+        val t = transport ?: return
+        scope.launch(Dispatchers.IO) {
+            try {
+                deviceStatus.value = Api.device(t.get("/core/device"))
+                deviceError.value = null
+            } catch (e: Exception) {
+                deviceError.value = e.message ?: "offline"
+                deviceStatus.value = null
+            }
+            try { health.value = Api.health(t.get("/health")) } catch (_: Exception) { /* device card is enough */ }
+        }
+    }
+
+    /** Save a pairing obtained from the PC's Allow click, then reconnect. */
+    fun savePairing(url: String, token: String) {
+        scope.launch {
+            settings.saveComputer(url, token)
+            settings.setOnboarded(true)
+            refreshDevice()
         }
     }
 
