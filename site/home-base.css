@@ -8,9 +8,9 @@
   --tomato: #ee5a36;
   --mint: #8fdcb8;
   /* device screen UI: the same in light and dark mode, like a real screen */
-  --scr-bg: #131312;
-  --scr-ink: #f2efe6;
-  --scr-dim: #8f8c84;
+  --scr-bg: #2a1a12;
+  --scr-ink: #fff4e0;
+  --scr-dim: #b89a6e;
 }
 
 *, *::before, *::after { box-sizing: border-box; }
@@ -111,7 +111,7 @@ button, input { font: inherit; color: inherit; }
 /* ---------- device screen ---------- */
 .scr {
   position: absolute; inset: 3em; border-radius: 2.4em; overflow: hidden; display: flex; flex-direction: column; padding: 2.6em 3.2em 2.8em;
-  background: radial-gradient(130% 90% at 50% -10%, #24231f 0%, var(--scr-bg) 68%);
+  background: radial-gradient(130% 90% at 50% -10%, #3b281a 0%, var(--scr-bg) 68%);
   color: var(--scr-ink); font-family: var(--font-mono);
   box-shadow: 0 0 6em rgba(255,226,205,.1);
   animation: scr-glow 5s ease-in-out infinite alternate;
@@ -125,7 +125,7 @@ button, input { font: inherit; color: inherit; }
 .scr-main:has(.scr-list) { gap: 1.1em; }
 .scr-main:has(.scr-list) .scr-title { font-size: 4.6em; }
 .scr-keys { display: flex; gap: 1.2em; font-size: 2.3em; color: var(--scr-dim); }
-.scr-keys b { display: inline-block; min-width: 1.7em; padding: .12em .3em; margin-right: .35em; text-align: center; font-weight: 600; color: var(--scr-ink); border: .1em solid rgba(242,239,230,.3); border-radius: .35em; }
+.scr-keys b { display: inline-block; min-width: 1.7em; padding: .12em .3em; margin-right: .35em; text-align: center; font-weight: 600; color: var(--scr-ink); border: .1em solid rgba(255,244,224,.3); border-radius: .35em; }
 .scr-keys span:first-child b { background: var(--tomato); border-color: var(--tomato); color: #2a1208; }
 .scr-label { font-size: 2.3em; letter-spacing: .12em; text-transform: uppercase; color: var(--scr-dim); }
 .scr-label--hot { color: var(--tomato); }

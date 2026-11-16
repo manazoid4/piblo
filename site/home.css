@@ -220,3 +220,10 @@ p { text-wrap: pretty; }
 .priv-card p { color: var(--ink-2); font-size: 15px; line-height: 1.5; }
 @media (min-width: 720px) { .priv-grid { grid-template-columns: 1fr 1fr; column-gap: 28px; } }
 @media (min-width: 980px) { .priv-grid { grid-template-columns: repeat(4, 1fr); } }
+
+/* How the keys work: visible, light page, same table as the device */
+.keyhelp { margin-top: 18px; padding: 18px; background: var(--card); border-radius: 22px; box-shadow: var(--shadow); }
+.keyhelp h3 { font-size: 20px; letter-spacing: -.02em; margin: 0 0 6px; }
+.keyhelp ul { list-style: none; margin: 12px 0 0; padding: 0; display: grid; gap: 8px; }
+.keyhelp li { display: flex; align-items: baseline; gap: 12px; color: var(--ink-2); font-size: 16.5px; }
+.keyhelp kbd { flex: none; min-width: 5.2em; padding: 3px 9px; text-align: center; font-family: var(--font-mono); font-size: 13px; font-weight: 600; color: var(--ink); border: 1.5px solid var(--ink); border-radius: 8px; background: var(--bg); }
