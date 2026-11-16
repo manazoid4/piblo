@@ -37,6 +37,8 @@ data class CoreEvent(val id: Int, val kind: String, val text: String, val source
 data class Summary(val agent: String, val count: Int, val items: List<PendingApproval>)
 data class EventsPage(val events: List<CoreEvent>, val last: Int)
 
+data class HaltState(val halted: Boolean, val until: String?)
+
 class ProtoException(message: String) : Exception(message)
 
 object Proto {
@@ -124,5 +126,13 @@ object Proto {
     /** GET /buddy/text/{id} status: pending / inserted / no_field / too_long (device acks). */
     fun parseTextStatus(json: String): String = guard { JSONObject(json).optString("status", "pending") }
 
-    private inline fun <T> guard(block: () -> T): T = try { block() } catch (e: ProtoException) { throw e } catch (e: Exception) { throw ProtoException("unexpected response: ${e.message}") }
+        fun parseHaltState(json: String): HaltState = guard {
+            val o = JSONObject(json)
+            HaltState(o.optBoolean("halted"), if (o.isNull("until")) null else o.optString("until").takeIf { it.isNotBlank() })
+        }
+
+        fun haltJson(on: Boolean, minutes: Int? = null): String =
+            JSONObject().put("on", on).apply { if (minutes != null) put("minutes", minutes) }.toString()
+
+        private inline fun <T> guard(block: () -> T): T = try { block() } catch (e: ProtoException) { throw e } catch (e: Exception) { throw ProtoException("unexpected response: ${e.message}") }
 }

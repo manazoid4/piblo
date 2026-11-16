@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import uk.mazworks.piblo.proto.CoreClient
+import uk.mazworks.piblo.proto.HaltState
 import uk.mazworks.piblo.proto.Priority
 import uk.mazworks.piblo.proto.Proto
 import uk.mazworks.piblo.proto.ProtoException
@@ -167,9 +168,35 @@ class ProtoTest {
     }
 
     @Test fun doubleTappedNoteIsNotQueuedTwice() {
-        val e = uk.mazworks.piblo.data.ShareEntry(text = "buy milk", title = "Note from phone", url = "", createdAt = 1)
-        assertTrue(uk.mazworks.piblo.data.hasQueuedShare(listOf(e), "buy milk", "Note from phone"))
-        assertFalse(uk.mazworks.piblo.data.hasQueuedShare(listOf(e), "buy eggs", "Note from phone"))
-        assertFalse(uk.mazworks.piblo.data.hasQueuedShare(emptyList(), "buy milk", "Note from phone"))
+            val e = uk.mazworks.piblo.data.ShareEntry(text = "buy milk", title = "Note from phone", url = "", createdAt = 1)
+            assertTrue(uk.mazworks.piblo.data.hasQueuedShare(listOf(e), "buy milk", "Note from phone"))
+            assertFalse(uk.mazworks.piblo.data.hasQueuedShare(listOf(e), "buy eggs", "Note from phone"))
+            assertFalse(uk.mazworks.piblo.data.hasQueuedShare(emptyList(), "buy milk", "Note from phone"))
     }
+
+        @Test fun parseHaltStateReadsHaltedAndUntil() {
+            val hs = Proto.parseHaltState("{\"halted\":true,\"until\":\"2025-01-01T12:00:00Z\"}")
+            assertTrue(hs.halted)
+            assertEquals("2025-01-01T12:00:00Z", hs.until)
+
+            val hs2 = Proto.parseHaltState("{\"halted\":false}")
+            assertFalse(hs2.halted)
+            assertNull(hs2.until)
+
+            val hs3 = Proto.parseHaltState("{\"halted\":true,\"until\":\"\"}")
+            assertTrue(hs3.halted)
+            assertNull(hs3.until)   // blank string -> null
+
+            assertNull(Proto.parseHaltState("{\"halted\":false,\"until\":null}").until)  // Core sends null when not halted
+        }
+
+        @Test fun haltJsonEncodesOnAndOptionalMinutes() {
+            val j = JSONObject(Proto.haltJson(true))
+            assertTrue(j.getBoolean("on"))
+            assertFalse(j.has("minutes"))
+
+            val j2 = JSONObject(Proto.haltJson(false, 30))
+            assertFalse(j2.getBoolean("on"))
+            assertEquals(30, j2.getInt("minutes"))
+        }
 }
