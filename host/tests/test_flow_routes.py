@@ -145,8 +145,21 @@ def test_status_summarises_latency_and_errors(tmp_path):
 
 def test_status_on_empty_dir_is_safe(tmp_path):
     body = make_client(make_flow(tmp_path)).get("/flow/status").json()
-    assert body == {"recent": [], "count": 0, "avg_total_ms": 0, "p95_total_ms": 0,
-                    "errors": [], "effective_cleanup": "rules"}
+    assert body == {"recent": [], "count": 0, "last": None, "target_ms": 1500, "within_target": 0,
+                    "avg_stage_ms": {"upload": 0, "stt": 0, "clean": 0, "insert": 0},
+                    "avg_total_ms": 0, "p95_total_ms": 0, "errors": [], "effective_cleanup": "rules"}
+
+
+def test_status_exposes_per_stage_timings(tmp_path):
+    Path(tmp_path, "latency.log").write_text(
+        "2026-11-16T10:00:00 dictate intent=paste upload=40 stt=700 clean=2 insert=430 total=1172 via=rules stt_via=parakeet pc=pasted chars=20\n"
+        "2026-11-16T10:01:00 dictate intent=paste upload=50 stt=1400 clean=2 insert=30 total=1482 via=rules stt_via=parakeet pc=pasted chars=20\n"
+        "2026-11-16T10:02:00 dictate intent=paste upload=50 stt=1900 clean=2 insert=30 total=1982 via=rules stt_via=whisper pc=clipboard chars=20\n",
+        encoding="utf-8")
+    body = make_client(make_flow(tmp_path)).get("/flow/status").json()
+    assert body["last"]["total_ms"] == 1982 and body["last"]["pc"] == "clipboard"
+    assert body["avg_stage_ms"] == {"upload": 47, "stt": 1333, "clean": 2, "insert": 163}
+    assert body["target_ms"] == 1500 and body["within_target"] == 2
 
 
 def test_insert_text_uses_configured_mode(tmp_path, monkeypatch):

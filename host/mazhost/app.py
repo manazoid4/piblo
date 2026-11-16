@@ -1007,6 +1007,7 @@ def create_app(
     @api.post("/dictate")
     async def dictate(request: Request, target: str = "text"):
         """wav in -> cleaned text out. target=pc-paste also pastes on the PC."""
+        t_in = time.perf_counter()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             size = 0
             async for chunk in request.stream():
@@ -1016,16 +1017,19 @@ def create_app(
                     raise HTTPException(413, "audio_too_large")
                 tmp.write(chunk)
             path = Path(tmp.name)
+        upload_ms = round((time.perf_counter() - t_in) * 1000)
         try:
             security.validate_upload(path, size)
             armed = flow_foreground() if target == "pc-paste" else 0  # focus when the audio landed
             try:
                 result = await asyncio.wait_for(
-                    run_in_threadpool(flow_service.dictate, path), timeout=flow_service.dictate_timeout)
+                    run_in_threadpool(flow_service.dictate, path, log=False), timeout=flow_service.dictate_timeout)
             except asyncio.TimeoutError:
                 flow_service._cancel.set()
                 raise HTTPException(504, "stt_timeout")
+            insert_ms, pc = 0, ""
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
+                t_ins = time.perf_counter()
                 prefs = read_settings(flow_service)
                 enter = result["intent"] == "claude" or bool(prefs["press_enter"])
 
@@ -1039,6 +1043,11 @@ def create_app(
                 except Exception:  # noqa: BLE001 - clipboard busy/locked: still return the text
                     result["pc"] = "failed"
                 result["reply"] = result["pc"]  # firmware decodeReply reads `reply` as the outcome
+                insert_ms, pc = round((time.perf_counter() - t_ins) * 1000), result["pc"]
+            if result["text"]:
+                flow_service.log_result(result, upload_ms, insert_ms, pc)
+            else:
+                result["ms"]["upload"] = upload_ms
             return result
         finally:
             try:
