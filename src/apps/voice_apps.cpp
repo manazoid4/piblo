@@ -18,6 +18,7 @@
 #include "../core/sys.h"
 #include "../input/keyboard.h"
 #include "../net/mazhost.h"
+#include <easy_keys.h>
 #include "../storage/store.h"
 #include "apps.h"
 #include "common.h"
@@ -429,9 +430,9 @@ public:
 
     const char* hints() const override {
         switch (dictate::state()) {
-            case dictate::State::Listening: return _toggle ? "tap SPACE: type  ESC cancel" : "release SPACE: type  ESC cancel";
+            case dictate::State::Listening: return _toggle ? easy_keys::kFlowHintTap : easy_keys::kFlowHintHold;
             case dictate::State::Working:   return "sending...  ESC cancel";
-            default: return "hold or tap SPACE to speak";
+            default: return easy_keys::kFlowHintIdle;
         }
     }
 
@@ -460,6 +461,12 @@ public:
                 if (millis() - _downAt < 350) _toggle = true;
                 else dictate::stop();
             }
+            invalidate();
+            return true;
+        }
+        if (e.down && e.code == KEY_ENTER && mine && dictate::state() == dictate::State::Listening) {
+            _toggle = false;  // ENTER = yes/do: finish and type
+            dictate::stop();
             invalidate();
             return true;
         }

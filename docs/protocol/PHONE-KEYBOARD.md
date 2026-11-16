@@ -103,7 +103,7 @@ can read its result.
 - Text is always literal printable characters (0x20..0x7E). Control bytes
   (newline, ESC, …) are dropped and never become keys, shortcuts or
   separators. It must never approve anything, and the approval overlay
-  itself is untouched (Y/ENTER approve, N/ESC reject, timeout = rejected).
+  itself is untouched (Y/ENTER approve, DEL/N reject, ESC/L = later (leaves it pending), timeout = rejected).
 - A repeated client id is never inserted twice (the device keeps an 8-id
   dedupe ring; the Core already dedupes too).
 - Acks queue on the device (cap 24) and retry every 1.5 s until Core confirms. If

@@ -11,6 +11,7 @@
 #include "../input/keyboard.h"
 #include "../net/mazhost.h"
 #include "../net/net.h"
+#include <easy_keys.h>
 #include <nod_theme.h>
 #include <talk_home.h>
 
@@ -215,7 +216,7 @@ private:
         if (host::updateReady()) return "Update available: press U";
         if (Sys.agentQuestion) return "Agent asked: press N";
         now = field::nowText();
-        return now != "READY" ? ui::ellipsis(now, 20) : std::string("Quick: 1-3");
+        return now != "READY" ? ui::ellipsis(now, 20) : std::string(easy_keys::kHomeIdleHint);
     }
 
     void renderTalk(M5Canvas& g) {

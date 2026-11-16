@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cmath>
 #include "../include/alert_policy.h"
+#include <cstring>
 #include "../include/approval_format.h"
 #include "../include/charge_monitor.h"
 #include "../include/poll_backoff.h"
@@ -284,7 +285,20 @@ int main() {
       CHECK(!isApproveKey(KEY_N) && !isApproveKey(KEY_ESC) && !isApproveKey(KEY_SPACE));
       CHECK(!isApproveKey(KEY_UP) && !isApproveKey(KEY_DOWN) && !isApproveKey(KEY_LEFT) && !isApproveKey(KEY_RIGHT));
       CHECK(!isApproveKey(KEY_BACKSPACE) && !isApproveKey(0) && !isApproveKey(0xFF));
-      CHECK(isRejectKey(KEY_N) && isRejectKey(KEY_ESC) && !isRejectKey(KEY_Y) && !isRejectKey(KEY_ENTER));
+      // Owner key table (16 Nov): ENTER yes, DEL no, ESC back (never denies), L later.
+      CHECK(isRejectKey(KEY_BACKSPACE) && isRejectKey(KEY_DELETE) && isRejectKey(KEY_N));
+      CHECK(!isRejectKey(KEY_ESC) && !isRejectKey(KEY_L) && !isRejectKey(KEY_SPACE) && !isRejectKey(KEY_Y) && !isRejectKey(KEY_ENTER));
+      CHECK(isLaterKey(KEY_L) && isLaterKey(KEY_ESC) && !isLaterKey(KEY_SPACE) && !isLaterKey(KEY_ENTER) && !isLaterKey(KEY_BACKSPACE));
+      CHECK(!isApproveKey(KEY_L) && !isApproveKey(KEY_DELETE));
+      // Footer text fits and teaches the one table.
+      CHECK(strlen(kApprovalHoldFoot) <= 36 && strlen(kApprovalOnceFoot) <= 36 && strlen(kApprovalTapHint) <= 36);
+      CHECK(strlen(kHomeIdleHint) <= 20 && std::string(kHomeIdleHint) == "Y: type on PC");
+      CHECK(strlen(kFlowHintIdle) <= 33 && strlen(kFlowHintHold) <= 33 && strlen(kFlowHintTap) <= 33);
+      for (const char* f : {kApprovalHoldFoot, kApprovalOnceFoot}) {
+          const std::string t = f;
+          CHECK(t.find("ENTER") != std::string::npos && t.find("DEL no") != std::string::npos && t.find("L later") != std::string::npos);
+          CHECK(t.find("ESC") == std::string::npos && t.find("N/") == std::string::npos);  // ESC never denies
+      }
       CHECK(isEasyNavKey(KEY_UP) && isEasyNavKey(KEY_DOWN) && isEasyNavKey(KEY_ENTER) && isEasyNavKey(KEY_ESC));
       CHECK(escGoesBack(false) && !escGoesBack(true));
       CHECK(backspaceGoesBack(false) && !backspaceGoesBack(true));
