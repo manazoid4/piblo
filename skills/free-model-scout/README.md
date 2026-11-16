@@ -54,7 +54,7 @@ Every allowance is one flat **meter** (`contract.mjs`): `provider_kind` (API | A
 **Subscription apps (Claude, Fable, Antigravity, ChatGPT) are APP meters from an editable manual snapshot**, labelled `confidence: manual`. Scout never logs in, scrapes or reads cookies. Copy `tests/manual-snapshot.example.json`, edit the numbers from the app yourself, update `checked_at`.
 
 ```bash
-node planner.mjs --snapshot my-snapshot.json                  # one-line summary
+node planner.mjs --snapshot my-snapshot.json                  # three plain lines
 node planner.mjs --snapshot my-snapshot.json --json --hours=8 # JSON plan
 node planner.mjs --snapshot my-snapshot.json --tz=Europe/London --now=2026-11-15T18:30:00Z --json
 ```
