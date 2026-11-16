@@ -12,8 +12,10 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
     private val base = baseUrl.trimEnd('/')
 
     fun summary(): Summary = Proto.parseSummary(call("GET", "/buddy/summary"))
-    fun events(since: Int): EventsPage = Proto.parseEvents(call("GET", "/buddy/events?since=$since"))
-    fun decide(id: String, allow: Boolean) { call("POST", "/buddy/decide", Proto.decideJson(id, allow)) }
+        fun events(since: Int): EventsPage = Proto.parseEvents(call("GET", "/buddy/events?since=$since"))
+        fun haltState(): HaltState = Proto.parseHaltState(call("GET", "/buddy/halt"))
+        fun setHalt(on: Boolean, minutes: Int? = null) { call("POST", "/buddy/halt", Proto.haltJson(on, minutes)) }
+        fun decide(id: String, allow: Boolean) { call("POST", "/buddy/decide", Proto.decideJson(id, allow)) }
     fun alertAction(id: String, action: String, minutes: Int = 10) {
         require(action == "ack" || action == "snooze")
         call("POST", "/buddy/alert/${java.net.URLEncoder.encode(id, "UTF-8")}/$action", if (action == "snooze") """{"minutes":$minutes}""" else "{}")

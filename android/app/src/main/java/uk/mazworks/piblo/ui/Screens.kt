@@ -58,6 +58,7 @@ import uk.mazworks.piblo.data.Reminder
 import uk.mazworks.piblo.hub.LinkState
 import uk.mazworks.piblo.proto.CoreClient
 import uk.mazworks.piblo.proto.CoreHttpException
+import uk.mazworks.piblo.proto.HaltState
 import uk.mazworks.piblo.proto.Priority
 import uk.mazworks.piblo.system.FindPhone
 import uk.mazworks.piblo.system.Notifier
@@ -116,23 +117,65 @@ fun HomeScreen() {
     val state by a.hub.state.collectAsStateWithLifecycle()
     val battery = rememberBattery()
     LazyColumn(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), contentPadding = androidx.compose.foundation.layout.PaddingValues(vertical = 16.dp)) {
-        item { if (state.link == LinkState.ONLINE) LiveScreen() else PibloScreen(state, battery) }
-        item { PibloButtons(state, a.hub::answer, { FindPhone.stop(ctx) }) }
-        item {
-            Section("Status") {
-                val link = when (state.link) {
-                    LinkState.SIMULATOR -> "Using the built-in simulator"
-                    LinkState.CONNECTING -> "Connecting to your computer..."
-                    LinkState.ONLINE -> "Connected to your computer"
-                    LinkState.OFFLINE -> "Can't reach your computer. Trying again..."
-                    LinkState.AUTH_FAILED -> "Your computer didn't accept the pairing. Connect again."
+            item { if (state.link == LinkState.ONLINE) LiveScreen() else PibloScreen(state, battery) }
+            item { PibloButtons(state, a.hub::answer, { FindPhone.stop(ctx) }) }
+            item {
+                Section("Status") {
+                    val link = when (state.link) {
+                        LinkState.SIMULATOR -> "Using the built-in simulator"
+                        LinkState.CONNECTING -> "Connecting to your computer..."
+                        LinkState.ONLINE -> "Connected to your computer"
+                        LinkState.OFFLINE -> "Can't reach your computer. Trying again..."
+                        LinkState.AUTH_FAILED -> "Your computer didn't accept the pairing. Connect again."
+                    }
+                    Text(link, Modifier.testTag("status_link"))
+                    Text("Phone battery: ${if (battery >= 0) "$battery%" else "unknown"}")
+                    if (state.link == LinkState.ONLINE) Text("Your computer's agent: ${when (state.agent) { "needs_you" -> "waiting for you"; "working" -> "working"; else -> "idle" }}")
                 }
-                Text(link, Modifier.testTag("status_link"))
-                Text("Phone battery: ${if (battery >= 0) "$battery%" else "unknown"}")
-                if (state.link == LinkState.ONLINE) Text("Your computer's agent: ${when (state.agent) { "needs_you" -> "waiting for you"; "working" -> "working"; else -> "idle" }}")
             }
-        }
-        item {
+            if (state.link == LinkState.ONLINE) item {
+                Section("Approvals") {
+                    var haltState by remember { mutableStateOf<HaltState?>(null) }
+                    var loading by remember { mutableStateOf(true) }
+                    var error by remember { mutableStateOf<String?>(null) }
+                    val scope = rememberCoroutineScope()
+
+                    LaunchedEffect(Unit) {
+                        loading = true; error = null
+                        try {
+                            haltState = withContext(Dispatchers.IO) { a.transport?.haltState() }
+                        } catch (e: CancellationException) { throw e }
+                        catch (_: Exception) { error = "Piblo is offline" }
+                        loading = false
+                    }
+
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        if (loading) {
+                            Text("Loading...", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        } else if (error != null) {
+                            Text(error!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                        } else {
+                            haltState?.let { hs ->
+                                SwitchRow(
+                                    "Pause approvals",
+                                    if (hs.halted) "Paused until ${hs.until ?: "indefinitely"}" else "Approvals will be shown",
+                                    hs.halted,
+                                    "pause_approvals_switch"
+                                ) { on ->
+                                    scope.launch(Dispatchers.IO) {
+                                        try {
+                                            a.transport?.setHalt(on)
+                                            haltState = a.transport?.haltState()
+                                        } catch (e: CancellationException) { throw e }
+                                        catch (_: Exception) { error = "Piblo is offline" }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            item {
             Section("Try it (demo, stays on this phone)") {
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     AssistChip({ a.hub.localApproval("Run shell command", "rm -rf build/ && npm run build") }, { Text("Approval") }, Modifier.testTag("demo_approval"))
