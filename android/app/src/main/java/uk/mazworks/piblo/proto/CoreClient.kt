@@ -3,6 +3,8 @@ package uk.mazworks.piblo.proto
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
+import org.json.JSONObject
 
 /** HTTP status + Core's `detail` string (e.g. 401 authentication_required, 409 approval_expired). */
 class CoreHttpException(val status: Int, val detail: String) : IOException("HTTP $status $detail")
@@ -35,7 +37,30 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
     /** Press Cardputer keys by name (esc/up/enter/...), optionally repeated, e.g. "down*2". */
     fun pressKeys(keys: String) { call("POST", "/core/cardputer/key", Proto.keysJson(keys)) }
 
+    /** Forward a portal action (update, reboot, key:..., open:...). Returns the device's reply. */
+    fun deviceAction(action: String): String = call("POST", "/core/cardputer/action", JSONObject().put("action", action).toString())
+
+    /** Authenticated GET/POST for the app's own screens. Call from Dispatchers.IO. */
+    fun get(path: String): String = call("GET", path)
+    fun post(path: String, body: String? = null): String = call("POST", path, body)
+    fun patch(path: String, body: String? = null): String = call("PATCH", path, body)
+    fun delete(path: String): String = call("DELETE", path)
+
+    /** For slow brain turns: a long read timeout, still bounded so a stuck call can never spin forever. */
+    fun postSlow(path: String, body: String? = null): String = request(base, "POST", path, body, token, clientVersion, readTimeoutMs = 120_000)
+
     private fun call(method: String, path: String, body: String? = null): String = request(base, method, path, body, token, clientVersion)
+
+    /** Device pairing (public routes, no bearer). See docs/protocol/DEVICE-PAIRING.md. */
+    fun pairingRequest(baseUrl: String, deviceId: String, name: String): String = request(
+        baseUrl.trimEnd('/'), "POST", "/pair/device/request",
+        JSONObject().put("device_id", deviceId).put("name", name).toString(), null, clientVersion,
+    )
+
+    fun pairingPoll(baseUrl: String, requestId: String): String = request(
+        baseUrl.trimEnd('/'), "GET", "/pair/device/request/" + URLEncoder.encode(requestId, "UTF-8"),
+        null, null, clientVersion,
+    )
 
     companion object {
         const val DEFAULT_PORT = 8787
@@ -119,7 +144,7 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
             } finally { c.disconnect() }
         }
 
-        internal fun request(base: String, method: String, path: String, body: String?, token: String?, clientVersion: String): String {
+        internal fun request(base: String, method: String, path: String, body: String?, token: String?, clientVersion: String, readTimeoutMs: Int = 8000): String {
             val url = URL(base + path)
             if (url.protocol == "http" && !permitsLocalHttp(url.host))
                 throw IOException("HTTPS required for non-local Piblo Core")
@@ -127,7 +152,7 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
             try {
                 c.requestMethod = method
                 c.connectTimeout = 4000
-                c.readTimeout = 8000
+                c.readTimeout = readTimeoutMs
                 c.instanceFollowRedirects = false
                 c.setRequestProperty("X-Piblo-Client", "android/$clientVersion")
                 c.setRequestProperty("Accept", "application/json")
