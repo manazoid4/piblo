@@ -31,8 +31,8 @@ bool            gJobToPc = false;
 host::Reply     gJobReply;       // written by the task before gGate.finish()
 
 void uploadTask(void*) {
-    const auto reply = gJobToPc ? host::flowPaste(gJobPath, HTTP_MS)
-                                : host::transcribe(gJobPath, HTTP_MS);
+    const auto reply = gJobToPc ? host::boardFlowPaste(gJobPath, HTTP_MS)
+                                : host::boardTranscribe(gJobPath, HTTP_MS);
     store::remove(gJobPath);
     gJobReply = reply;
     gGate.finish();

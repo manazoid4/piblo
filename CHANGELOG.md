@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.3 — ESP-NOW offload to the Piblo board (16 Nov 2026)
+
+- When a Piblo board is paired and healthy, Flow / transcribe uploads go over ESP-NOW and the board forwards them to Core; otherwise (or on any failure) the direct HTTP upload runs exactly as in 1.5.2. System screen shows Board status.
+
 ## v1.5.2 — approval details on device + Flow upload that never freezes (16 Nov 2026)
 
 - Approval cards show their detail lines (amount / recipient / category) again: the firmware accepts both the current `ASK ON PIBLO` head and the legacy `THE NOD` head, so current Core no longer drops the amount and recipient (#152).
