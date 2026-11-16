@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.5.4
+- Board link: ESP-NOW starts again if Wi-Fi was off at boot or switched off later.
+- System screen shows the board link state (radio, key, HELLOs sent).
+
 ## v1.5.3 — ESP-NOW offload to the Piblo board (16 Nov 2026)
 
 - When a Piblo board is paired and healthy, Flow / transcribe uploads go over ESP-NOW and the board forwards them to Core; otherwise (or on any failure) the direct HTTP upload runs exactly as in 1.5.2. System screen shows Board status.

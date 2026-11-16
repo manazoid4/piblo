@@ -187,12 +187,12 @@ private:
                 const std::string boardMac = bs.haveMac ? board::macString() : "unknown";
                 snprintf(buf, sizeof(buf),
                          "nod v" NOD_FW_VERSION " (" NOD_FW_SHA ")\nCore %s%s\nChip     %s "
-                         "rev%d\nCores    %d\nKeyboard %s\nUptime   %s\nBoard    %s (%s)\nBuild    " PIBLO_LABEL,
+                         "rev%d\nCores    %d\nKeyboard %s\nUptime   %s\nBoard    %s (%s)\nLink     %s\nBuild    " PIBLO_LABEL,
                          cv.empty() ? "offline" : ("v" + cv).c_str(), upd.c_str(), ESP.getChipModel(),
                          (int)ESP.getChipRevision(), (int)ESP.getChipCores(),
                          KB.ok() ? "TCA8418 ok" : "NOT DETECTED",
                          ui::hhmmss(Sys.uptimeSeconds()).c_str(),
-                         boardStatus, boardMac.c_str());
+                         boardStatus, boardMac.c_str(), board::diag().c_str());
                 _detail = buf;
                 break;
             }
