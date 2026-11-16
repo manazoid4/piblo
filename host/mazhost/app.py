@@ -47,6 +47,7 @@ from .discovery import DiscoveryResponder
 from . import fw
 from . import private_mode
 from .errors import ErrorCode, RouteError
+from .bodydouble import BodyDouble, build_bodydouble_router
 from .focus import Focus, install_focus_routes
 from .maker import install_maker_routes
 from .where import build_where_router
@@ -1235,6 +1236,10 @@ def create_app(
     api.include_router(build_dev_router(resolve_data_dir(cfg), Path(cfg.repo_dir) if cfg.repo_dir else Path(__file__).resolve().parents[2]))
     api.include_router(build_features_router(resolve_data_dir(cfg)))
     api.include_router(build_flow_router(flow_service))
+    body_double = BodyDouble(buddy, resolve_data_dir(cfg) / "body_double.json")
+    api.include_router(build_bodydouble_router(body_double))
+    api.on_event("startup")(body_double.start)
+    api.on_event("shutdown")(body_double.stop)
     api.include_router(build_dump_router(cfg, model_router))
     api.include_router(webui_router)
     api.include_router(build_library_router(cfg, model_router))
