@@ -23,6 +23,7 @@
 #include "../storage/store.h"
 #include "apps.h"
 #include "common.h"
+#include "../net/board_link.h"
 
 namespace maz {
 namespace apps {
@@ -181,13 +182,17 @@ private:
             case 7: {
                 const std::string cv = host::coreInfo().version;
                 const std::string upd = host::updateReady() ? "\nUPDATE READY v" + host::coreInfo().fwVersion : "";
+                const auto& bs = board::state();
+                const char* boardStatus = bs.linked ? (bs.healthy ? "linked, healthy" : "linked, not ready") : "not linked";
+                const std::string boardMac = bs.haveMac ? board::macString() : "unknown";
                 snprintf(buf, sizeof(buf),
                          "nod v" NOD_FW_VERSION " (" NOD_FW_SHA ")\nCore %s%s\nChip     %s "
-                         "rev%d\nCores    %d\nKeyboard %s\nUptime   %s\nBuild    " PIBLO_LABEL,
+                         "rev%d\nCores    %d\nKeyboard %s\nUptime   %s\nBoard    %s (%s)\nBuild    " PIBLO_LABEL,
                          cv.empty() ? "offline" : ("v" + cv).c_str(), upd.c_str(), ESP.getChipModel(),
                          (int)ESP.getChipRevision(), (int)ESP.getChipCores(),
                          KB.ok() ? "TCA8418 ok" : "NOT DETECTED",
-                         ui::hhmmss(Sys.uptimeSeconds()).c_str());
+                         ui::hhmmss(Sys.uptimeSeconds()).c_str(),
+                         boardStatus, boardMac.c_str());
                 _detail = buf;
                 break;
             }
