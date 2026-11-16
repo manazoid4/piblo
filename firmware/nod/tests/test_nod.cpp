@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cmath>
 #include "../include/alert_policy.h"
+#include "../include/approval_format.h"
 #include "../include/charge_monitor.h"
 #include "../include/poll_backoff.h"
 #include "../include/nod_hold.h"
@@ -205,6 +206,18 @@ int main() {
       for (uint32_t ms = 0; ms < HOLD_MS + 50; ms += 7) CHECK(holdPercent(ms) <= holdPercent(ms + 7));  // monotonic
       CHECK(HOLD_MS >= 500 && HOLD_MS <= 1200);  // deliberate, not tedious
       CHECK(holdPercent(HOLD_MS - 1) == 99); }
+    // ---- approval detail head: both Core prefixes render the amount/recipient lines ----
+    { using namespace maz;
+      CHECK(approvalHasDetails("ASK ON PIBLO  PAYMENT\n42.00\nto Acme Ltd"));
+      CHECK(approvalHasDetails("THE NOD  PAYMENT\n42.00\nto Acme Ltd"));
+      CHECK(approvalHasDetails("ASK ON PIBLO  "));      // head alone still counts as detailed
+      CHECK(approvalHasDetails("THE NOD  "));
+      CHECK(!approvalHasDetails("ASK ON PIBLO"));       // missing the two-space separator
+      CHECK(!approvalHasDetails("THE NOD "));           // one space only
+      CHECK(!approvalHasDetails("CLAUDE CODE NEEDS YOU"));
+      CHECK(!approvalHasDetails("Pay Acme"));
+      CHECK(!approvalHasDetails(""));
+      CHECK(!approvalHasDetails("ask on piblo  PAYMENT")); }  // heads are case-sensitive
     // tone sequencer: notes start on schedule, never early, never skipped, and nothing blocks
     { ToneSeq q; ToneStep s{};
       CHECK(!q.poll(0, s) && !q.playing(0));  // empty queue is silent
