@@ -186,6 +186,8 @@ class ProtoTest {
             val hs3 = Proto.parseHaltState("{\"halted\":true,\"until\":\"\"}")
             assertTrue(hs3.halted)
             assertNull(hs3.until)   // blank string -> null
+
+            assertNull(Proto.parseHaltState("{\"halted\":false,\"until\":null}").until)  // Core sends null when not halted
         }
 
         @Test fun haltJsonEncodesOnAndOptionalMinutes() {

@@ -128,7 +128,7 @@ object Proto {
 
         fun parseHaltState(json: String): HaltState = guard {
             val o = JSONObject(json)
-            HaltState(o.optBoolean("halted"), o.optString("until", null).takeIf { it.isNotBlank() })
+            HaltState(o.optBoolean("halted"), if (o.isNull("until")) null else o.optString("until").takeIf { it.isNotBlank() })
         }
 
         fun haltJson(on: Boolean, minutes: Int? = null): String =
