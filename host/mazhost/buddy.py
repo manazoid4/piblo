@@ -216,12 +216,13 @@ class Buddy:
         for row in sorted(rows.values(), key=lambda r: r["created"]):
             data = row["data"]
             # A reminder that never fired before the restart stays pending (late, not lost); legacy rows have no _due.
-            pending = "_due" in data and not data.get("_fired") and row["outcome"] is None
+            fired = bool(data.get("_fired")) or "_due" not in data
+            pending = not fired and row["outcome"] is None
             snoozed = row["outcome"] == "snoozed" and data.get("_snooze") is not None
             rec = {**{k: v for k, v in data.items() if k not in ("_due", "_fired", "_snooze")},
-                   "due": data["_due"] if pending else row["created"], "fired": not pending,
+                   "due": data.get("_due", row["created"]), "fired": fired,
                    "snooze_until": data["_snooze"] if snoozed else 0.0,
-                   "_exp": (row["expires"] or float("inf")) if pending else 0.0,
+                   "_exp": (row["expires"] or float("inf")) if not fired else 0.0,
                    "outcome": "acked" if row["outcome"] == "acked" else "snoozed" if snoozed else None}
             if snoozed:
                 rec["_exp"] = row["expires"] or float("inf")

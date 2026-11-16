@@ -183,3 +183,73 @@ def test_empty_today_and_core_app_mounts_it():
     assert app.get("/promises/today").status_code == 401    # behind the same bearer token
     r = app.get("/promises/today", headers={"Authorization": "Bearer test-token-that-is-not-default"})
     assert r.status_code == 200 and r.json()["empty"] and r.json()["cards"] == []
+
+
+# ---- review round 1 regressions
+
+def test_restart_keeps_due_and_fired_for_a_fired_unanswered_promise(stack, monkeypatch):
+    c, _ = stack()
+    pid = confirm(c, note="ring the plumber", due=future(3600)).json()["id"]
+    real = time.time
+    monkeypatch.setattr(time, "time", lambda: real() + 3700)
+    before = c.get("/promises/today").json()["cards"][0]
+    assert before["state"] == "due"
+    c2, buddy2 = stack()
+    after = c2.get("/promises/today").json()["cards"][0]
+    assert after["state"] == "due" and after["when"] == before["when"] and after["id"] == pid
+    rec = next(r for r in buddy2.alerts()["alerts"] if r["id"] == pid)
+    assert rec["fired"] and abs(rec["due"] - (real() + 3600)) < 120      # the real deadline, not the created time
+
+
+def test_done_early_then_restart_then_undo_still_fires_later(stack, monkeypatch):
+    c, _ = stack()
+    pid = confirm(c, note="early bird", due=future(3600)).json()["id"]
+    c.post(f"/promises/{pid}/done")
+    c2, _ = stack()
+    assert c2.get("/promises/today").json()["cards"][0]["state"] == "done"
+    assert c2.post(f"/promises/{pid}/undo").json()["outcome"] is None
+    real = time.time
+    monkeypatch.setattr(time, "time", lambda: real() + 3700)
+    assert c2.get("/promises/today").json()["cards"][0]["state"] == "due"
+
+
+def test_alert_table_full_is_429_not_500(stack):
+    c, _ = stack()
+    for i in range(50):
+        assert confirm(c, note=f"n{i}", due=future(3600 + i * 60)).status_code == 200
+    r = confirm(c, note="one too many", due=future(9000))
+    assert r.status_code == 429 and r.json()["detail"] == "alert_table_full"
+
+
+def test_past_uk_reading_is_never_swapped_for_the_us_one():
+    with pytest.raises(PromiseError) as e:      # 03/02/2027 is 3 Feb (past); US reading 2 Mar is still ahead
+        propose("by 03/02/2027", datetime(2027, 2, 10, 12, 0, tzinfo=timezone.utc))
+    assert e.value.code == "in_the_past"
+    assert due_of("by 13/02/2027", datetime(2027, 2, 10, 12, 0, tzinfo=timezone.utc)) == ["2027-02-13T09:00"]
+
+
+def test_in_n_days_and_weeks_use_the_calendar_day_and_a_stated_time():
+    assert due_of("in 3 days") == ["2027-01-07T09:00"]
+    assert due_of("in 2 weeks at 5pm") == ["2027-01-18T17:00"]
+    # Across the clock change the wall time holds (09:00 BST), it does not drift by an hour.
+    wed = datetime(2027, 3, 24, 12, 0, tzinfo=timezone.utc)
+    assert due_of("in 7 days", wed) == ["2027-03-31T09:00"]
+    assert propose("in 7 days", wed)["candidates"][0]["label"].endswith("BST")
+
+
+def test_today_without_a_time_after_nine_defaults_to_five_pm_then_an_hour_on():
+    noon = datetime(2027, 1, 4, 12, 0, tzinfo=timezone.utc)
+    out = propose("sort the invoice today", noon)
+    assert [c["due"] for c in out["candidates"]] == ["2027-01-04T17:00"] and out["default_time"]
+    evening = datetime(2027, 1, 4, 18, 30, tzinfo=timezone.utc)
+    assert due_of("sort the invoice today", evening) == ["2027-01-04T19:30"]
+    early = datetime(2027, 1, 4, 7, 0, tzinfo=timezone.utc)
+    assert due_of("sort the invoice today", early) == ["2027-01-04T09:00"]
+    with pytest.raises(PromiseError):           # a stated time that has passed is still rejected
+        propose("today at 8am", noon)
+
+
+def test_in_n_hours_is_elapsed_time_across_the_clock_change():
+    # 00:30 GMT on 28 Mar 2027 + 2h elapsed = 03:30 BST (01:30 never happens).
+    now = datetime(2027, 3, 28, 0, 30, tzinfo=timezone.utc)
+    assert due_of("in 2 hours", now) == ["2027-03-28T03:30"]

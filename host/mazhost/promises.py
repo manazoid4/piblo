@@ -92,6 +92,7 @@ def propose(note: str, now: datetime | None = None) -> dict:
     text, today = note.lower(), now.date()
     days: list[date] = []
     exact: datetime | None = None
+    today_word = False
     if m := _NUM.search(text):
         y = _year(m[3])
         reads = [_date(y, int(m[2]), int(m[1])), _date(y, int(m[1]), int(m[2]))]   # British first, then US
@@ -111,12 +112,15 @@ def propose(note: str, now: datetime | None = None) -> dict:
             raise PromiseError("invalid_date", "That date does not exist.")
         days = [day]
     elif m := _IN.search(text):
-        step = {"hour": timedelta(hours=1), "day": timedelta(days=1), "week": timedelta(weeks=1)}[m[2]]
-        exact = (now + int(m[1]) * step).replace(second=0, microsecond=0)
+        n = int(m[1])
+        if m[2] == "hour":   # elapsed time, so add it in UTC and let the clock change fall where it falls
+            exact = (now.astimezone(timezone.utc) + timedelta(hours=n)).astimezone(zone).replace(second=0, microsecond=0)
+        else:                # calendar days: same wall-clock time, honouring a stated time
+            days = [today + timedelta(days=n * (7 if m[2] == "week" else 1))]
     elif "tomorrow" in text:
         days = [today + timedelta(days=1)]
     elif "today" in text:
-        days = [today]
+        days, today_word = [today], True
     elif m := _DAY.search(text):
         coming = (_DAYS.index(m[2]) - today.weekday()) % 7 or 7
         days = [today + timedelta(days=coming)]
@@ -130,6 +134,13 @@ def propose(note: str, now: datetime | None = None) -> dict:
         cands, default_time = [exact], False
     else:
         cands = [_local(d, hh, mm, zone) for d in days]
+        if today_word and default_time and cands[0] <= now:
+            # No time said and 09:00 has gone: end of the working day, or an hour from now if that has gone too.
+            late = _local(today, 17, 0, zone)
+            cands = [late if late > now else (now.astimezone(timezone.utc) + timedelta(hours=1))
+                     .astimezone(zone).replace(second=0, microsecond=0)]
+    if cands[0] <= now:   # the first (British) reading is past: say so, never fall through to the US one
+        raise PromiseError("in_the_past", "That time has already passed.")
     out = [{"due": c.replace(tzinfo=None).isoformat(timespec="minutes"), "label": label(c)}
            for c in cands if c > now]
     if not out:
@@ -233,6 +244,8 @@ def build_promises_router(service: Promises) -> APIRouter:
             return fn(*a)
         except PromiseError as error:
             raise HTTPException(422, {"error": error.code, "message": error.message})
+        except OverflowError as error:
+            raise HTTPException(429, str(error))
 
     @router.post("/propose")
     def propose_route(body: Propose):
