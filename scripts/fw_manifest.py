@@ -10,7 +10,7 @@ root = Path(__file__).resolve().parents[1]
 src = Path(sys.argv[1]) if len(sys.argv) > 1 else root / ".pio/build/cardputer-adv/firmware.bin"
 out = Path(sys.argv[2]) if len(sys.argv) > 2 else root / "host/fw"
 data = src.read_bytes()
-m = re.search(rb"nod v(\d+\.\d+(?:\.\d+)?) \(([0-9a-f]+|nogit)\)\nCore", data)
+m = re.search(rb"(?:nod|Piblo) v(\d+\.\d+(?:\.\d+)?) \(([0-9a-f]+|nogit)\)\nCore", data)
 if not m:
     sys.exit("no nod version string in bin")
 out.mkdir(parents=True, exist_ok=True)

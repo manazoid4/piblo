@@ -74,10 +74,10 @@ public:
             return true;
         }
         if (_cursor.sel == 8) {
-            notify::post(Note::Info, "M5Launcher", "opening firmware manager");
+            notify::post(Note::Info, "Launcher", "opening firmware manager");
             delay(180);
             if (!launcher::reboot())
-                notify::post(Note::Error, "M5Launcher", "hand-back failed");
+                notify::post(Note::Error, "Launcher", "hand-back failed");
             return true;
         }
         _detail = true;

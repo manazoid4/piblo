@@ -23,7 +23,7 @@ def main_head():
 
 def check(binpath, head):
     d = Path(binpath).read_bytes()
-    m = re.search(rb"nod v(\d+\.\d+(?:\.\d+)?) \(([0-9a-f]+)\)\nCore", d)
+    m = re.search(rb"(?:nod|Piblo) v(\d+\.\d+(?:\.\d+)?) \(([0-9a-f]+)\)\nCore", d)
     if not m: sys.exit("REFUSED: no nod version string in bin")
     if not head.startswith(m[2].decode()): sys.exit(f"REFUSED: bin is build {m[2].decode()}, origin/main is {head[:7]}")
     if d[0] != 0xE9: sys.exit("REFUSED: not an ESP32 app image (first byte != 0xE9)")

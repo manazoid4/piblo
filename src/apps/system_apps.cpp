@@ -50,7 +50,7 @@ public:
         if (!e.down) return false;
         if (!_detail.empty()) {
             if ((e.code == KEY_ENTER || e.code == KEY_U) && host::updateReady() &&
-                _detail.rfind("nod v", 0) == 0) {
+                _detail.rfind("Piblo v", 0) == 0) {
                 shell::confirmFwUpdate();
                 invalidate();
                 return true;
@@ -186,7 +186,7 @@ private:
                 const char* boardStatus = bs.linked ? (bs.healthy ? "linked, healthy" : "linked, not ready") : "not linked";
                 const std::string boardMac = bs.haveMac ? board::macString() : "unknown";
                 snprintf(buf, sizeof(buf),
-                         "nod v" NOD_FW_VERSION " (" NOD_FW_SHA ")\nCore %s%s\nChip     %s "
+                         "Piblo v" NOD_FW_VERSION " (" NOD_FW_SHA ")\nCore %s%s\nChip     %s "
                          "rev%d\nCores    %d\nKeyboard %s\nUptime   %s\nBoard    %s (%s)\nBuild    " PIBLO_LABEL,
                          cv.empty() ? "offline" : ("v" + cv).c_str(), upd.c_str(), ESP.getChipModel(),
                          (int)ESP.getChipRevision(), (int)ESP.getChipCores(),
@@ -197,7 +197,7 @@ private:
                 break;
             }
             case 8:
-                notify::post(Note::Info, "Rebooting", "back to M5Launcher");
+                notify::post(Note::Info, "Rebooting", "back to the launcher");
                 delay(600);
                 if (!launcher::reboot())
                     notify::post(Note::Error, "Launcher", "hand-back failed");
@@ -790,7 +790,7 @@ const char* HELP_LINES[] = {
     "            whole screen off.",
     "#GLOBAL",
     "Ctrl+K      command palette",
-    "Ctrl+L      back to M5Launcher",
+    "Ctrl+L      back to launcher",
     "Fn+SPACE    context ask (Talk)",
     "Fn+F        toggle field mode",
     "Fn+Q        quiet / silent / normal",
@@ -814,10 +814,10 @@ const char* HELP_LINES[] = {
     "up/down move   ENTER open",
     "D twice     delete",
     "#ABOUT",
-    "Piblo v" NOD_FW_VERSION " on Cardputer ADV",
+    "Piblo v" NOD_FW_VERSION " handheld",
     "by Maz Works  mazworks.uk",
     "Bruce and Nemo stay available",
-    "through M5Launcher.",
+    "through the launcher.",
 };
 constexpr int HELP_COUNT = sizeof(HELP_LINES) / sizeof(HELP_LINES[0]);
 
