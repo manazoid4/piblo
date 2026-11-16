@@ -25,6 +25,7 @@ from .beam import BeamStore
 from .braindump import structure_braindump
 from .dump_routes import build_dump_router, inbox_dir, save_safely
 from .catchup import Catchup, build_catchup_router
+from .promises import Promises, build_promises_router
 from .share_in import build_share_router
 from .buddy_forms import build_buddy_forms_router
 from .onboarding import Onboarding, build_onboarding_router
@@ -1243,6 +1244,7 @@ def create_app(
     onboarding = Onboarding(resolve_data_dir(cfg))
     catchup = Catchup(resolve_data_dir(cfg), buddy, inbox_dir(cfg) / "library")
     api.include_router(build_catchup_router(catchup))
+    api.include_router(build_promises_router(Promises(buddy)))
     api.include_router(build_share_router(cfg, model_router))
     api.include_router(build_onboarding_router(onboarding))
     api.include_router(build_buddy_forms_router(onboarding=onboarding))
