@@ -58,6 +58,7 @@ uint8_t gUpResCode = RES_WORKING;
 uint16_t gUpResHttp = 0;
 char gUpResText[96] = "";
 bool gUpResultReady = false;
+volatile bool gUpAbort = false;  // set by upload() on timeout so the task stops sending
 
 // Synchronization
 SemaphoreHandle_t gUpMutex = nullptr;
@@ -259,8 +260,7 @@ void onSend(const uint8_t* mac, esp_now_send_status_t status) {
 
 // ---------- Upload task ----------
 
-void uploadTask(void* arg) {
-    (void)arg;
+void runUpload() {
     // Read WAV file into buffer
     File file = store::fs()->open(gUpWavPath.c_str(), FILE_READ);
     if (!file) {
@@ -270,7 +270,6 @@ void uploadTask(void* arg) {
         gUpResultReady = true;
         gUpSt = Done;
         xSemaphoreGive(gUpMutex);
-        vTaskDelete(nullptr);
         return;
     }
 
@@ -283,7 +282,6 @@ void uploadTask(void* arg) {
         gUpResultReady = true;
         gUpSt = Done;
         xSemaphoreGive(gUpMutex);
-        vTaskDelete(nullptr);
         return;
     }
 
@@ -299,7 +297,6 @@ void uploadTask(void* arg) {
             gUpResultReady = true;
             gUpSt = Done;
             xSemaphoreGive(gUpMutex);
-            vTaskDelete(nullptr);
             return;
         }
         gUpBufSize = gUpTotal;
@@ -325,6 +322,7 @@ void uploadTask(void* arg) {
 
     while (true) {
         uint32_t now = millis();
+        if (gUpAbort) break;
         if (now - startMs > kResultTimeoutMs) {
             xSemaphoreTake(gUpMutex, portMAX_DELAY);
             gUpResCode = 4;
@@ -401,6 +399,12 @@ void uploadTask(void* arg) {
         delay(5);
     }
 
+}
+
+// The buffer is only needed during an upload; keep the heap free for the HTTP fallback.
+void uploadTask(void*) {
+    runUpload();
+    if (gUpBuf) { free(gUpBuf); gUpBuf = nullptr; gUpBufSize = 0; }
     vTaskDelete(nullptr);
 }
 
@@ -510,10 +514,11 @@ std::string upload(uint8_t kind, const std::string& wavPath, uint32_t timeoutMs)
     gUpResHttp = 0;
     gUpResText[0] = '\0';
     gUpResultReady = false;
+    gUpAbort = false;
     xSemaphoreGive(gUpMutex);
 
-    // Start upload task
-    if (gUpTask) vTaskDelete(gUpTask);
+    // Start upload task (a previous one has finished or been told to abort)
+    gUpTask = nullptr;
     if (xTaskCreatePinnedToCore(uploadTask, "boardUp", 12288, nullptr, 1, &gUpTask, 0) != pdPASS) {
         return "";
     }
@@ -535,6 +540,7 @@ std::string upload(uint8_t kind, const std::string& wavPath, uint32_t timeoutMs)
     }
 
     // Timeout
+    gUpAbort = true;
     xSemaphoreTake(gUpMutex, portMAX_DELAY);
     if (gUpSt != Done) {
         gUpResCode = 4;
