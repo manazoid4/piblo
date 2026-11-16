@@ -33,6 +33,7 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import uk.mazworks.piblo.BuildConfig
@@ -68,7 +69,12 @@ fun OnboardingScreen(onDone: () -> Unit) {
         searching = true
         message = null
         scope.launch(Dispatchers.IO) {
-            val found = try { LanDiscovery.search() } catch (_: Exception) { emptyList() }
+            var found = try { LanDiscovery.search() } catch (_: Exception) { emptyList() }
+            if (found.isEmpty()) {
+                // Not on the same Wi-Fi (e.g. Tailscale): try the Core this phone used before.
+                val known = a.settings.prefs.first().coreUrl
+                if (known.isNotBlank()) found = listOfNotNull(LanDiscovery.probe(known, BuildConfig.VERSION_NAME))
+            }
             cores = found
             searching = false
         }
@@ -137,7 +143,8 @@ fun OnboardingScreen(onDone: () -> Unit) {
                         Text("Searching this Wi-Fi…", color = Muted)
                     }
                     cores.isEmpty() -> Text(
-                        "No computer found. Make sure Piblo Core is running on this Wi-Fi, then search again.",
+                        "No computer found. Make sure Piblo Core is running, then search again.\n\n" +
+                            "Not on the same Wi-Fi? Tap \"Enter address and code\". Tailscale addresses (100.x.x.x:8787) work.",
                         color = Muted,
                         textAlign = TextAlign.Center,
                     )
@@ -210,7 +217,7 @@ private fun ManualConnect(
     Section("Enter address and code") {
         OutlinedTextField(
             address, { address = it }, label = { Text("Computer address") },
-            placeholder = { Text("192.168.1.20:8787") }, singleLine = true,
+            placeholder = { Text("192.168.1.20:8787 or 100.x.x.x:8787") }, singleLine = true,
             modifier = Modifier.fillMaxWidth().testTag("manual_address"),
         )
         OutlinedTextField(

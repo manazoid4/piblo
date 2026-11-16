@@ -54,6 +54,15 @@ object LanDiscovery {
         return found.values.toList()
     }
 
+    /** Asks one known address (remembered Core, or a typed LAN / Tailscale one) for /health. Null when unreachable or not Piblo Core. */
+    fun probe(baseUrl: String, clientVersion: String): DiscoveredCore? = try {
+        val base = CoreClient.normalizeBase(baseUrl) ?: return null
+        val o = JSONObject(CoreClient(base, "", clientVersion).health())
+        val u = java.net.URL(base)
+        if (!o.optBoolean("ok")) null
+        else DiscoveredCore(o.optString("name").ifBlank { u.host }, u.host, if (u.port == -1) CoreClient.DEFAULT_PORT else u.port, o.optString("version"))
+    } catch (_: Exception) { null }
+
     /** Global broadcast plus every non-loopback IPv4 subnet broadcast (Android often drops the global one). */
     private fun broadcastTargets(): List<InetSocketAddress> {
         val out = mutableListOf<InetSocketAddress>()

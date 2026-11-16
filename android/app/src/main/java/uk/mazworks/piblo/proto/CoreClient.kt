@@ -52,6 +52,8 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
     private fun call(method: String, path: String, body: String? = null): String = request(base, method, path, body, token, clientVersion)
 
     /** Device pairing (public routes, no bearer). See docs/protocol/DEVICE-PAIRING.md. */
+    fun health(): String = request(base, "GET", "/health", null, null, clientVersion, readTimeoutMs = 3000)
+
     fun pairingRequest(baseUrl: String, deviceId: String, name: String): String = request(
         baseUrl.trimEnd('/'), "POST", "/pair/device/request",
         JSONObject().put("device_id", deviceId).put("name", name).toString(), null, clientVersion,
@@ -74,7 +76,7 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
          */
         private fun permitsLocalHttp(host: String): Boolean {
             val h = host.lowercase().removePrefix("[").removeSuffix("]")
-            if (h == "localhost" || h == "::1" || h.endsWith(".local")) return true
+            if (h == "localhost" || h == "::1" || h.endsWith(".local") || h.endsWith(".ts.net")) return true
             if ('.' !in h && ':' !in h) return true  // a short local machine name
             val octets = h.split('.').map { it.toIntOrNull() }
             if (octets.size != 4 || octets.any { it == null || it !in 0..255 }) return false

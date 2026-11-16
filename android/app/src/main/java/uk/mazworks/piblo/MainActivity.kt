@@ -9,6 +9,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
@@ -46,13 +47,13 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) Dark else Light) {
                 if (!prefs.onboarded) {
                     // First launch: find the computer and pair. No demo, no fake data.
-                    OnboardingScreen(onDone = { app.scope.launch { app.settings.setOnboarded(true) } })
+                    Surface(Modifier.fillMaxSize()) { OnboardingScreen(onDone = { app.scope.launch { app.settings.setOnboarded(true) } }) }
                     return@MaterialTheme
                 }
                 var tab by rememberSaveable { mutableIntStateOf(0) }
                 var live by rememberSaveable { mutableStateOf(false) }
                 if (live) {
-                    LiveViewScreen(onClose = { live = false })
+                    Surface(Modifier.fillMaxSize()) { LiveViewScreen(onClose = { live = false }) }
                     return@MaterialTheme
                 }
                 Scaffold(
