@@ -186,8 +186,13 @@ Reply talkText(const std::string& session, const std::string& text);
 Reply talkTextContext(const std::string& session, const std::string& text,
                       const std::string& context);
 Reply talkAudio(const std::string& session, const std::string& wavPath);
-Reply transcribe(const std::string& wavPath);
-Reply flowPaste(const std::string& wavPath);  // /dictate?target=pc-paste
+Reply transcribe(const std::string& wavPath, uint32_t timeoutMs = 60000);
+Reply flowPaste(const std::string& wavPath, uint32_t timeoutMs = 60000);  // /dictate?target=pc-paste
+
+// Board offload path (ESP-NOW to Piblo board). Falls back to HTTP when board is not healthy
+// or upload fails. Does not block the UI loop; the caller keeps the recording until success.
+Reply boardTranscribe(const std::string& wavPath, uint32_t timeoutMs = 60000);
+Reply boardFlowPaste(const std::string& wavPath, uint32_t timeoutMs = 60000);
 Reply brainDump(const std::string& wavPath, const std::vector<uint32_t>& highlights);
 Reply pcAction(const std::string& action);
 bool speak(const std::string& text, const std::string& wavPath);

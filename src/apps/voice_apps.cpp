@@ -5,6 +5,7 @@
 //              This is the screen v0.2 rewires to OpenFlowKit.
 //   Capture  — a thought. Fastest path from pocket to stored, voice or text.
 //   Recorder — a session. Long-form, file management, playback.
+#include <cmath>
 #include <algorithm>
 #include <time.h>
 #include <vector>
@@ -429,7 +430,7 @@ public:
     const char* hints() const override {
         switch (dictate::state()) {
             case dictate::State::Listening: return _toggle ? "tap SPACE: type  ESC cancel" : "release SPACE: type  ESC cancel";
-            case dictate::State::Working:   return "typing on PC...";
+            case dictate::State::Working:   return "sending...  ESC cancel";
             default: return "hold or tap SPACE to speak";
         }
     }
@@ -501,7 +502,18 @@ public:
             return;
         }
         if (dictate::active(this) && st == dictate::State::Working) {
-            ui::emptyState(g, "TYPING", "cleaning up your words");
+            // Buddy pulses while the upload runs on its own task; keys stay live.
+            const float pulse = 0.5f + 0.5f * sinf(millis() / 220.0f);
+            ui::mark(g, SCREEN_W / 2, BODY_Y + 42, 16, ACCENT, pulse);
+            g.setTextDatum(top_center);
+            g.setFont(&fonts::Font2);
+            g.setTextColor(ACCENT, BG);
+            g.drawString("Sending...", SCREEN_W / 2, BODY_Y + 66);
+            g.setFont(&fonts::Font0);
+            g.setTextColor(DIM, BG);
+            g.drawString(("ESC cancels  " + std::to_string(dictate::sendingMs() / 1000) + "s").c_str(),
+                         SCREEN_W / 2, BODY_Y + 86);
+            g.setTextDatum(top_left);
             return;
         }
         if (_status.empty()) {
@@ -510,8 +522,12 @@ public:
         }
         g.setFont(&fonts::Font0);
         g.setTextColor(_ok ? LIVE : WARN, BG);
-        g.drawString(_status.c_str(), PAD, BODY_Y + 8);
-        drawShortText(g, _text, BODY_Y + 24, 6);
+        // The header rule sits at BODY_Y+19: start below it, and wrap long errors.
+        constexpr size_t width = 38;
+        int y = BODY_Y + 26;
+        for (size_t at = 0; at < _status.size() && y < BODY_Y + 26 + 28; at += width, y += 12)
+            g.drawString(_status.substr(at, width).c_str(), PAD, y);
+        drawShortText(g, _text, y + 2, 3);
     }
 
 private:

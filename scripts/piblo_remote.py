@@ -33,7 +33,7 @@ def _env_file_values() -> dict:
         f = pathlib.Path(d) / ".env" if d else None
         if f and f.is_file():
             vals = {}
-            for line in f.read_text(encoding="utf-8", errors="ignore").splitlines():
+            for line in f.read_text(encoding="utf-8-sig", errors="ignore").splitlines():
                 k, sep, v = line.strip().partition("=")
                 if sep and not k.startswith("#"):
                     vals[k.strip()] = v.strip().strip('"').strip("'")

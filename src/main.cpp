@@ -14,6 +14,7 @@
 #include "core/shell.h"
 #include "core/sys.h"
 #include "input/keyboard.h"
+#include "net/board_link.h"
 #include "net/control.h"
 #include "net/mazhost.h"
 #include "net/net.h"
@@ -89,6 +90,7 @@ void setup() {
         notify::post(Note::Warn, "SD card unreadable", "format it as FAT32 to keep data safely");
     if (Cfg.fieldMode)
         notify::post(Note::Info, "FIELD mode restored", "lower background + faster dim");
+    board::begin();    // ESP-NOW link to the Piblo board (offload); falls back to HTTP when not healthy
 }
 
 void loop() {
@@ -100,6 +102,7 @@ void loop() {
     ambient::update();
     sfx::update();     // non-blocking alert/approval/alarm chirps
     host::linkIdle();  // WiFi power saving back on 20 s after the last voice request, from any screen
+    board::update();   // non-blocking ESP-NOW discovery/ping
 
     health::observeLoop(millis() - loopStarted);
     health::update();

@@ -1,6 +1,9 @@
 #include "dictate.h"
 
 #include <Arduino.h>
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#include <upload_gate.h>  // firmware/nod/include (pure upload state machine)
 
 #include "../core/sys.h"
 #include "../net/mazhost.h"
@@ -15,6 +18,26 @@ namespace {
 // A field holds a line, not a monologue. Capping at 30s keeps the upload small
 // enough to feel instant and stops a pocket-pressed key filling the card.
 constexpr uint32_t MAX_SECONDS = 30;
+// The HTTP call gives up after HTTP_MS; the UI gives up slightly later so a slow
+// PC never leaves the screen stuck. Same stack as the host worker (measured safe).
+constexpr uint32_t HTTP_MS = 25000;
+constexpr uint32_t UI_MS = 28000;
+constexpr uint32_t UPLOAD_STACK = 9216;
+
+nod::UploadGate gGate;
+bool            gSent = false;   // upload task launched for the current Working state
+std::string     gJobPath;        // worker-owned copy: the task deletes the file when done
+bool            gJobToPc = false;
+host::Reply     gJobReply;       // written by the task before gGate.finish()
+
+void uploadTask(void*) {
+    const auto reply = gJobToPc ? host::boardFlowPaste(gJobPath, HTTP_MS)
+                                : host::boardTranscribe(gJobPath, HTTP_MS);
+    store::remove(gJobPath);
+    gJobReply = reply;
+    gGate.finish();
+    vTaskDelete(nullptr);
+}
 
 State               gState = State::Idle;
 const void*         gOwner = nullptr;
@@ -47,6 +70,10 @@ void fail(const char* why) {
 
 bool start(const void* owner, bool toPc) {
     if (gState == State::Listening || gState == State::Working) return false;
+    if (gGate.busy()) {  // an abandoned upload is still on the wire
+        fail("still sending the last one - wait");
+        return false;
+    }
     if (!store::ready()) {
         fail("no storage for the recording");
         return false;
@@ -85,7 +112,8 @@ void stop() {
         return;
     }
     gState = State::Working;
-    // One frame of grace so "WORKING" is on screen before the blocking upload.
+    gSent = false;
+    // One frame of grace so "Sending" is on screen before the task starts.
     gWorkAt = millis() + 120;
 }
 
@@ -95,6 +123,11 @@ void cancel() {
         gPath = gSink->path();
         delete gSink;
         gSink = nullptr;
+    }
+    if (gState == State::Working && gSent) {
+        // The task owns (and deletes) the file; just stop waiting for it.
+        gPath.clear();
+        if (!gGate.abandon()) gGate.take();  // finished a moment ago: drop the result
     }
     discard();
     gState = State::Idle;
@@ -111,12 +144,37 @@ void update() {
     }
     if (gState != State::Working || millis() < gWorkAt) return;
 
-    if (!Sys.wifiConnected || !host::configured()) {
-        fail("no host - connect Wi-Fi to dictate");
+    if (!gSent) {
+        if (!Sys.wifiConnected || !host::configured()) {
+            fail("no host - connect Wi-Fi to dictate");
+            return;
+        }
+        if (!gGate.begin(millis())) {
+            fail("still sending the last one - wait");
+            return;
+        }
+        // Only touch the job slot once we own the gate: an abandoned task may still use it.
+        gJobPath = gPath;
+        gJobToPc = gToPc;
+        gJobReply = host::Reply{};
+        if (xTaskCreatePinnedToCore(uploadTask, "pibloDict", UPLOAD_STACK, nullptr, 1,
+                                    nullptr, 0) != pdPASS) {
+            gGate.abort();
+            fail("low memory - try again");
+            return;
+        }
+        gSent = true;
         return;
     }
-    const auto reply = gToPc ? host::flowPaste(gPath) : host::transcribe(gPath);
-    discard();
+    if (!gGate.take()) {
+        if (gGate.timedOut(millis(), UI_MS) && gGate.abandon()) {  // else it just finished: next tick
+            gPath.clear();  // the task deletes the file
+            fail(gToPc ? "PC too slow - it may still type" : "PC did not answer in time");
+        }
+        return;
+    }
+    const auto reply = gJobReply;
+    gPath.clear();
     if (!reply.ok) {
         fail(reply.error.empty() ? "host could not transcribe"
                                  : reply.error.c_str());
@@ -144,6 +202,7 @@ const char* error() { return gError.c_str(); }
 const char* pcOutcome() { return gPcOutcome.c_str(); }
 float       level() { return voice::level(); }
 uint32_t    elapsedSeconds() { return voice::elapsedSeconds(); }
+uint32_t    sendingMs() { return gState == State::Working && gSent ? millis() - gWorkAt : 0; }
 
 bool take(const void* owner, std::string& out) {
     if (!gReady || owner != gOwner) return false;

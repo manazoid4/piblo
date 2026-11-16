@@ -12,6 +12,7 @@
 #include "../core/settings.h"
 #include "../core/sys.h"
 #include "../storage/store.h"
+#include "../net/board_link.h"
 
 namespace maz {
 namespace host {
@@ -41,7 +42,7 @@ const char* route() {
 }
 
 bool beginRequest(NodHttp& http, const std::string& base, const char* path,
-                  bool remote) {
+                  bool remote, uint32_t timeoutMs = 60000) {
     // Modem sleep (the ESP32 default) parks every TCP ACK/reply until the next AP beacon
     // (~100-300 ms each), which throttles uploads and delays Core's reply. Stay awake while
     // talking; linkIdle() restores power saving.
@@ -52,7 +53,7 @@ bool beginRequest(NodHttp& http, const std::string& base, const char* path,
         gFastLinkAt = millis();
     }
     http.setConnectTimeout(remote ? 6500 : 1800);
-    http.setTimeout(60000);
+    http.setTimeout(timeoutMs);
     const String url = (base + path).c_str();
     const bool begun = http.open(url, remote);
     if (!begun) return false;
@@ -98,7 +99,7 @@ Reply decodeReply(HTTPClient& http, int status) {
 
 Reply upload(const char* path, const std::string& wavPath,
              const std::vector<std::pair<std::string, std::string>>& headers,
-             bool idempotent = true) {
+             bool idempotent = true, uint32_t timeoutMs = 60000) {
     Reply out;
     if (!configured() || WiFi.status() != WL_CONNECTED || !store::ready()) {
         out.error = "host offline";
@@ -114,7 +115,7 @@ Reply upload(const char* path, const std::string& wavPath,
     for (const auto& base : bases()) {
         file.seek(0);
         NodHttp http;
-        if (!beginRequest(http, base.first, path, base.second)) continue;
+        if (!beginRequest(http, base.first, path, base.second, timeoutMs)) continue;
         http.addHeader("Content-Type", "audio/wav");
         for (const auto& header : headers)
             http.addHeader(header.first.c_str(), header.second.c_str());
@@ -289,13 +290,33 @@ Reply talkAudio(const std::string& session, const std::string& wavPath) {
     return upload("/turn/raw", wavPath, headers);
 }
 
-Reply transcribe(const std::string& wavPath) {
-    return upload("/transcribe/raw", wavPath, {{"X-MAZ-Route", route()}});
+Reply transcribe(const std::string& wavPath, uint32_t timeoutMs) {
+    return upload("/transcribe/raw", wavPath, {{"X-MAZ-Route", route()}}, true, timeoutMs);
 }
 
-Reply flowPaste(const std::string& wavPath) {
+Reply flowPaste(const std::string& wavPath, uint32_t timeoutMs) {
     // Piblo Flow: Core cleans the text and types it into the focused PC window.
-    return upload("/dictate?target=pc-paste", wavPath, {}, /*idempotent=*/false);
+    return upload("/dictate?target=pc-paste", wavPath, {}, /*idempotent=*/false, timeoutMs);
+}
+
+Reply boardTranscribe(const std::string& wavPath, uint32_t timeoutMs) {
+    // Try board offload first (kind 1 = /transcribe/raw)
+    if (board::canUpload()) {
+        std::string result = board::upload(1, wavPath, timeoutMs);
+        if (!result.empty()) return host::Reply{true, 200, result, result, "", "", "", 0, "", 0};
+    }
+    // Fall back to HTTP
+    return transcribe(wavPath, timeoutMs);
+}
+
+Reply boardFlowPaste(const std::string& wavPath, uint32_t timeoutMs) {
+    // Try board offload first (kind 0 = /dictate?target=pc-paste)
+    if (board::canUpload()) {
+        std::string result = board::upload(0, wavPath, timeoutMs);
+        if (!result.empty()) return host::Reply{true, 200, result, result, "", "", "", 0, "", 0};
+    }
+    // Fall back to HTTP
+    return flowPaste(wavPath, timeoutMs);
 }
 
 Reply brainDump(const std::string& wavPath,

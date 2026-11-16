@@ -1,4 +1,4 @@
-v1.5.1 (Piblo name everywhere on the device; old MAZ Pocket name removed). v1.5.0 (nod v1.5: blue talk dot in the Toy-shop warm palette, charging mode, no OTA battery gate). See CHANGELOG.md for details.
+v1.5.3 (optional ESP-NOW offload to the Piblo board; HTTP fallback unchanged). v1.5.2 (approval details render on the device for both Core heads; Flow/Type-on-PC upload no longer freezes the screen). v1.5.1 (Piblo name everywhere on the device; old MAZ Pocket name removed). v1.5.0 (nod v1.5: blue talk dot in the Toy-shop warm palette, charging mode, no OTA battery gate). See CHANGELOG.md for details.
 
 # MAZ Pocket v1.0.0 — WORK CONSISTENCY
 
