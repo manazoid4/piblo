@@ -36,6 +36,7 @@ import uk.mazworks.piblo.hub.Item
 import uk.mazworks.piblo.hub.ItemKind
 import uk.mazworks.piblo.hub.LinkState
 import uk.mazworks.piblo.hub.Origin
+import uk.mazworks.piblo.hub.shouldDrainShares
 import uk.mazworks.piblo.hub.Transport
 import uk.mazworks.piblo.proto.CoreClient
 import uk.mazworks.piblo.proto.CoreHttpException
@@ -57,6 +58,10 @@ class PibloApp : Application() {
     private var lastForward = 0L
     private var lastForwardKey = ""
     private var netCbRegistered = false
+    @Volatile private var shareDrainRequested = false
+
+    /** Call after enqueuing a share: it is sent on the next online cycle. */
+    fun requestShareDrain() { shareDrainRequested = true }
 
     val hub = Hub(
         object : Clock {
@@ -129,6 +134,7 @@ class PibloApp : Application() {
         val l = CoreLink(hub, t)
         link = l
         linkJob = scope.launch(Dispatchers.IO) {
+            var prevLinkState: LinkState? = null
             while (isActive) {
                 val delayMs = l.cycle()
                 val nowState = hub.state.value.link
@@ -143,8 +149,9 @@ class PibloApp : Application() {
                     delay(minOf(chunk, remaining))
                     remaining -= chunk
                 }
-                // Every online cycle (not only on reconnect), so a share or note queued while connected is sent too.
-                if (remaining <= 0 && nowState == LinkState.ONLINE) drainShareQueue(t)
+                // Only on reconnect or right after a new enqueue: Core ignores idempotency_id, so retrying a slow /share could file it twice.
+                if (remaining <= 0 && shouldDrainShares(nowState, prevLinkState, shareDrainRequested)) { shareDrainRequested = false; drainShareQueue(t) }
+                prevLinkState = nowState
             }
         }
     }

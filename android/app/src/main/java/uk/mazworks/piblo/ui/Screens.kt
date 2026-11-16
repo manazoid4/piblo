@@ -198,6 +198,7 @@ fun ToolsScreen() {
     val state by a.hub.state.collectAsStateWithLifecycle()
     var noteText by remember { mutableStateOf("") }
     var remText by remember { mutableStateOf("") }
+    var noteSending by remember { mutableStateOf(false) }
     var noteMsg by remember { mutableStateOf<String?>(null) }
     // Notification permission is asked only when the person first sets a reminder or timer.
     val askNotif = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
@@ -251,7 +252,7 @@ fun ToolsScreen() {
                 notes.forEach { n ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(n.text, Modifier.weight(1f))
-                        TextButton({ scope.launch(Dispatchers.IO) { noteMsg = sendNoteToComputer(a, n.text) } }, Modifier.testTag("note_send_${n.id}")) { Text("Send to Piblo") }
+                        TextButton({ if (!noteSending) { noteSending = true; scope.launch(Dispatchers.IO) { noteMsg = sendNoteToComputer(a, n.text); noteSending = false } } }, Modifier.testTag("note_send_${n.id}"), enabled = !noteSending) { Text("Send to computer") }
                         TextButton({ scope.launch(Dispatchers.IO) { dao.delete(n) } }) { Text("Delete") }
                     }
                 }
@@ -263,11 +264,18 @@ fun ToolsScreen() {
 
 /** Files a phone note on the connected computer through the share queue (same path as Android Share), so it also survives being offline. */
 private suspend fun sendNoteToComputer(a: PibloApp, text: String): String {
-    if (!a.settings.now().hasComputer) return "Connect your computer first (Connections tab)."
-    val dao = a.db.dao()
-    if (dao.shareQueueCount() >= uk.mazworks.piblo.data.MAX_SHARE_QUEUE) return "Too many items waiting to send. Try again in a moment."
-    dao.enqueueShare(uk.mazworks.piblo.data.ShareEntry(text = text, title = "Note from phone", url = "", createdAt = System.currentTimeMillis(), idempotencyId = java.util.UUID.randomUUID().toString()))
-    return "Note will be filed on your computer as soon as it is connected."
+    return try {
+        val p = a.settings.now()
+        if (!(p.hasComputer && p.mode == Prefs.Mode.COMPUTER)) return "Connect your computer first (Connections tab)."
+        val dao = a.db.dao()
+        if (dao.shareQueueCount() >= uk.mazworks.piblo.data.MAX_SHARE_QUEUE) return "Too many items waiting to send. Try again in a moment."
+        val title = "Note from phone"
+        if (!uk.mazworks.piblo.data.hasQueuedShare(dao.pendingShares(), text, title))
+            dao.enqueueShare(uk.mazworks.piblo.data.ShareEntry(text = text, title = title, url = "", createdAt = System.currentTimeMillis(), idempotencyId = java.util.UUID.randomUUID().toString()))
+        a.requestShareDrain()
+        "Note will be filed on your computer as soon as it is connected."
+    } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+    catch (_: Exception) { "Couldn't send. Try again." }
 }
 
 // ---------------------------------------------------------------- Phone keyboard

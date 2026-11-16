@@ -86,6 +86,8 @@ fun LiveScreen() {
                         val bytes = withContext(Dispatchers.IO) { t.screenPng() }
                         frame = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
                         unreachable = false
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
                     } catch (_: Exception) {
                         unreachable = true   // 503 or any error: keep the last frame
                     }

@@ -46,6 +46,7 @@ class ShareActivity : ComponentActivity() {
                                 createdAt = System.currentTimeMillis(),
                                 idempotencyId = java.util.UUID.randomUUID().toString())
                         )
+                        app.requestShareDrain()
                         "Saved to Piblo. It will be sent when your computer is connected."
                     }
                 } catch (_: Exception) { "Couldn't save. Open Piblo and check your computer connection." }

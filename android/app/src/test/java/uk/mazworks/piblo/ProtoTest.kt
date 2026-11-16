@@ -155,4 +155,21 @@ class ProtoTest {
         assertEquals(uk.mazworks.piblo.proto.SHARE_TITLE_MAX, o.getString("title").length)
         assertEquals(uk.mazworks.piblo.proto.SHARE_URL_MAX, o.getString("url").length)
     }
+
+    @Test fun shareDrainsOnReconnectOrRequestOnly() {
+        val on = uk.mazworks.piblo.hub.LinkState.ONLINE
+        val off = uk.mazworks.piblo.hub.LinkState.OFFLINE
+        assertTrue(uk.mazworks.piblo.hub.shouldDrainShares(on, off, false))   // just reconnected
+        assertTrue(uk.mazworks.piblo.hub.shouldDrainShares(on, null, false))  // first online cycle
+        assertTrue(uk.mazworks.piblo.hub.shouldDrainShares(on, on, true))     // new enqueue
+        assertFalse(uk.mazworks.piblo.hub.shouldDrainShares(on, on, false))   // steady state: no re-send of a slow /share
+        assertFalse(uk.mazworks.piblo.hub.shouldDrainShares(off, off, true))  // never while offline
+    }
+
+    @Test fun doubleTappedNoteIsNotQueuedTwice() {
+        val e = uk.mazworks.piblo.data.ShareEntry(text = "buy milk", title = "Note from phone", url = "", createdAt = 1)
+        assertTrue(uk.mazworks.piblo.data.hasQueuedShare(listOf(e), "buy milk", "Note from phone"))
+        assertFalse(uk.mazworks.piblo.data.hasQueuedShare(listOf(e), "buy eggs", "Note from phone"))
+        assertFalse(uk.mazworks.piblo.data.hasQueuedShare(emptyList(), "buy milk", "Note from phone"))
+    }
 }
