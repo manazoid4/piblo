@@ -1,0 +1,253 @@
+package uk.mazworks.piblo.ui
+
+import android.content.Context
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
+import uk.mazworks.piblo.BuildConfig
+import uk.mazworks.piblo.PibloApp
+import uk.mazworks.piblo.hub.Answer
+import uk.mazworks.piblo.hub.LinkState
+import uk.mazworks.piblo.proto.Api
+import uk.mazworks.piblo.proto.DeviceStatus
+import uk.mazworks.piblo.proto.PromisesToday
+import uk.mazworks.piblo.proto.TodayPage
+
+private fun app(ctx: Context) = ctx.applicationContext as PibloApp
+
+/**
+ * Home: the real Piblo. Live device status, the one approval that needs the person,
+ * today's promises and the latest results. No demo content.
+ */
+@Composable
+fun HomeScreen(openLive: () -> Unit, onConnect: () -> Unit = {}) {
+    val a = app(LocalContext.current)
+    val scope = rememberCoroutineScope()
+    val state by a.hub.state.collectAsStateWithLifecycle()
+    val prefs by a.settings.prefs.collectAsStateWithLifecycle(initialValue = uk.mazworks.piblo.data.Prefs())
+    val device by a.deviceStatus.collectAsStateWithLifecycle()
+    val deviceErr by a.deviceError.collectAsStateWithLifecycle()
+    var promises by remember { mutableStateOf<PromisesToday?>(null) }
+    var today by remember { mutableStateOf<TodayPage?>(null) }
+    var updateConfirm by remember { mutableStateOf(false) }
+    var busy by remember { mutableStateOf(false) }
+    var error by remember { mutableStateOf<String?>(null) }
+
+    // Promises and today's counters refresh on their own; neither may ever spin forever.
+    LaunchedEffect(Unit) {
+        while (true) {
+            val t = a.transport
+            if (t != null) {
+                withContext(Dispatchers.IO) {
+                    try { promises = Api.promisesToday(t.get("/promises/today")) } catch (_: Exception) { }
+                    try { today = Api.today(t.get("/buddy/today")) } catch (_: Exception) { }
+                }
+            }
+            delay(10_000)
+        }
+    }
+
+    Column(
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (!prefs.hasComputer) {
+            Section("Welcome") {
+                Text("This phone isn't connected to a computer yet.", fontWeight = FontWeight.SemiBold)
+                Text("Pair with Piblo Core on your Wi-Fi to see your device, approvals and promises here.", style = MaterialTheme.typography.bodySmall, color = Muted)
+                Button(onConnect, modifier = Modifier.testTag("home_connect")) { Text("Connect your computer") }
+            }
+        }
+
+        DeviceCard(device, deviceErr, busy, onUpdate = { updateConfirm = true })
+
+        Section("Waiting for you") {
+            val head = state.head
+            if (head == null) {
+                EmptyState("Nothing waiting", "When an agent needs you, its name and what it wants appear here. You approve on this phone or on Piblo.")
+            } else {
+                Text(head.title, fontWeight = FontWeight.Bold)
+                Text(head.body, style = MaterialTheme.typography.bodyMedium)
+                Text(head.origin.name.lowercase().replace('_', ' ') + " request", style = MaterialTheme.typography.bodySmall, color = Muted)
+                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Button({ a.hub.answer(Answer.APPROVE) }, modifier = Modifier.testTag("approve")) { Text("Approve") }
+                    OutlinedButton({ a.hub.answer(Answer.REJECT) }, modifier = Modifier.testTag("reject")) { Text("Reject") }
+                }
+                if (head.canSnooze) TextButton({ a.hub.answer(Answer.SNOOZE) }, modifier = Modifier.testTag("snooze")) { Text("Snooze 10 min") }
+            }
+        }
+
+        PromisesCard(promises, busy, onReload = {
+            scope.launch(Dispatchers.IO) {
+                val t = a.transport ?: return@launch
+                try { promises = Api.promisesToday(t.get("/promises/today")) } catch (_: Exception) { }
+            }
+        })
+
+        Section("Latest") {
+            val t = today
+            if (t == null) {
+                if (prefs.hasComputer) Text("Reading today…", color = Muted, style = MaterialTheme.typography.bodySmall)
+            } else {
+                Labeled("Done today", "${t.done}")
+                Labeled("Waiting on you", "${t.needs}")
+                Labeled("Approved / denied", "${t.approved} / ${t.denied}")
+                t.lastText?.let { Text("Last: $it", style = MaterialTheme.typography.bodySmall, color = Muted) }
+            }
+            Button(openLive, modifier = Modifier.testTag("open_live")) { Text("Open Live View") }
+        }
+
+        error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+    }
+
+    if (updateConfirm) {
+        val d = device
+        AlertDialog(
+            onDismissRequest = { updateConfirm = false },
+            title = { Text("Update Piblo?") },
+            text = { Text("Install ${d?.hubVersion ?: "the new build"}? Piblo restarts when it finishes. Keep it on Wi-Fi with battery above 30% or charging.") },
+            confirmButton = {
+                TextButton({
+                    updateConfirm = false
+                    scope.launch(Dispatchers.IO) {
+                        try { a.transport?.deviceAction("update"); a.refreshDevice() } catch (e: Exception) { error = "Update didn't start: ${e.message}" }
+                    }
+                }) { Text("Install") }
+            },
+            dismissButton = { TextButton({ updateConfirm = false }) { Text("Not now") } },
+        )
+    }
+}
+
+@Composable
+private fun DeviceCard(d: DeviceStatus?, err: String?, busy: Boolean, onUpdate: () -> Unit) {
+    Section("Your Piblo") {
+        if (d == null) {
+            val msg = when {
+                err != null -> "Can't reach your computer. Check it's running and on the same Wi-Fi."
+                else -> "Connecting…"
+            }
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                if (err == null) CircularProgressIndicator(strokeWidth = 2.dp)
+                Text(msg, style = MaterialTheme.typography.bodyMedium, color = Muted)
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(d.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+                Pill(if (d.online) "Online" else "Offline", if (d.online) Teal else Red)
+            }
+            d.battery?.let { Labeled("Battery", "$it%${if (d.charging) " · charging" else ""}") }
+            Labeled("Software", d.version.ifBlank { "unknown" })
+            if (d.app.isNotBlank()) Labeled("Showing", d.app)
+            Labeled("Wi-Fi", when {
+                d.wifiSsid.isNotBlank() -> d.wifiSsid
+                d.wifiConnected -> "connected"
+                else -> "not connected"
+            })
+            d.hubVersion?.let { Labeled("Ready to install", it) }
+            d.lastStage?.let { Labeled("Last update", it + (d.lastError?.let { e -> " ($e)" } ?: "")) }
+            if (d.online && d.updateAvailable) {
+                Button(onUpdate, enabled = !busy, modifier = Modifier.testTag("update_firmware")) { Text("Update firmware") }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PromisesCard(data: PromisesToday?, busy: Boolean, onReload: () -> Unit) {
+    var note by remember { mutableStateOf("") }
+    var candidate by remember { mutableStateOf<Pair<String, String>?>(null) }  // due, label
+    var message by remember { mutableStateOf<String?>(null) }
+    val a = app(LocalContext.current)
+    val scope = rememberCoroutineScope()
+
+    Section("Today's promises") {
+        if (data == null || data.empty) {
+            EmptyState("No promises yet", "Promises you confirm here show up on Piblo and come back until you mark them done.")
+        } else {
+            data.cards.forEach { c ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.padding(end = 8.dp)) {
+                        Text(c.title, fontWeight = FontWeight.SemiBold, style = MaterialTheme.typography.bodyMedium)
+                        Text("${c.state} · ${c.whenText}", style = MaterialTheme.typography.bodySmall, color = Muted)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        if (c.actions.contains("done")) TextButton({ scope.launch(Dispatchers.IO) { a.transport?.post("/promises/${c.id}/done", null); onReload() } }) { Text("Done") }
+                        if (c.actions.contains("later")) TextButton({ scope.launch(Dispatchers.IO) { a.transport?.post("/promises/${c.id}/later", "{}"); onReload() } }) { Text("Later") }
+                        if (c.actions.contains("undo")) TextButton({ scope.launch(Dispatchers.IO) { a.transport?.post("/promises/${c.id}/undo", null); onReload() } }) { Text("Undo") }
+                    }
+                }
+            }
+        }
+
+        OutlinedTextField(
+            note, { note = it }, label = { Text("New promise") },
+            placeholder = { Text("Call the dentist tomorrow at 10:00") }, singleLine = true,
+            modifier = Modifier.fillMaxWidth().testTag("promise_note"),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Button(
+                {
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            val raw = a.transport?.post("/promises/propose", JSONObject().put("note", note.trim()).toString())
+                                ?: throw IllegalStateException("not_connected")
+                            val o = JSONObject(raw)
+                            val c = o.optJSONArray("candidates")?.optJSONObject(0)
+                            if (c != null) candidate = c.optString("due") to c.optString("label")
+                            else message = o.optString("message").ifBlank { "No date found in that note." }
+                        } catch (e: Exception) { message = "Couldn't read that promise. Is your computer connected?" }
+                    }
+                },
+                enabled = note.isNotBlank() && !busy,
+                modifier = Modifier.testTag("promise_add"),
+            ) { Text("Add") }
+        }
+        candidate?.let { (due, label) ->
+            Text("Save \"$label\" for $due?", style = MaterialTheme.typography.bodyMedium)
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button({
+                    scope.launch(Dispatchers.IO) {
+                        try {
+                            a.transport?.post("/promises/confirm", JSONObject().put("note", note.trim()).put("due", due).put("confirmed", true).toString())
+                            note = ""; candidate = null; onReload()
+                        } catch (e: Exception) { message = "Couldn't save that promise." }
+                    }
+                }, modifier = Modifier.testTag("promise_confirm")) { Text("Save") }
+                OutlinedButton({ candidate = null }) { Text("Cancel") }
+            }
+        }
+        message?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+    }
+}

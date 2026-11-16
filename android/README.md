@@ -14,6 +14,13 @@ export ANDROID_HOME=/path/to/sdk
 
 Debug APK: `app/build/outputs/apk/debug/app-debug.apk`.
 
+## Which APK installs over which
+
+Android only updates an app when the new APK is signed with the same key. Beta APKs are signed with the Piblo Beta key
+(CI secret `PIBLO_ANDROID_KEYSTORE_B64`, set in `.github/workflows/android.yml`); builds on a laptop use the default
+Android debug key and will not install over a beta: uninstall first (settings stay on your computer, you pair again).
+`assembleRelease` signs with the same key as debug, so a release APK is never "unsigned, cannot install".
+
 ## Install the debug APK
 
 1. Copy `app-debug.apk` to the phone.

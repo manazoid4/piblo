@@ -14,7 +14,6 @@ export function Home() {
   const act = useAct();
   const online = pill.state === 'connected';
   const beam = usePoll<Beam>('/beam/history?limit=6', 6000);
-  const device = usePoll<{ device_fw_version?: string | null; staged_fw_version?: string | null }>('/core/cardputer/status', 15000);
   const [note, setNote] = useState('');
   const [checking, setChecking] = useState(false);
   const dev = deviceInfo?.device;
@@ -77,16 +76,14 @@ export function Home() {
 
         <section className="card stack" aria-labelledby="fw-h">
           <h2 id="fw-h">Software on Piblo</h2>
+          <dl className="meta">
+            <dt>On your Piblo</dt><dd>{online ? `v${dev?.version ?? '?'}` : 'not connected'}</dd>
+            <dt>Ready on this PC</dt><dd>{hub ? `v${hub.version ?? '?'}` : 'nothing staged'}</dd>
+          </dl>
           <p className="sub">
-            {hub ? `Version ${hub.version ?? '?'} is ready on this PC.` : 'No update ready on this PC.'}{' '}
-            {online && hub ? (deviceInfo?.update_available ? 'It is newer than what Piblo runs.' : 'Piblo is up to date.') : ''}
+            {!online ? 'Connect Piblo to see if it needs an update.' : deviceInfo?.update_available ? 'Update available. Press Install update.' : 'Piblo is up to date.'}
           </p>
           {health?.fw_latest?.version && <span className="meta">Latest known: {health.fw_latest.version}</span>}
-          {device.data?.device_fw_version && (
-            <span className="meta">
-              Piblo v{device.data.device_fw_version} · {device.data.staged_fw_version ? `update ${device.data.staged_fw_version} ready` : 'up to date'}
-            </span>
-          )}
           {deviceInfo?.last_report?.stage && (
             <span className="meta">
               Last update: {deviceInfo.last_report.stage}
