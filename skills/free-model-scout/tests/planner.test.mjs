@@ -21,6 +21,12 @@ test("normal window: runs now within reserve, next window is the reset, overnigh
   assert.equal(p.overnight[1].lanes.find(l => l.id === "claude:5h").assumed_refill, true);
   assert.equal(p.overnight[1].lanes.find(l => l.id === "claude:5h").budget_units, 80); // refilled to limit * 0.8
   assert.match(p.summary, /never paid/);
+  const lines = p.summary.split(/\r?\n/);
+  assert.equal(lines.length, 3);
+  assert.equal(lines[0], "Can run now: Claude 5h (32 of 40, 8 kept back), Ollama (not metered).");
+  assert.match(lines[1], /^Next refill: Claude 5h, .*23:00 GMT\.$/);
+  assert.match(lines[2], /^Tonight \(8 h\): 2 blocks, split at each refill\..*You typed these numbers in at .*18:00 GMT; Scout did not check them\.$/);
+  assert.doesNotMatch(p.summary, /segment\(s\)|claude:5h|Next window/);
 });
 test("exhausted meter is blocked until its reset, local lane keeps running overnight", () => {
   const p = plan([app({ remaining: 0, reset_at: "2026-11-15T23:00:00Z" }), local], { now: NOW });
@@ -52,7 +58,7 @@ test("missing reset: usable now, no invented schedule; exhausted without reset a
   assert.equal(dead.can_run_now.length, 0);
   assert.equal(dead.next_window_opens, null);
   assert.equal(dead.needs_input.length, 1);
-  assert.match(dead.summary, /Next window: none known/);
+  assert.match(dead.summary, /Next refill: not known/);
 });
 test("DST spring forward: daily 23:00 local reset stays 23:00 local (22:00Z after the change)", () => {
   const now = Date.parse("2026-03-28T22:00:00Z");

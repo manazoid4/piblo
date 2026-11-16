@@ -79,9 +79,21 @@ export function plan(meters, { now = Date.now(), tz = "Europe/London", hours = 8
   const nw = opens ? { id: opens.id, at: Date.parse(opens.opens_at), why: "blocked meter reopens" }
     : first !== undefined ? { id: cuts.get(first), at: first, why: "next scheduled reset" } : null;
   const nextWindow = nw && { id: nw.id, at: new Date(nw.at).toISOString(), at_local: fmtLocal(nw.at, tz), why: nw.why };
-  const nowTxt = nowRows.length ? nowRows.map(r => r.id + (r.budget_units === null ? "" : " (" + r.budget_units + ")")).join(", ") : "nothing";
-  const summary = `Now: ${nowTxt}. Next window: ${nextWindow ? nextWindow.id + " " + nextWindow.at_local : "none known"}. `
-    + `Overnight ${hours}h: ${overnight.length} segment(s), free/prepaid/local only, never paid.`;
+  // Three plain lines. Names: meter id with ":" and "-" as spaces, first letter capitalised.
+  const name = (id) => { const t = id.replace(/[:-]/g, " "); return t[0].toUpperCase() + t.slice(1); };
+  const byId = new Map(ms.map(m => [meterId(m), m]));
+  const nowTxt = nowRows.length ? nowRows.map(r => {
+    if (r.budget_units === null) return name(r.id) + " (not metered)";
+    const m = byId.get(r.id), of = r.assumed_refill ? m.limit : m.remaining;
+    return `${name(r.id)} (${r.budget_units} of ${of}, ${of - r.budget_units} kept back)`;
+  }).join(", ") : "nothing";
+  const typed = ms.filter(m => m.confidence === "manual" && m.checked_at).map(m => Date.parse(m.checked_at)).filter(Number.isFinite);
+  const summary = `Can run now: ${nowTxt}.
+`
+    + `Next refill: ${nextWindow ? name(nextWindow.id) + ", " + nextWindow.at_local : "not known"}.
+`
+    + `Tonight (${hours} h): ${overnight.length} ${overnight.length === 1 ? "block" : "blocks"}, split at each refill. Free, prepaid or local only, never paid.`
+    + (typed.length ? ` You typed these numbers in at ${fmtLocal(Math.max(...typed), tz)}; Scout did not check them.` : "");
   return { schema_version: 1, now: new Date(now).toISOString(), tz, until: new Date(until).toISOString(), reserve,
     can_run_now: nowRows, blocked, next_window_opens: nextWindow, overnight, needs_input, summary };
 }
