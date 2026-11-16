@@ -3,6 +3,7 @@ package uk.mazworks.piblo.hub
 import uk.mazworks.piblo.proto.CoreClient
 import uk.mazworks.piblo.proto.CoreHttpException
 import uk.mazworks.piblo.proto.EventsPage
+import uk.mazworks.piblo.proto.HaltState
 import uk.mazworks.piblo.proto.Summary
 import java.io.IOException
 import kotlin.math.min
@@ -38,7 +39,7 @@ class CoreTransport(private val c: CoreClient) : Transport {
     override fun screenPng() = c.screenPng()
     override fun pressKeys(keys: String) = c.pressKeys(keys)
     override fun haltState() = c.haltState()
-    override fun setHalt(on: Boolean, minutes: Int? = null) = c.setHalt(on, minutes)
+    override fun setHalt(on: Boolean, minutes: Int?) = c.setHalt(on, minutes)
 }
 
 /** Clearly a stub: the current firmware has no BLE GATT service. See android/README.md for the proposed framing. */
@@ -55,7 +56,7 @@ object BleTransportStub : Transport {
     override fun share(json: String) = na()
     override fun pressKeys(keys: String) = na()
     override fun haltState(): HaltState = na()
-    override fun setHalt(on: Boolean, minutes: Int? = null) = na()
+    override fun setHalt(on: Boolean, minutes: Int?) = na()
 }
 
 /**
