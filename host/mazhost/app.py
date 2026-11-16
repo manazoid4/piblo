@@ -231,6 +231,7 @@ def create_app(
     work_store.bootstrap()
     work_service = WorkService(work_store)
     inflight = {"n": 0}  # live turns/jobs: self-update never restarts Core under one
+    device_fw = {}
     updates = updater or SelfUpdater(
         enabled=cfg.autoupdate, interval_s=cfg.update_interval_s, repo_dir=cfg.repo_dir,
         github_token=cfg.github_token, port=cfg.port,
@@ -567,6 +568,8 @@ def create_app(
             return {"ok": True, "name": "nod Core", "version": CORE_VERSION}
         if "ESP32" in request.headers.get("user-agent", "") and request.client:
             core_service.note_device(request.client.host)  # the device polls this; live view reuses its address
+            if fw_version:
+                device_fw["version"] = fw_version
         core_status = versioned_core_status() if cfg.core_enabled else {"ok": False, "disabled": True}
         return {
             "ok": True,
@@ -735,7 +738,9 @@ def create_app(
 
     @api.get("/core/cardputer/status")
     def core_cardputer_status():
-        return core_service.cardputer_status()
+        status = core_service.cardputer_status()
+        m = fw.manifest()
+        return {**status, "device_fw_version": device_fw.get("version") or None, "staged_fw_version": m["version"] if m else None}
 
     @api.get("/core/cardputer/screen")
     def core_cardputer_screen():
