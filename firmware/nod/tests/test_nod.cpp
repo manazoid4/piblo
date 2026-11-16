@@ -2,6 +2,7 @@
 #include <cstdlib>
 #include <cmath>
 #include "../include/alert_policy.h"
+#include "../include/approval_format.h"
 #include "../include/charge_monitor.h"
 #include "../include/poll_backoff.h"
 #include "../include/nod_hold.h"
@@ -14,6 +15,7 @@
 #include "../include/safe_file.h"
 #include "../include/pair_connect.h"
 #include "../include/fw_version.h"
+#include "../include/upload_gate.h"
 #include <map>
 #include <string>
 using namespace nod;
@@ -44,6 +46,30 @@ int main() {
     CHECK(fwIsNewer("1.6.0", "1.5.1")); CHECK(fwIsNewer("1.10.0", "1.9.9")); CHECK(fwIsNewer("v2.0", "1.9.9"));
     CHECK(!fwIsNewer("1.5.1", "1.6.0")); CHECK(!fwIsNewer("1.6.0", "1.6.0")); CHECK(!fwIsNewer("1.6.0-beta", "1.6.0"));
     CHECK(!fwIsNewer("", "1.5.1")); CHECK(!fwIsNewer("bad", "1.5.1")); CHECK(!fwIsNewer("1.6.0", "")); CHECK(!fwIsNewer(nullptr, "1.0.0"));
+
+    // upload gate: background Flow upload state machine
+    {
+        UploadGate g;
+        CHECK(g.state() == UploadGate::Idle && !g.busy());
+        CHECK(!g.take());                                   // nothing to take
+        CHECK(g.begin(1000)); CHECK(!g.begin(1001));        // no double-send
+        CHECK(!g.timedOut(1000 + 24999, 25000)); CHECK(g.timedOut(1000 + 25000, 25000));
+        CHECK(!g.take());                                   // not finished yet
+        g.finish(); CHECK(g.state() == UploadGate::Done);   // success path
+        CHECK(!g.begin(2000));                              // result not collected yet
+        CHECK(g.take()); CHECK(!g.busy()); CHECK(!g.take());
+        // timeout: UI gives up, worker still alive -> stays busy, then frees itself
+        CHECK(g.begin(0xFFFFFF00u)); CHECK(g.timedOut(0x100u, 0x200u));  // millis() wrap
+        CHECK(g.abandon()); CHECK(g.busy()); CHECK(!g.timedOut(0x1000, 1));
+        CHECK(!g.begin(5)); CHECK(!g.take());               // re-entry refused, no stale result
+        g.finish(); CHECK(g.state() == UploadGate::Idle); CHECK(g.begin(6));
+        // cancel after the worker already finished: result dropped, gate free
+        g.finish(); CHECK(!g.abandon()); CHECK(g.state() == UploadGate::Done); CHECK(g.take()); CHECK(!g.busy());
+        // worker failed to start
+        CHECK(g.begin(7)); g.abort(); CHECK(!g.busy());
+        // repeated use does not wedge
+        for (int i = 0; i < 200; i++) { CHECK(g.begin(i)); if (i % 3 == 0) g.abandon(); g.finish(); g.take(); CHECK(!g.busy()); }
+    }
 
     // battery curve
     CHECK(voltageToPercent(3000) == 0); CHECK(voltageToPercent(4300) == 100);
@@ -205,6 +231,18 @@ int main() {
       for (uint32_t ms = 0; ms < HOLD_MS + 50; ms += 7) CHECK(holdPercent(ms) <= holdPercent(ms + 7));  // monotonic
       CHECK(HOLD_MS >= 500 && HOLD_MS <= 1200);  // deliberate, not tedious
       CHECK(holdPercent(HOLD_MS - 1) == 99); }
+    // ---- approval detail head: both Core prefixes render the amount/recipient lines ----
+    { using namespace maz;
+      CHECK(approvalHasDetails("ASK ON PIBLO  PAYMENT\n42.00\nto Acme Ltd"));
+      CHECK(approvalHasDetails("THE NOD  PAYMENT\n42.00\nto Acme Ltd"));
+      CHECK(approvalHasDetails("ASK ON PIBLO  "));      // head alone still counts as detailed
+      CHECK(approvalHasDetails("THE NOD  "));
+      CHECK(!approvalHasDetails("ASK ON PIBLO"));       // missing the two-space separator
+      CHECK(!approvalHasDetails("THE NOD "));           // one space only
+      CHECK(!approvalHasDetails("CLAUDE CODE NEEDS YOU"));
+      CHECK(!approvalHasDetails("Pay Acme"));
+      CHECK(!approvalHasDetails(""));
+      CHECK(!approvalHasDetails("ask on piblo  PAYMENT")); }  // heads are case-sensitive
     // tone sequencer: notes start on schedule, never early, never skipped, and nothing blocks
     { ToneSeq q; ToneStep s{};
       CHECK(!q.poll(0, s) && !q.playing(0));  // empty queue is silent
