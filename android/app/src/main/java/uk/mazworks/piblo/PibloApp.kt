@@ -129,7 +129,6 @@ class PibloApp : Application() {
         val l = CoreLink(hub, t)
         link = l
         linkJob = scope.launch(Dispatchers.IO) {
-            var prevLinkState: LinkState? = null
             while (isActive) {
                 val delayMs = l.cycle()
                 val nowState = hub.state.value.link
@@ -144,10 +143,8 @@ class PibloApp : Application() {
                     delay(minOf(chunk, remaining))
                     remaining -= chunk
                 }
-                if (remaining <= 0 && nowState == LinkState.ONLINE && prevLinkState != LinkState.ONLINE) {
-                    drainShareQueue(t)
-                }
-                prevLinkState = nowState
+                // Every online cycle (not only on reconnect), so a share or note queued while connected is sent too.
+                if (remaining <= 0 && nowState == LinkState.ONLINE) drainShareQueue(t)
             }
         }
     }

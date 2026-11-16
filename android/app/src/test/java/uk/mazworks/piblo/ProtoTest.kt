@@ -142,4 +142,17 @@ class ProtoTest {
         assertNull(CoreClient.normalizeBase("http://8.8.8.8:8787"))
         assertEquals("https://example.com", CoreClient.normalizeBase("https://example.com"))
     }
+
+    @Test fun shareKeepsTheWholeTextUpToCoreLimit() {
+        val long = "a".repeat(5_000)
+        assertEquals(5_000, JSONObject(Proto.shareJson(long, "t", "", "id1")).getString("text").length)
+        val huge = "b".repeat(60_000)
+        assertEquals(uk.mazworks.piblo.proto.SHARE_TEXT_MAX, JSONObject(Proto.shareJson(huge, "t", "", "id2")).getString("text").length)
+    }
+
+    @Test fun shareBoundsTitleAndUrlToCoreLimits() {
+        val o = JSONObject(Proto.shareJson("x", "t".repeat(300), "https://e.com/" + "u".repeat(3000), "id3"))
+        assertEquals(uk.mazworks.piblo.proto.SHARE_TITLE_MAX, o.getString("title").length)
+        assertEquals(uk.mazworks.piblo.proto.SHARE_URL_MAX, o.getString("url").length)
+    }
 }
