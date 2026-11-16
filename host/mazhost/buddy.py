@@ -379,6 +379,18 @@ class Buddy:
             self._db("set_alert_outcome", aid, rec["outcome"], rec["snooze_until"] if action == "snooze" else None)
             return {"ok": True, "id": aid, "outcome": rec["outcome"]}
 
+    def alert_undo(self, aid: str) -> dict:
+        """Take back an ack: the alert is open again, and never re-fires on its own."""
+        with self._cv:
+            rec = self._alerts.get(aid)
+            if rec is None:
+                raise KeyError(aid)
+            if rec["outcome"] != "acked":
+                raise ValueError("nothing_to_undo")
+            rec["outcome"], rec["outcome_at"] = None, None
+            self._db("set_alert_outcome", aid, None)
+            return {"ok": True, "id": aid, "outcome": None}
+
     def alerts(self) -> dict:
         with self._cv:
             self._fire_due_locked()
