@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Empty, Icon, PageHead } from '../components/ui';
+import { TodayPromises } from '../components/TodayPromises';
 import { ago } from '../lib/logic';
 import { useAct, usePoll, useStore } from '../lib/store';
 
@@ -92,6 +93,8 @@ export function Home() {
           </div>
         </section>
       </div>
+
+      <TodayPromises />
 
       <section className="card stack" aria-labelledby="beam-h">
         <h2 id="beam-h">Send to Piblo</h2>
