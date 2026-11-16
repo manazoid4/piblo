@@ -57,3 +57,28 @@ def test_health_uses_core_decision_and_no_stage_fails_closed(tmp_path, monkeypat
         body = api.get("/health", params={"fw_version": version}, headers=AUTH).json()
         assert body["fw_update_available"] is expected
     assert "fw_update_available" not in api.get("/health?fw_version=1.5.1").json()
+
+
+def test_pusher_tells_device_once_per_change(tmp_path, monkeypatch):
+    stage(tmp_path, monkeypatch)
+    sent = []
+    pusher = fw.FwPusher(lambda action: sent.append(action) or {"ok": True})
+    assert pusher.tick("192.168.1.9") and not pusher.tick("192.168.1.9")
+    assert pusher.tick("192.168.1.10")  # device appeared at a new address
+    stage(tmp_path, monkeypatch, version="1.6.1")
+    assert pusher.tick("192.168.1.10") and sent == ["fwcheck"] * 3
+
+
+def test_pusher_retries_when_device_unreachable_and_never_raises(tmp_path, monkeypatch):
+    stage(tmp_path, monkeypatch)
+    pusher = fw.FwPusher(lambda action: {"ok": False})
+    assert not pusher.tick() and not pusher.tick()
+    pusher.send = lambda action: (_ for _ in ()).throw(RuntimeError("down"))
+    assert not pusher.tick()
+    pusher.send = lambda action: {"ok": True}
+    assert pusher.tick()
+
+
+def test_no_staged_firmware_pushes_nothing(tmp_path, monkeypatch):
+    monkeypatch.setenv("MAZ_FW_DIR", str(tmp_path))
+    assert not fw.FwPusher(lambda action: {"ok": True}).tick()

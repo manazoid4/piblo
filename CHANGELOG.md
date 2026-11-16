@@ -3,6 +3,9 @@
 ## v1.5.4
 - Board link: ESP-NOW starts again if Wi-Fi was off at boot or switched off later.
 - System screen shows the board link state (radio, key, HELLOs sent).
+- Updates arrive at once: when new firmware is staged on Core, or Piblo first connects, Core tells Piblo to check straight away. "Update device" on the web page now refreshes the check first, then asks you to confirm.
+- Piblo checks for a new version about 2 s after Wi-Fi connects, and always asks your PC on the home network first (the remote link is only the fallback).
+- New setting "Auto-update on charger" (off by default): when on, Piblo installs a staged update by itself while charging and idle for 2 minutes on Home. A bad update still rolls back.
 
 ## v1.5.3 — ESP-NOW offload to the Piblo board (16 Nov 2026)
 

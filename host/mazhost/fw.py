@@ -62,6 +62,30 @@ def staged_status(running_version: str = "") -> dict:
             "update_available": running is not None and latest > running}
 
 
+class FwPusher:
+    """Tells the device (action "fwcheck") when staged firmware changes or the device address changes,
+    so it learns of an update at once instead of waiting for its own poll. Best-effort."""
+
+    def __init__(self, send):
+        self.send, self.sig, self.ip = send, None, None
+
+    def tick(self, device_ip=None) -> bool:
+        staged = manifest()
+        if not staged:
+            return False
+        try:
+            sig = (staged["version"], (fw_dir() / "manifest.json").stat().st_mtime_ns)
+            if (sig, device_ip) == (self.sig, self.ip):
+                return False
+            if not self.send("fwcheck").get("ok"):
+                return False  # device off or unreachable: retry next tick
+        except Exception:
+            log.debug("fwcheck push failed", exc_info=True)
+            return False
+        self.sig, self.ip = sig, device_ip
+        return True
+
+
 def report_path() -> Path:
     return fw_dir() / "last_report.json"
 
