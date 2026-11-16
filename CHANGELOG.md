@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.5.2 — approval details on device + Flow upload that never freezes (16 Nov 2026)
+
+- Approval cards show their detail lines (amount / recipient / category) again: the firmware accepts both the current `ASK ON PIBLO` head and the legacy `THE NOD` head, so current Core no longer drops the amount and recipient (#152).
+- Flow / Type-on-PC upload moved off the main loop onto its own task with an `UploadGate` state machine: no double-send, ESC cancel, 25 s HTTP / 28 s UI timeout with a clear error, and the screen, keys and approvals keep responding while sending (#156).
+- Type-on-PC header no longer sits under the error text; while sending the Buddy pulses with "Sending..." and an ESC countdown (#156).
+
 ## v1.5.1 — Piblo name everywhere (8 Nov 2026)
 
 - Device shows Piblo, never MAZ Pocket: home title, Settings, Wi-Fi hotspot (Piblo-Setup, password piblosetup), web address piblo.local, serial banner.
