@@ -14,6 +14,7 @@ export function Home() {
   const act = useAct();
   const online = pill.state === 'connected';
   const beam = usePoll<Beam>('/beam/history?limit=6', 6000);
+  const device = usePoll<{ device_fw_version?: string | null; staged_fw_version?: string | null }>('/core/cardputer/status', 15000);
   const [note, setNote] = useState('');
   const [checking, setChecking] = useState(false);
   const dev = deviceInfo?.device;
@@ -81,6 +82,11 @@ export function Home() {
             {online && hub ? (deviceInfo?.update_available ? 'It is newer than what Piblo runs.' : 'Piblo is up to date.') : ''}
           </p>
           {health?.fw_latest?.version && <span className="meta">Latest known: {health.fw_latest.version}</span>}
+          {device.data?.device_fw_version && (
+            <span className="meta">
+              Piblo v{device.data.device_fw_version} · {device.data.staged_fw_version ? `update ${device.data.staged_fw_version} ready` : 'up to date'}
+            </span>
+          )}
           {deviceInfo?.last_report?.stage && (
             <span className="meta">
               Last update: {deviceInfo.last_report.stage}

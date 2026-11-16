@@ -472,3 +472,12 @@ def test_voice_token_cap_applies_only_to_the_spoken_path():
     assert raw("surface=FLOW selected=SHIFT") == 160  # screen Ask is not a spoken reply
     api.post("/turn/text", headers=headers, json={"text": "hello", "session_id": sid, "route": "local"})
     assert models.last_cap == 160
+
+
+def test_cardputer_status_reports_device_and_staged_fw_versions():
+    c = client()
+    auth = {"Authorization": "Bearer test-token-that-is-not-default"}
+    c.get("/health?fw_version=1.2.3", headers={**auth, "user-agent": "ESP32-S3"})
+    body = c.get("/core/cardputer/status", headers=auth).json()
+    assert body["device_fw_version"] == "1.2.3"
+    assert "staged_fw_version" in body
