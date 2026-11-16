@@ -9,6 +9,9 @@ const val TITLE_MAX = 60      // docs/ALERTS.md
 const val BODY_MAX = 200      // docs/ALERTS.md
 const val SOURCE_MAX = 40     // AlertIn.source
 const val TEXT_MAX = 500      // phone keyboard text (easy-mode-task.md, POST /buddy/text)
+const val SHARE_TEXT_MAX = 50_000 // Share.text in host/mazhost/share_in.py
+const val SHARE_TITLE_MAX = 200
+const val SHARE_URL_MAX = 2000
 const val KEY_MAX = 400       // cardputer key names (POST /core/cardputer/key)
 const val KIND_FIND_PHONE = "find_phone"
 
@@ -110,9 +113,9 @@ object Proto {
     /** POST /share body. text contains the shared content, title is optional, url is optional, idempotencyKey allows Core to dedupe. */
     fun shareJson(text: String, title: String, url: String, idempotencyId: String): String =
         JSONObject()
-            .put("text", truncate(text, TEXT_MAX))
-            .put("title", title)
-            .put("url", url)
+            .put("text", truncate(text, SHARE_TEXT_MAX))
+            .put("title", truncate(title, SHARE_TITLE_MAX))
+            .put("url", truncate(url, SHARE_URL_MAX))
             .put("idempotency_id", idempotencyId)
             .toString()
 

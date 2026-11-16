@@ -37,6 +37,9 @@ data class ShareEntry(
     val idempotencyId: String = "",
 )
 
+/** True if an identical share (same text and title) is already waiting: a double tap must not queue it twice. */
+fun hasQueuedShare(pending: List<ShareEntry>, text: String, title: String) = pending.any { it.text == text && it.title == title }
+
 const val MAX_MESSAGES = 200
 const val MAX_NOTES = 500
 const val MAX_SHARE_RETRIES = 3

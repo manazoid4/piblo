@@ -198,6 +198,8 @@ fun ToolsScreen() {
     val state by a.hub.state.collectAsStateWithLifecycle()
     var noteText by remember { mutableStateOf("") }
     var remText by remember { mutableStateOf("") }
+    var noteSending by remember { mutableStateOf(false) }
+    var noteMsg by remember { mutableStateOf<String?>(null) }
     // Notification permission is asked only when the person first sets a reminder or timer.
     val askNotif = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     fun ensureNotifPermission() { if (Build.VERSION.SDK_INT >= 33 && !Notifier.canNotify(ctx)) askNotif.launch(Manifest.permission.POST_NOTIFICATIONS) }
@@ -246,9 +248,11 @@ fun ToolsScreen() {
             Section("Notes") {
                 OutlinedTextField(noteText, { noteText = it }, Modifier.fillMaxWidth().testTag("note_text"), label = { Text("Write a note") })
                 Button({ val t = noteText.trim(); if (t.isNotEmpty()) { scope.launch(Dispatchers.IO) { if (dao.noteCount() < uk.mazworks.piblo.data.MAX_NOTES) dao.insert(Note(text = t.take(2000), createdAt = System.currentTimeMillis())) }; noteText = "" } }, Modifier.testTag("note_add")) { Text("Save note") }
+                noteMsg?.let { Text(it, Modifier.testTag("note_msg"), style = MaterialTheme.typography.bodySmall) }
                 notes.forEach { n ->
                     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Text(n.text, Modifier.weight(1f))
+                        TextButton({ if (!noteSending) { noteSending = true; scope.launch(Dispatchers.IO) { noteMsg = sendNoteToComputer(a, n.text); noteSending = false } } }, Modifier.testTag("note_send_${n.id}"), enabled = !noteSending) { Text("Send to computer") }
                         TextButton({ scope.launch(Dispatchers.IO) { dao.delete(n) } }) { Text("Delete") }
                     }
                 }
@@ -256,6 +260,22 @@ fun ToolsScreen() {
         }
         item { PhoneKeyboardSection(a, state.link == LinkState.ONLINE) }
     }
+}
+
+/** Files a phone note on the connected computer through the share queue (same path as Android Share), so it also survives being offline. */
+private suspend fun sendNoteToComputer(a: PibloApp, text: String): String {
+    return try {
+        val p = a.settings.now()
+        if (!(p.hasComputer && p.mode == Prefs.Mode.COMPUTER)) return "Connect your computer first (Connections tab)."
+        val dao = a.db.dao()
+        if (dao.shareQueueCount() >= uk.mazworks.piblo.data.MAX_SHARE_QUEUE) return "Too many items waiting to send. Try again in a moment."
+        val title = "Note from phone"
+        if (!uk.mazworks.piblo.data.hasQueuedShare(dao.pendingShares(), text, title))
+            dao.enqueueShare(uk.mazworks.piblo.data.ShareEntry(text = text, title = title, url = "", createdAt = System.currentTimeMillis(), idempotencyId = java.util.UUID.randomUUID().toString()))
+        a.requestShareDrain()
+        "Note will be filed on your computer as soon as it is connected."
+    } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+    catch (_: Exception) { "Couldn't send. Try again." }
 }
 
 // ---------------------------------------------------------------- Phone keyboard
@@ -384,7 +404,6 @@ fun ConnectionsScreen() {
         item {
             Section("Piblo device") {
                 Text("Coming soon. Connecting this phone straight to a Piblo over Bluetooth needs a firmware update that isn't released yet.")
-                Button({}, enabled = false) { Text("Pair over Bluetooth") }
             }
         }
     }

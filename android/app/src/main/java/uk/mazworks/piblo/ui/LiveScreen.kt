@@ -36,7 +36,10 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -72,19 +75,25 @@ fun LiveScreen() {
     var frame by remember { mutableStateOf<ImageBitmap?>(null) }
     var unreachable by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            val t = a.transport
-            if (t != null) {
-                try {
-                    val bytes = withContext(Dispatchers.IO) { t.screenPng() }
-                    frame = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
-                    unreachable = false
-                } catch (_: Exception) {
-                    unreachable = true   // 503 or any error: keep the last frame
+    // Poll only while the app is on screen: a backgrounded phone must not keep pulling frames.
+    val owner = LocalLifecycleOwner.current
+    LaunchedEffect(owner) {
+        owner.lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                val t = a.transport
+                if (t != null) {
+                    try {
+                        val bytes = withContext(Dispatchers.IO) { t.screenPng() }
+                        frame = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.asImageBitmap()
+                        unreachable = false
+                    } catch (e: kotlinx.coroutines.CancellationException) {
+                        throw e
+                    } catch (_: Exception) {
+                        unreachable = true   // 503 or any error: keep the last frame
+                    }
                 }
+                delay(500)
             }
-            delay(500)
         }
     }
 
@@ -104,7 +113,8 @@ fun LiveScreen() {
         }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             keys.forEach { (label, key) ->
-                Button({ scope.launch(Dispatchers.IO) { a.transport?.pressKeys(key) } }, Modifier.testTag("live_key_${label.lowercase()}")) { Text(label) }
+                // A dropped link must not crash the app: an uncaught IOException in this scope would.
+                Button({ scope.launch(Dispatchers.IO) { try { a.transport?.pressKeys(key) } catch (_: Exception) { unreachable = true } } }, Modifier.testTag("live_key_${label.lowercase()}")) { Text(label) }
             }
         }
     }

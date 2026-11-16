@@ -142,3 +142,6 @@ class CoreLink(
         return backoff.next()
     }
 }
+/** Drain the share queue when the link has just come online, or right after something was enqueued while online. */
+fun shouldDrainShares(now: LinkState, prev: LinkState?, requested: Boolean): Boolean =
+    now == LinkState.ONLINE && (prev != LinkState.ONLINE || requested)
