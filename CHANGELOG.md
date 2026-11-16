@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.5.4
+## v1.5.4
 - Board link: ESP-NOW starts again if Wi-Fi was off at boot or switched off later.
 - System screen shows the board link state (radio, key, HELLOs sent).
 
