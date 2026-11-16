@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <approval_format.h>
+#include <easy_keys.h>
 #include <nod_hold.h>
 #include <poll_backoff.h>
 
@@ -196,7 +197,12 @@ bool handleKey(const KeyEvent& e) {
         if (!nodShown) send("allow");
         else if (!gHoldKey) { gHoldKey = e.code; gHoldStart = millis(); gHoldId = gQueue.front().id; }  // key repeats must not restart the hold
     }
-    else if (e.code == KEY_N || e.code == KEY_ESC) send("deny");
+    else if (easy_keys::isRejectKey(e.code)) send("deny");  // DEL / N
+    else if (easy_keys::isLaterKey(e.code)) {               // L / ESC: leave it pending at Core, never deny
+        const std::string id = gQueue.front().id;
+        markDone(id); drop(id);
+        toast("Later: still waiting", DIM, 1200);
+    }
     // No session-wide approval shortcut: each action needs a deliberate decision.
     return true;
 }
@@ -270,11 +276,11 @@ void render(M5Canvas& g) {
     g.setTextColor(TEXT, PANEL);
     g.drawString(t, x + bw + 12, y + 70);
 
-    // Nod: a hold bar under the hint fills while Y/ENT stays down.
+    // Nod: a hold bar under the hint fills while ENTER/Y stays down.
     const bool hint = r.nod && gHintUntil && static_cast<int32_t>(millis() - gHintUntil) < 0;
     g.setTextColor(gPhase == Phase::Sending || hint ? WARN : ACCENT, PANEL);
-    g.drawString(gPhase == Phase::Sending ? "Sending..." : hint ? "hold Y to approve"
-                 : r.nod ? "HOLD Y/ENT  N/ESC stop" : "Y/ENT once  N/ESC deny", x + 6, y + (r.nod ? 80 : 85));
+    g.drawString(gPhase == Phase::Sending ? "Sending..." : hint ? easy_keys::kApprovalTapHint
+                 : r.nod ? easy_keys::kApprovalHoldFoot : easy_keys::kApprovalOnceFoot, x + 6, y + (r.nod ? 80 : 85));
     if (r.nod) {
         g.drawRect(x + 6, y + 90, w - 12, 7, ACCENT);
         if (gHoldKey) g.fillRect(x + 7, y + 91, (w - 14) * nod::holdPercent(millis() - gHoldStart) / 100, 5, OK);

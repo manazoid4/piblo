@@ -2,7 +2,7 @@
 //
 // A global modal (like the firmware-update confirm): when Core holds a pending
 // Claude Code permission request, any screen is covered by tool + summary +
-// countdown, and Y/ENTER allow, N/ESC deny, A allow-all for that session.
+// countdown, and Y/ENTER allow, DEL/N deny, ESC/L later (never deny) for that session.
 // Polling is one tiny GET /buddy/summary on the existing host worker, slow
 // while idle, a little faster while a request is on screen. See docs/APPROVALS.md.
 #pragma once

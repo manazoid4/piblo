@@ -3,6 +3,8 @@
 // cannot drift apart.
 //
 // Rules pinned here (native tests in tests/test_nod.cpp enforce them):
+//   * One key table everywhere (owner, 16 Nov): ENTER = yes/do, DEL = no/deny,
+//     ESC = back (never denies), hold SPACE = speak, L = later.
 //   * Only Y and ENTER can approve. No Easy Mode shortcut, remap,
 //     auto-repeat or "any key" path may approve, and phone text never can.
 //     A timeout or lost connection is a rejection (approvals.cpp owns that;
@@ -26,6 +28,8 @@ enum : uint8_t {
     KEY_ESC       = 0x29,
     KEY_BACKSPACE = 0x2A,
     KEY_SPACE     = 0x2C,
+    KEY_DELETE    = 0x4C,
+    KEY_L         = 0x0F,
     KEY_Y         = 0x1C,
     KEY_N         = 0x19,
     KEY_UP        = 0x52,
@@ -39,10 +43,26 @@ inline bool isApproveKey(uint8_t code) {
     return code == KEY_Y || code == KEY_ENTER;
 }
 
-// Explicit reject keys: N / ESC only.
+// Explicit deny keys: DEL (Backspace/Delete) or N. ESC never denies.
 inline bool isRejectKey(uint8_t code) {
-    return code == KEY_N || code == KEY_ESC;
+    return code == KEY_BACKSPACE || code == KEY_DELETE || code == KEY_N;
 }
+
+// "Later": leave the request pending (Core keeps it) and get out of the way.
+// ESC is back, so it does this too and never denies.
+inline bool isLaterKey(uint8_t code) {
+    return code == KEY_L || code == KEY_ESC;
+}
+
+// On-screen key text, in one place so tests can pin it. Budgets: approval
+// footer 36 chars (Font0 in the 232 px card), Home idle line 20, hints 33.
+constexpr const char* kApprovalHoldFoot = "HOLD ENTER yes  DEL no  L later";
+constexpr const char* kApprovalOnceFoot = "ENTER yes  DEL no  L later";
+constexpr const char* kApprovalTapHint  = "hold ENTER to approve";
+constexpr const char* kHomeIdleHint     = "Y: type on PC";
+constexpr const char* kFlowHintIdle     = "hold SPACE to speak  ESC back";
+constexpr const char* kFlowHintHold     = "release SPACE: type  ESC cancel";
+constexpr const char* kFlowHintTap      = "ENTER or SPACE: type  ESC cancel";
 
 // Essential navigation, reachable with no Fn on the Cardputer ADV.
 inline bool isEasyNavKey(uint8_t code) {
