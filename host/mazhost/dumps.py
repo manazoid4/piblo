@@ -14,6 +14,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable
 
+from .ledger import append_ledger
+
 STATUSES = ("new", "claimed", "done")
 _ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,119}$")
 _STARTER_PROJECTS = [
@@ -159,6 +161,10 @@ def save_dump(
         }
         _atomic_write(inbox / f"{dump_id}.md", _render(meta, body))
         _write_index(inbox)
+    try:
+        append_ledger("braindump", transcript or summary)
+    except (OSError, UnicodeError, ValueError):
+        pass
     return meta
 
 
