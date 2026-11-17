@@ -84,5 +84,6 @@ def test_mode_switch_restarts_and_persists(tmp_path):
 
 
 def test_ledger_format(tmp_path):
-    p = append_ledger("checkin", "hello", now=datetime(2026, 11, 16, 9, 5), directory=tmp_path)
-    assert p.name == "2026-11-16.md" and p.read_text() == "## 09:05 checkin\nhello\n\n"
+    p = append_ledger("checkin", "hello", now=datetime(2026, 11, 16, 9, 5), root=tmp_path)
+    assert p.name == "2026-11-16.md"
+    assert p.read_text() == "# Piblo ledger 2026-11-16\n\n## 09:05 checkin\nhello\n\n"
