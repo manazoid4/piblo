@@ -36,6 +36,8 @@ from .buddy_companion import install_companion_routes
 from .buddy_store import BuddyStore
 from .needs_routes import build_needs_router
 from .commands import parse_command
+from .compound import parse_compound
+from .compound_run import CompoundRunner
 from .config import Settings
 from .control_routes import install_control_routes
 from .core import CoreError, MazCore
@@ -227,6 +229,7 @@ def create_app(
     sessions = SessionStore(cfg.max_turns, cfg.session_ttl_minutes)
     memory_notes = MemoryNotes(resolve_data_dir(cfg))
     catchup = None  # set once buddy exists; answer() reads it at call time
+    compound_runner = None  # same: set once buddy and promises exist
     authority = AuthorityBroker(cfg)
     elevated_executor = ElevatedExecutor(cfg, authority)
     debug_capsules = DebugCapsules(cfg)
@@ -505,6 +508,12 @@ def create_app(
             }
         # Context Ask is informational: selected-screen context must never turn
         # an ordinary question into an executable PC/reminder command.
+        steps = None if pocket_context else parse_compound(refined.text)
+        if steps and compound_runner is not None:
+            started = compound_runner.start(refined.text, steps)
+            sessions.add_turn(session_id, refined.text, started["reply"])
+            return {"text": refined.text, "reply": started["reply"], "provider": "piblo-local",
+                    "actions": refined.actions, "compound": started["run"], "timings": {"llm_ms": 0}}
         command = None if pocket_context else parse_command(refined.text)
         if command:
             return deterministic_command(session_id, refined.text, command, refined.actions)
@@ -1271,7 +1280,14 @@ def create_app(
     onboarding = Onboarding(resolve_data_dir(cfg))
     catchup = Catchup(resolve_data_dir(cfg), buddy, inbox_dir(cfg) / "library")
     api.include_router(build_catchup_router(catchup))
-    api.include_router(build_promises_router(Promises(buddy)))
+    promise_keeper = Promises(buddy)
+    api.include_router(build_promises_router(promise_keeper))
+    compound_runner = CompoundRunner(buddy, promise_keeper, focus, pc_controller)
+
+    @api.get("/compound/last")
+    def compound_last():
+        return compound_runner.last or {"state": "none"}
+
     api.include_router(build_share_router(cfg, model_router))
     api.include_router(build_onboarding_router(onboarding))
     api.include_router(build_buddy_forms_router(onboarding=onboarding))
