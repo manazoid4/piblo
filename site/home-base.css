@@ -28,7 +28,7 @@ button, input { font: inherit; color: inherit; }
 .waitlist-hp { position: absolute; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 
 /* ---------- scroll reveal ---------- */
-.js [data-reveal] { opacity: 0; transform: translateY(18px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+.js [data-reveal] { transition: opacity .4s ease-out, transform .4s ease-out; }
 .js [data-reveal].in { opacity: 1; transform: none; }
 
 /* ---------- product render ----------
