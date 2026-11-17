@@ -449,7 +449,7 @@ public:
 
     bool onKey(const KeyEvent& e) override {
         const bool mine = dictate::active(this);
-        if (e.code == KEY_SPACE || e.code == _talk) {
+        if (e.code == KEY_SPACE || e.code == KEY_Y) {  // the hint promises both keys
             const bool listening = mine && dictate::state() == dictate::State::Listening;
             if (e.down && !mine) {
                 begin();
