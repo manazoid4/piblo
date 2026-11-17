@@ -14,6 +14,8 @@
 .plan-batch { font-weight: 600; margin: 4px 0 10px; }
 .plan > p:last-child { color: var(--band-2); line-height: 1.45; }
 .plan-plus { box-shadow: inset 0 0 0 3px #ffc93c; }
+.coming-later { text-align: center; padding: 24px 16px; color: var(--muted, #6b645b); font-size: 15px; }
+.coming-later h3 { font-size: 16px; margin: 0 0 4px; color: var(--ink, #2a1a12); }
 @media (min-width: 760px) {
   .pieces { grid-template-columns: repeat(3, 1fr); }
   .plans { grid-template-columns: 1fr 1fr; }

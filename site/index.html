@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#fbfaf7">
-  <meta name="description" content="Piblo is a small device for capturing thoughts and staying focused. Prototype in development; a Windows computer is currently required.">
-  <meta property="og:title" content="Piblo. A little more headspace.">
-  <meta property="og:description" content="A small device for capturing thoughts and staying focused. Prototype in development; a Windows computer is currently required.">
+  <meta name="description" content="Piblo is a proactive AI companion that keeps an eye on your day and asks before it acts. 100 units in batch one, each engraved. Prototype in development.">
+  <meta property="og:title" content="Piblo. It's already on it.">
+  <meta property="og:description" content="A proactive AI companion that keeps an eye on your day and asks before it acts. 100 units in batch one. Prototype in development.">
   <meta property="og:type" content="website">
   <link rel="canonical" href="https://piblo.co.uk/">
   <meta property="og:url" content="https://piblo.co.uk/">
@@ -18,8 +18,8 @@
   <meta property="og:site_name" content="Piblo">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@Piblo_UK">
-  <meta name="twitter:title" content="Piblo. A little more headspace.">
-  <meta name="twitter:description" content="A small device for capturing thoughts and staying focused. Prototype in development; a Windows computer is currently required.">
+  <meta name="twitter:title" content="Piblo. It's already on it.">
+  <meta name="twitter:description" content="A proactive AI companion that keeps an eye on your day and asks before it acts. 100 units in batch one. Prototype in development.">
   <meta name="twitter:image" content="https://piblo.co.uk/media/piblo-og.jpg">
   <meta name="twitter:image:alt" content="Piblo. Less screen. More life. Designed in the UK. piblo.co.uk">
   <title>Piblo. A little more headspace.</title>
@@ -37,7 +37,7 @@
     "description": "A small device for capturing thoughts and staying focused. Prototype in development.",
     "url": "https://piblo.co.uk/",
     "applicationCategory": "PersonalAssistant",
-    "slogan": "Say it once. Piblo handles the rest.",
+    "slogan": "It's already on it. It just asks first.",
     "brand": {
       "@type": "Brand",
       "name": "Piblo"
@@ -55,7 +55,7 @@
   <div class="wrap header-inner">
     <a class="logo" href="#top" aria-label="Piblo home"><img src="/media/brand/piblo-wordmark.svg" alt="Piblo" width="61" height="26"></a>
     <nav class="nav" aria-label="Site sections"><a href="#pieces">Two pieces</a><a href="#how">How it works</a><a href="#features">What it does</a><a href="#choose">Choose</a><a href="#faq">Questions</a></nav>
-    <a class="btn btn-primary btn-small" href="#waitlist" data-va="cta_click">Join the launch list</a>
+    <a class="btn btn-primary btn-small" href="/api/reserve" data-va="cta_click">Reserve &mdash; &pound;5</a>
   </div>
 </header>
 
@@ -66,7 +66,7 @@
       <h1>It&rsquo;s already on it. <span>It just asks first.</span></h1>
       <p class="lede">Piblo Home keeps an eye on your day and speaks up first. Piblo lifts out and comes with you. Nothing happens until you press YES.</p>
       <div class="actions">
-        <a class="btn btn-primary btn-big" href="#waitlist" data-va="cta_click">Join the launch list</a>
+        <a class="btn btn-primary btn-big" href="/api/reserve" data-va="cta_click">Reserve yours &mdash; &pound;5</a>
         <a class="btn btn-quiet btn-big" href="#proof">See the prototype story</a>
       </div>
     </div>
@@ -228,29 +228,24 @@
     <div class="wrap">
       <p class="sec-no"><b>06</b>Choose</p>
       <h2>Choose your Piblo</h2>
-      <p class="band-lede">Start with Piblo on its own, or add Piblo Home for the desk base and its own screen.</p>
+      <p class="band-lede">Batch one: 100 Piblo Standard units, each engraved with its number.</p>
       <div class="choices" data-reveal>
         <article class="choice">
           <div class="choice-img"><img src="/media/concept/piblo-solo.svg" alt="Concept drawing: Piblo Standard on its own, landscape body with screen, orange dial and YES key." loading="lazy" decoding="async"></div>
           <div class="choice-copy">
             <h3>Piblo Standard</h3>
-            <p class="price">£149</p>
-            <p class="choice-batch">Batch one: 100 units. £129 if you join the list early.</p>
-            <p>Piblo on its own. Works with the free Piblo app on your phone and Piblo Core on your PC.</p>
-          </div>
-        </article>
-        <article class="choice">
-          <div class="choice-img"><img src="/media/concept/pair-docked-plus.svg" alt="Concept drawing: Piblo Plus, Piblo docked in Piblo Home, the desk base with its own screen." loading="lazy" decoding="async"></div>
-          <div class="choice-copy">
-            <h3>Piblo Plus</h3>
-            <p class="price">£280</p>
-            <p class="choice-batch">Batch one: 50 units.</p>
-            <p>Two devices: Piblo plus Piblo Home. Home has 6 GB of on-board compute to run a capable AI locally, and hands bigger jobs to Piblo Core on your PC when needed.</p>
+            <p class="price">&pound;149</p>
+            <p class="choice-batch">Batch one: 100 units. &pound;129 if you reserve early.</p>
+            <p>Piblo on its own. Works with the free Piblo app on your phone and Piblo Core on your PC. Each batch-one unit is engraved with its number out of 100.</p>
+            <a class="btn btn-primary" href="/api/reserve">Reserve yours &mdash; &pound;5</a>
           </div>
         </article>
       </div>
-      <p class="ed-note">Pro is coming later: more local AI, 8–16 GB.</p>
-      <p class="fine">Prices include VAT. Batch one ships after the Kickstarter; dates to be confirmed.</p>
+      <div class="coming-later" data-reveal>
+        <h3>Coming later</h3>
+        <p>Piblo Home (the desk base with its own screen), Piblo Plus (Piblo + Home with 6 GB compute) and Piblo Pro (8&ndash;16 GB, full local AI).</p>
+      </div>
+      <p class="fine">Price includes VAT. Each batch-one Piblo is engraved &lsquo;N of 100&rsquo;. Ships after the Kickstarter; dates to be confirmed.</p>
     </div>
   </section>
 
@@ -258,7 +253,8 @@
     <div class="join-card">
       <p class="fine">Follow the build</p>
       <h2>Reserve your place</h2>
-      <p class="join-lede">Join the list to lock in £129 for Piblo Standard. Free to join, with no payment or commitment. No launch date has been set.</p>
+      <p class="join-lede">Join the list to lock in &pound;129 for Piblo Standard, or reserve now for &pound;5.</p>
+      <a class="btn btn-tomato btn-big" href="/api/reserve">Reserve &mdash; &pound;5</a>
       <form class="waitlist-form" id="waitlist-form" action="/api/waitlist" method="post" novalidate>
         <input type="hidden" name="ref" value="">
         <input type="hidden" name="source" value="">
@@ -297,7 +293,7 @@
     <p class="sec-no"><b>07</b>Questions</p>
     <h2>Straight answers</h2>
     <div class="faq"><details><summary>What works today?</summary><p>Piblo is a development prototype. Earlier tests demonstrated a Wi-Fi connection to a Windows computer and a saved spoken note. Voice capture reliability and response times still need work. The feature screens here are illustrations, and the features are still in testing.</p></details>
-      <details><summary>Do I need both pieces?</summary><p>No. Standard is Piblo on its own; Plus adds Piblo Home.</p></details>
+      <details><summary>Do I need both pieces?</summary><p>Batch one is Piblo Standard on its own. Piblo Home will be available later.</p></details>
       <details><summary>Does it work when I&rsquo;m out?</summary><p>Yes. It talks to your phone over Bluetooth, saves notes offline and syncs when it can.</p></details>
       <details><summary>What is Piblo Flow?</summary><p>Flow is voice typing for your connected computer, with tools to clean up dictated text. It is still in testing and needs a computer and speech service. It is not a finished standalone device feature.</p></details>
       <details><summary>Does it need a computer?</summary><p>Today, yes: the prototype pairs with a Windows computer. The plan is that a phone will be enough for everyday reminders and notes, with a computer giving you the best voice. Android comes next, then Linux, macOS and iPhone.</p></details>
@@ -305,7 +301,7 @@
       <details><summary>Can an AI do something without asking me?</summary><p>Reading, summarising and reminding just happen. Anything that sends, books or posts is designed to wait for you: Piblo will show who, what and how much on its own screen, then wait for your yes. That part is still in testing. Payments and deletions are not built yet.</p></details>
       <details><summary>How is it different from my phone?</summary><p>It does a few things and nothing else. No apps, no feeds, no notifications you didn&rsquo;t ask for. It shows one thing at a time and you answer with a real key, so you can deal with it and get back to your day.</p></details>
       <details><summary>Is it always listening?</summary><p>No. You press a key to talk. Piblo is local-first and needs no account to pair with your computer.</p></details>
-      <details><summary>How much will it cost?</summary><p>Piblo Standard is £149, or £129 if you join the list early. Piblo Plus is £280 for both devices. Prices include VAT; shipping and batch dates are to be confirmed.</p></details>
+      <details><summary>How much will it cost?</summary><p>Piblo Standard is &pound;149, or &pound;129 if you reserve early. Piblo Home and Plus are coming later. Price includes VAT; shipping and batch dates are to be confirmed.</p></details>
       <details><summary>When does the Kickstarter start, and when would it ship?</summary><p>There is no date yet. We&rsquo;ll only set one when the prototype is proven and the costs are checked, and backers will get an honest ship estimate based on real manufacturing progress.</p></details></div>
   </section>
 

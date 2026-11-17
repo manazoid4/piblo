@@ -27,7 +27,7 @@ test("all four pages have semantic structure and indexed identity", () => {
 test("all internal paths, static assets and hash targets resolve locally", () => {
   for (const [page, html] of Object.entries(contents)) {
     for (const url of [...attrs(html, "href"), ...attrs(html, "src")]) {
-      if (/^(https?:|mailto:|tel:|data:|\/_vercel\/)/.test(url)) continue; // /_vercel/* is served by Vercel at runtime
+      if (/^(https?:|mailto:|tel:|data:|\/_vercel\/|\/api\/)/.test(url)) continue; // /_vercel/* and /api/* are served by Vercel at runtime
       const [location, fragment] = url.split("#", 2);
       const route = location.startsWith("/") ? location : location ? (page + location) : page;
       if (location) assert.ok(existsSync(locallyResolve(route)), page + " missing " + route);
@@ -188,9 +188,10 @@ test("homepage structure: screen cards replace phone frames, every image has alt
   assert.doesNotMatch(html, /class="device/);
   for (const tag of html.match(/<img[^>]*>/g) || []) assert.match(tag, /\salt="[^"]+"/, tag);
   const choose = html.slice(html.indexOf('id="choose"'), html.indexOf('id="waitlist"'));
-  assert.match(choose, /£149/);
-  assert.match(choose, /£280/);
-  assert.match(choose, /class="price"[^>]*>£149/);
+  assert.match(choose, /149/);
+  assert.doesNotMatch(choose, /£280/);
+  assert.match(choose, /class="price"/);
+  assert.match(choose, /Coming later/);
   assert.match(html, /Things it does before you ask/);
   assert.match(html, /Reserve your place/);
   assert.match(html, /Do I need both pieces\?/);
