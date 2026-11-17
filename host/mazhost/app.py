@@ -1271,7 +1271,8 @@ def create_app(
     async def feature_voice_command(text):
         return await run_in_threadpool(feature_commands.handle, text)
 
-    install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command)
+    install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command,
+                      stt=speech if isinstance(speech, SpeechToText) else None)
     # ------------------------------------------------------------ SUBTITLES
     install_subtitle_routes(api, subtitle_jobs)
 
