@@ -52,6 +52,7 @@ from .maker import install_maker_routes
 from .where import build_where_router
 from .memory_notes import (MAX_MEMORY_CHARS, NO_SECRETS, REDACTED, TOO_LONG, MemoryNotes, build_memory_router,
                            is_sensitive, parse_remember)
+from .ledger import build_ledger_router
 from .learning import Learning
 from .speaks_first import SpeaksFirst
 from .rescue import install_rescue_routes
@@ -1258,6 +1259,7 @@ def create_app(
     install_focus_routes(api, focus, buddy.sync_focus)
     api.include_router(build_where_router(cfg, buddy, focus))
     api.include_router(build_memory_router(memory_notes))
+    api.include_router(build_ledger_router())
     install_rescue_routes(api, security.authorize, resolve_data_dir(cfg))
     api.include_router(build_agent_router(
         AgentBuilder(cfg, SkillVault(cfg, model_router), resolve_data_dir(cfg), llm=model_router, buddy=buddy)))
