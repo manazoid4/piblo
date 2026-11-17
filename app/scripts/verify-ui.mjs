@@ -86,6 +86,12 @@ async function launch(env, onboardingDone) {
   const overflow = await page.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth }));
   check('no horizontal overflow at 900x700', overflow.scroll <= overflow.client + 1, `${overflow.scroll} <= ${overflow.client}`);
 
+  // Clicking Buddy in the title bar goes Home (it used to sit in a drag region and swallow the click).
+  await page.getByRole('button', { name: 'Piblo: go to Home' }).click();
+  const homeShown = await page.getByRole('heading', { name: 'Your Piblo' }).isVisible({ timeout: 5_000 }).catch(() => false);
+  const region = await page.evaluate(() => getComputedStyle(document.querySelector('.brand')).getPropertyValue('-webkit-app-region'));
+  check('Buddy click opens Home', homeShown && region !== 'drag', `home=${homeShown} region=${region}`);
+
   await app.close();
   m.close();
 }
