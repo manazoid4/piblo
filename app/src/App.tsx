@@ -176,10 +176,18 @@ function Shell() {
   return (
     <div className="shell">
       <header className="titlebar">
-        <div className="brand">
+        <button
+          type="button"
+          className="brand"
+          aria-label="Piblo: go to Home"
+          onClick={() => {
+            setSection('home');
+            setWelcome(false);
+          }}
+        >
           <img className="brand-icon" src={iconUrl} alt="" aria-hidden="true" />
           Piblo
-        </div>
+        </button>
         <span className="spacer" />
         <button type="button" className="btn sm ghost" aria-label="Jump anywhere (Ctrl+K)" onClick={() => setPaletteOpen(true)}>
           <Icon name="search" size={14} /> Jump <kbd style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>Ctrl+K</kbd>
