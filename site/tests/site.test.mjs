@@ -58,7 +58,7 @@ test("roadmap is a short honest page — no 21-package slop, no filter UI", () =
 
 test("homepage is a clean Kickstarter teaser — no fake claims, real waitlist", () => {
   const html = contents["/"];
-  assert.match(html, /Concept drawing/i);
+  assert.match(html, /working prototype/i); // Nov 17: no concept renders on the homepage until real prototype photos
   assert.match(html, /action="\/api\/waitlist"/);
   assert.match(html, /heading to Kickstarter/i);
   assert.doesNotMatch(html, /everything is for sale|preorder/i);
@@ -97,7 +97,7 @@ test("Vercel defensive headers and sitemap exclude private-readiness indexing", 
 test("concept A palette: labelled as concept, CSP-safe, real waitlist, tokens in sync, AA contrast", () => {
   const html = readFileSync(join(root, "index.html"), "utf8");
   const css = readFileSync(join(root, "styles.css"), "utf8");
-  assert.match(html, /Concept drawing/i);
+  assert.match(html, /working prototype/i); // Nov 17: no concept renders on the homepage until real prototype photos
   assert.match(html, /action="\/api\/waitlist"/);
   assert.doesNotMatch(html, /\son[a-z]+\s*=|style=|<style|<script(?![^>]*(?:\ssrc=|\s+type="application\/ld\+json"))/i);
   assert.equal(readFileSync(join(root, "tokens.css"), "utf8"), readFileSync(join(root, "..", "design", "tokens-a.css"), "utf8"));
@@ -118,7 +118,7 @@ test("films: muted, playsinline, no autoplay, labelled as concept, small enough 
     assert.match(tag, /poster="\/media\/[^"]+\.jpg"/);
     assert.match(tag, /preload="(none|metadata)"/);
   }
-  assert.match(html, /Concept drawing/);
+  assert.match(html, /working prototype/i);
   for (const src of html.match(/\/media\/[\w.-]+\.(mp4|webp|jpg)/g)) assert.ok(statSync(join(root, src)).size < 3_000_000, src + " is over 3 MB");
 });
 test("Piblo rebrand: piblo.co.uk canonical/og:url and no visible Nod brand text", () => {

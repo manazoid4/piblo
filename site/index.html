@@ -3,11 +3,11 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="color-scheme" content="dark">
-  <meta name="theme-color" content="#0f0c0a">
-  <meta name="description" content="Piblo Home sits on your desk, keeps an eye on your day and asks before it acts. Piblo lifts out and comes with you. Batch 01: Piblo Standard + Home at a £129 early price. Working prototype; the design shown is a concept.">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#ece8e1">
+  <meta name="description" content="Piblo Home sits on your desk, keeps an eye on your day and asks before it acts. Piblo lifts out and comes with you. Batch 01: Piblo Standard + Home at a £129 early price. Working prototype; hardware design in progress.">
   <meta property="og:title" content="Piblo. It's already on it.">
-  <meta property="og:description" content="Piblo Home keeps an eye on your day and asks before it acts. Batch 01: Piblo Standard + Home, £129 early price. Working prototype; concept design.">
+  <meta property="og:description" content="Piblo Home keeps an eye on your day and asks before it acts. Batch 01: Piblo Standard + Home, £129 early price. Working prototype; hardware design in progress.">
   <meta property="og:type" content="website">
   <link rel="canonical" href="https://piblo.co.uk/">
   <meta property="og:url" content="https://piblo.co.uk/">
@@ -19,19 +19,16 @@
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@Piblo_UK">
   <meta name="twitter:title" content="Piblo. It's already on it.">
-  <meta name="twitter:description" content="Piblo Home keeps an eye on your day and asks before it acts. Batch 01: Piblo Standard + Home, £129 early price. Working prototype; concept design.">
+  <meta name="twitter:description" content="Piblo Home keeps an eye on your day and asks before it acts. Batch 01: Piblo Standard + Home, £129 early price. Working prototype; hardware design in progress.">
   <meta name="twitter:image" content="https://piblo.co.uk/media/piblo-og.jpg">
   <meta name="twitter:image:alt" content="Piblo. Less screen. More life. Designed in the UK. piblo.co.uk">
   <title>Piblo. It's already on it. It just asks first.</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="/media/brand/piblo-icon-512.png">
-  <link rel="preload" as="image" href="/media/concept/piblo-home-concept.webp" type="image/webp">
-  <link rel="stylesheet" href="/home-base.css">
-  <link rel="stylesheet" href="/premium.css">
-  <link rel="stylesheet" href="/studio/studio.css">
+    <link rel="stylesheet" href="/home-base.css">
+  <link rel="stylesheet" href="/bright.css">
   <script src="/home.js"></script>
   <script defer src="/script.js"></script>
-  <script type="module" src="/studio/studio.js"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -55,169 +52,153 @@
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="header">
   <div class="wrap header-inner">
-    <a class="logo" href="#top" aria-label="Piblo home"><img src="/media/brand/piblo-wordmark-light.svg" alt="Piblo" width="61" height="26"></a>
-    <nav class="nav" aria-label="Site sections"><a href="#demos">See it work</a><a href="#why">Why Piblo</a><a href="#studio">App Studio</a><a href="#batch">Batch 01</a><a href="#faq">Questions</a></nav>
+    <a class="logo" href="#top" aria-label="Piblo home"><img src="/media/brand/piblo-wordmark.svg" alt="Piblo" width="61" height="26"></a>
+    <nav class="nav" aria-label="Site sections"><a href="#what">What it does</a><a href="#asks">Asks first</a><a href="#batch">Batch 01</a><a href="#faq">Questions</a></nav>
     <a class="btn btn-primary btn-small" href="/api/reserve" data-va="cta_click">Reserve &mdash; &pound;5</a>
   </div>
 </header>
 
 <main id="main">
   <section class="hero" id="top">
-    <div class="wrap hero-grid">
+    <div class="wrap hero-panel">
       <div>
-        <p class="eyebrow mono"><span class="pip"></span>Heading to Kickstarter &middot; no date set</p>
+        <p class="label status"><i></i>Heading to Kickstarter &middot; no date set</p>
         <h1>It&rsquo;s already on it. <span>It just asks first.</span></h1>
-        <p class="lede">Piblo Home sits on your desk and keeps an eye on your day. Say what you need; anything that changes something waits for one press of YES.</p>
+        <p class="lede">A small desk companion that keeps an eye on your day and waits for your YES before it does anything.</p>
         <div class="actions">
           <a class="btn btn-primary" href="/api/reserve" data-va="cta_click">Reserve your place &mdash; &pound;5</a>
-          <a class="btn btn-quiet" href="#demos">Watch it work &darr;</a>
+          <a class="btn btn-quiet" href="#waitlist">Get build notes</a>
         </div>
-        <p class="offer-line">Batch 01: <b>Piblo Standard + Home, &pound;129 early price.</b> The &pound;5 is refundable and separate.</p>
+        <p class="note">Batch 01: Piblo Standard + Home, &pound;129 early price.</p>
       </div>
-      <figure class="hero-fig">
-        <img src="/media/concept/piblo-home-concept.webp" width="1080" height="1346" decoding="async" fetchpriority="high" alt="Concept render of Piblo Home on a desk: a dark bronze body with a screen showing Piblo Buddy asking 'What do you need?', six app tiles (Reminders, Notes, Home, Timers, Messages, Focus), a back key and a YES key, and an amber light on its side.">
-        <span class="callout callout--a" aria-hidden="true"><i></i>4&ndash;5&Prime; screen</span>
-        <span class="callout callout--b" aria-hidden="true"><i></i>Physical YES key</span>
-        <figcaption>Concept drawing of Piblo Home, not a product photo. The working prototype today is a Cardputer and a Windows PC.</figcaption>
+      <figure class="live">
+        <div class="screen" aria-hidden="true">
+          <div class="card">
+            <div class="card-top"><span>piblo</span><span>08:12</span></div>
+            <p class="card-kicker">Your 8:12 is late</p>
+            <p class="card-title">Leave at 8:20 instead?</p>
+            <div class="card-keys"><span><b>YES</b>ok</span><span><b class="k-dim">L</b>later</span></div>
+          </div>
+          <div class="card">
+            <div class="card-top"><span>piblo</span><span>17:46</span></div>
+            <p class="card-kicker">Ask on Piblo</p>
+            <p class="card-title">Save Budget.ods and remind you at 8pm?</p>
+            <div class="card-keys"><span><b>YES</b>do it</span><span><b class="k-dim">DEL</b>no</span></div>
+          </div>
+          <div class="card">
+            <div class="card-top"><span>piblo &middot; focus</span><span>10:05</span></div>
+            <p class="card-kicker">Deep work</p>
+            <p class="big-time">24:59</p>
+            <div class="card-keys"><span><b>YES</b>pause</span><span><b class="k-dim">ESC</b>back</span></div>
+          </div>
+        </div>
+        <figcaption>Piblo screen designs. Photos of the printed prototype are coming soon.</figcaption>
       </figure>
     </div>
   </section>
 
-  <section class="rail" aria-label="At a glance">
-    <ul class="wrap">
-      <li><span class="mono">Asks first</span><b>A real YES key a website can&rsquo;t press for you</b></li>
-      <li><span class="mono">Yours</span><b>Notes stay on your own PC</b></li>
-      <li><span class="mono">Heavy lifting</span><b>Piblo Core on your Windows PC</b></li>
-      <li><span class="mono">Batch 01</span><b>Standard + Home &middot; &pound;129 early</b></li>
-    </ul>
-  </section>
-
-  <section class="sec" id="demos" aria-labelledby="demos-title">
+  <section class="sec" id="what" aria-labelledby="what-title">
     <div class="wrap">
       <div class="sec-head">
-        <p class="mono">01 &middot; Real runs</p>
-        <div>
-          <h2 id="demos-title">Two requests. One press of YES.</h2>
-          <p>Recorded on the working prototype: Piblo Core on a Windows 11 PC, reached the same way the handheld reaches it. No mock replies. Where the handheld itself wasn&rsquo;t in the run, we say so.</p>
-        </div>
+        <p class="label">What it does</p>
+        <h2 id="what-title">Three things, done well.</h2>
       </div>
-      <div class="demos">
-<!--DEMO1-->
-<!--DEMO2-->
+      <div class="tiles">
+        <article class="tile" data-reveal>
+          <div class="mini" aria-hidden="true"><span>Tonight 20:00</span><b>Finish Budget</b></div>
+          <h3>Holds you to it.</h3>
+          <p>&ldquo;Save this and remind me to finish it tonight.&rdquo; One sentence, one press, done.</p>
+          <span class="chip chip--ok">Works on the prototype</span>
+        </article>
+        <article class="tile" data-reveal>
+          <div class="mini" aria-hidden="true"><span>Before you ask</span><b>Train delayed 8 min</b></div>
+          <h3>Speaks up first.</h3>
+          <p>Trains, traffic and your next meeting, offered before you go looking.</p>
+          <span class="chip">In testing</span>
+        </article>
+        <article class="tile" data-reveal>
+          <div class="mini" aria-hidden="true"><span>Hold to speak</span><b>&ldquo;Move the review to Thursday&rdquo;</b></div>
+          <h3>Types for you.</h3>
+          <p>Speak, and the words land wherever your cursor is on your Windows PC.</p>
+          <span class="chip">In testing</span>
+        </article>
       </div>
     </div>
   </section>
 
-  <section class="sec on-light" id="why" aria-labelledby="why-title">
-    <div class="wrap">
+  <section class="sec" id="asks" aria-labelledby="asks-title">
+    <div class="wrap ask" data-reveal>
+      <div class="yes" aria-hidden="true"><span>YES</span></div>
       <div class="sec-head">
-        <p class="mono">02 &middot; Why not your phone?</p>
-        <div>
-          <h2 id="why-title">Fewer steps than unlocking your phone.</h2>
-          <p>Your phone can set a reminder. It can&rsquo;t see the spreadsheet you&rsquo;re in, save it and hold you to it in one sentence, without pulling you into a feed.</p>
-        </div>
-      </div>
-      <div class="diff">
-        <article data-reveal><p class="mono">Approval</p><h3>A key, not a pop-up.</h3><p>Anything that changes your PC, sends or books waits for a physical press. A message from the internet can&rsquo;t fake it; nothing runs if you ignore it.</p></article>
-        <article data-reveal><p class="mono">Privacy</p><h3>Your notes live on your PC.</h3><p>Reminders, notes and memory are plain files on your own computer. No account is needed to pair. Cloud AI is optional and switchable.</p></article>
-        <article data-reveal><p class="mono">Focus</p><h3>One thing at a time.</h3><p>No feed, no app store, no badges. It shows one card and you answer with a key, then get back to your day.</p></article>
-      </div>
-      <table class="truth">
-        <caption>What&rsquo;s real today</caption>
-        <tbody>
-          <tr><th>Save the open file + set a reminder, with one YES</th><td><span class="st st--ok">Works on the prototype</span> Shown above, on a Windows PC.</td></tr>
-          <tr><th>Reminders, promises and focus sessions</th><td><span class="st st--ok">Works on the prototype</span> Kept by Piblo Core on your PC.</td></tr>
-          <tr><th>Voice typing into any PC app (Flow)</th><td><span class="st st--test">In testing</span> Works on the prototype; speed and accuracy still being tuned.</td></tr>
-          <tr><th>Piblo Home hardware, 4&ndash;5&Prime; screen, front dock</th><td><span class="st st--plan">Concept</span> Design shown above. Not built or fit-tested yet.</td></tr>
-          <tr><th>Away from home over your phone</th><td><span class="st st--plan">Planned</span> Notes captured offline, synced later.</td></tr>
-        </tbody>
-      </table>
-    </div>
-  </section>
-
-  <section class="sec" id="buddy" aria-labelledby="buddy-title">
-    <div class="wrap buddy">
-      <figure data-reveal>
-        <img src="/media/piblo-buddy-family.webp" width="1200" height="670" loading="lazy" decoding="async" alt="Three Buddy characters: one in a green hooded cloak, one in a blue hoodie with bear ears, and a sprout holding a mug of hot chocolate.">
-      </figure>
-      <div>
-        <p class="mono eyebrow">03 &middot; Meet Buddy</p>
-        <h2 id="buddy-title">A small face for a quiet helper.</h2>
-        <p class="lede">Buddy lives at the top of Home&rsquo;s screen, reads the room and grows with what you do together. No feeding, no streaks, no guilt.</p>
-        <ul class="buddy-forms" aria-label="Buddy forms shown">
-          <li><b>Monk</b>Calm, for focus time</li>
-          <li><b>Night Owl</b>Cosy, for late nights</li>
-          <li><b>Seed</b>Where every Buddy starts</li>
+        <p class="label">Asks first</p>
+        <h2 id="asks-title">Nothing happens until you press it.</h2>
+        <ul class="points">
+          <li><div><b>A real key, not a pop-up.</b><span>Anything that changes your PC, sends or books waits for a physical press. A website can&rsquo;t press it for you.</span></div></li>
+          <li><div><b>You see exactly what.</b><span>Who, what and which file, on one screen. Ignore it and it quietly expires.</span></div></li>
+          <li><div><b>Your notes stay yours.</b><span>Reminders and notes are files on your own PC. No account needed to pair.</span></div></li>
         </ul>
-        <p class="demo-note">Concept art. Six forms are planned.</p>
       </div>
     </div>
   </section>
 
-  <section class="sec studio-sec" id="studio" aria-labelledby="studio-title">
+  <section class="sec" id="batch" aria-labelledby="batch-title">
     <div class="wrap">
       <div class="sec-head">
-        <p class="mono">04 &middot; App Studio</p>
-        <div>
-          <h2 id="studio-title">Make a tiny app. Try it right here.</h2>
-          <p>Pick an example, change it, and press the keys. These run in your browser now; putting your own apps on Piblo comes later.</p>
-        </div>
-      </div>
-      <div class="studio" data-studio></div>
-    </div>
-  </section>
-
-  <section class="sec on-light" id="batch" aria-labelledby="batch-title">
-    <div class="wrap">
-      <div class="sec-head">
-        <p class="mono">05 &middot; Batch 01</p>
-        <div>
-          <h2 id="batch-title">The first batch, proposed.</h2>
-          <p>We&rsquo;ll only set a campaign date once the hardware is proven and the costs are checked.</p>
-        </div>
+        <p class="label">Batch 01</p>
+        <h2 id="batch-title">The first batch, proposed.</h2>
       </div>
       <article class="batch" data-reveal>
-        <div class="batch-img"><img src="/media/concept/piblo-home-concept.webp" width="1080" height="1346" loading="lazy" decoding="async" alt="Concept drawing of Piblo Home with its screen and keys."></div>
-        <div class="batch-copy">
-          <p class="mono muted">Proposed bundle</p>
-          <h3>Piblo Standard + Piblo Home</h3>
+        <div class="batch-side">
+          <div>
+            <p class="label">Proposed bundle</p>
+            <h3>Piblo Standard + Piblo Home</h3>
+          </div>
           <p class="price"><b>&pound;129</b><span>early price, inc. VAT</span></p>
-          <ul class="inbox">
-            <li>Piblo Home: a desk base with a 4&ndash;5&Prime; screen and a simple front dock</li>
-            <li>Piblo Standard: the pocket piece that lifts out, with real keys and a YES key</li>
-            <li>Piblo Core: the free Windows app that does the heavy work</li>
-          </ul>
-          <div class="reserve-box"><b>The &pound;5 reservation</b>Refundable at any time before shipping. It&rsquo;s separate from the price and isn&rsquo;t taken off it. It gets you priority access and the &pound;129 early-price offer.</div>
           <a class="btn btn-primary" href="/api/reserve" data-va="cta_click">Reserve &mdash; &pound;5</a>
-          <p class="fine">Design, components and price may change before the campaign. No ship date yet. Electronics are designed around affordable ESP32-class parts, with demanding work on your PC.</p>
+        </div>
+        <div class="batch-main">
+          <ul class="inbox">
+            <li><b>Piblo Home</b><span>Desk base with a 4&ndash;5&Prime; screen and a simple front dock.</span></li>
+            <li><b>Piblo Standard</b><span>The pocket piece that lifts out, with real keys and a YES key.</span></li>
+            <li><b>Piblo Core</b><span>Free Windows app that does the heavy work.</span></li>
+          </ul>
+          <div class="reserve-box"><b>The &pound;5 reservation</b>Refundable any time before shipping. It&rsquo;s separate from the price and isn&rsquo;t taken off it. It gets you priority access and the &pound;129 early-price offer.</div>
+          <p class="fine">Hardware is in design; parts and price may change before the campaign. No ship date yet.</p>
         </div>
       </article>
     </div>
   </section>
 
-  <section class="sec" id="waitlist" aria-labelledby="join-title">
-    <div class="wrap join">
+  <section class="sec" id="faq" aria-labelledby="faq-title">
+    <div class="wrap end">
       <div>
-        <p class="mono eyebrow">Follow the build</p>
-        <h2 id="join-title">Not ready to reserve? Get the build notes.</h2>
-        <p>Short emails when something real changes: first printed shell, first Home screen, campaign date.</p>
-        <p class="join-alt">Prefer to talk? <a class="link" href="https://discord.gg/DaxywF3SQf" target="_blank" rel="noopener noreferrer" data-va="discord_click">Join the Discord</a>.</p>
+        <div class="sec-head">
+          <p class="label">Questions</p>
+          <h2 id="faq-title">Straight answers</h2>
+        </div>
+        <div class="faq">
+          <details><summary>What works today?</summary><p>A working prototype: an M5Stack Cardputer handheld talking to Piblo Core on a Windows PC. Reminders, promises, focus sessions and approvals run there today. Piblo Home and the final pocket piece are being designed and printed now.</p></details>
+          <details><summary>How does the &pound;5 reservation work?</summary><p>It&rsquo;s refundable any time before shipping: reply to your receipt or email info@piblo.co.uk. It isn&rsquo;t a deposit taken off the price. It gives you priority access and the &pound;129 early-price offer.</p></details>
+          <details><summary>Why not just use my phone?</summary><p>For a timer, use your phone. Piblo is for things that take several steps there: acting on what&rsquo;s open on your PC, holding you to promises, and approving actions with a key that can&rsquo;t be pressed remotely.</p></details>
+          <details><summary>Does it need a computer?</summary><p>Today, yes: Piblo Core runs on a Windows PC. Phone support is planned, starting with Android.</p></details>
+          <details><summary>Is it always listening?</summary><p>No. You press a key to talk. Nothing is recorded in the background.</p></details>
+          <details><summary>Is the code open?</summary><p>The source is public on GitHub and free for personal, non-commercial use (PolyForm Noncommercial).</p></details>
+          <details><summary>When does it ship?</summary><p>No date yet. We&rsquo;ll set one when the hardware is proven and quotes are in.</p></details>
+        </div>
       </div>
-      <div>
+      <aside class="join" id="waitlist" aria-labelledby="join-title">
+        <h3 id="join-title">Get the build notes</h3>
+        <p>Short emails when something real changes: first printed shell, first Home screen, campaign date.</p>
         <form class="waitlist-form" id="waitlist-form" action="/api/waitlist" method="post" novalidate>
           <input type="hidden" name="ref" value="">
           <input type="hidden" name="source" value="">
           <input class="waitlist-hp" type="text" name="piblo_hp_field" tabindex="-1" autocomplete="off" aria-hidden="true">
-          <label class="waitlist-label">
-            <span>Email</span>
+          <label class="waitlist-label"><span>Email</span>
             <input class="waitlist-input" type="email" name="email" placeholder="you@example.com" autocomplete="email" inputmode="email" aria-describedby="waitlist-status" required>
           </label>
-          <label class="waitlist-check">
-            <input type="checkbox" name="consent" value="yes" required>
-            <span>I am happy to receive Piblo updates by email. <a href="/privacy/" target="_blank" rel="noopener noreferrer">Privacy notice</a></span>
-          </label>
+          <label class="waitlist-check"><input type="checkbox" name="consent" value="yes" required><span>I am happy to receive Piblo updates by email. <a href="/privacy/" target="_blank" rel="noopener noreferrer">Privacy notice</a></span></label>
           <button class="btn btn-primary waitlist-submit" type="submit">Join the launch list</button>
-          <p class="waitlist-status" id="waitlist-status" aria-live="polite">We&rsquo;ll only email you about Piblo. Unsubscribe any time.</p>
+          <p class="waitlist-status" id="waitlist-status" aria-live="polite">Only about Piblo. Unsubscribe any time.</p>
         </form>
         <div class="share-box" id="share-box" hidden>
           <h3>Know someone who&rsquo;d like Piblo?</h3>
@@ -228,47 +209,17 @@
           </div>
           <p class="fine share-note" aria-live="polite"></p>
         </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="sec on-light" id="faq" aria-labelledby="faq-title">
-    <div class="wrap narrow">
-      <div class="sec-head">
-        <p class="mono">06 &middot; Questions</p>
-        <div><h2 id="faq-title">Straight answers</h2></div>
-      </div>
-      <div class="faq">
-        <details><summary>What works today?</summary><p>A working prototype: an M5Stack Cardputer handheld talking to Piblo Core on a Windows PC. Reminders, promises, focus sessions and approvals run there today, and the two runs above were recorded on it. Piblo Home and the final pocket piece are designs, not built yet.</p></details>
-        <details><summary>What&rsquo;s in Batch 01?</summary><p>The proposed bundle is Piblo Standard (the pocket piece) plus Piblo Home (the desk base), at a &pound;129 early price. Design, parts and price can still change before the campaign.</p></details>
-        <details><summary>How does the &pound;5 reservation work?</summary><p>It&rsquo;s refundable any time before shipping: reply to your receipt or email info@piblo.co.uk. It&rsquo;s separate from the price, not a deposit taken off it. It gives you priority access and the &pound;129 early-price offer.</p></details>
-        <details><summary>Why not just use my phone?</summary><p>For a timer, use your phone. Piblo is for the things that take several steps on a phone: acting on what&rsquo;s open on your PC, holding you to promises, and approving actions with a key that can&rsquo;t be pressed remotely, without pulling you into notifications.</p></details>
-        <details><summary>Does it need a computer?</summary><p>Today, yes: Piblo Core runs on a Windows PC and does the heavy work. Phone support is planned, starting with Android.</p></details>
-        <details><summary>Can an AI do something without asking me?</summary><p>Reading, summarising and reminding just happen. Anything that changes your PC, sends, books or posts waits for YES on Piblo, shows what it&rsquo;s about to do, and expires if you don&rsquo;t answer. Payments are not built.</p></details>
-        <details><summary>Is it always listening?</summary><p>No. You press a key to talk. Nothing is recorded in the background.</p></details>
-        <details><summary>Is the code open?</summary><p>The source is public on GitHub and free for personal, non-commercial use (PolyForm Noncommercial). It&rsquo;s not an OSI open-source licence.</p></details>
-        <details><summary>When does the Kickstarter start, and when would it ship?</summary><p>No date yet. We&rsquo;ll set one when the hardware is proven and quotes are in, and backers will get an honest ship estimate based on real manufacturing progress.</p></details>
-      </div>
-    </div>
-  </section>
-
-  <section class="sec" aria-labelledby="founder-title">
-    <div class="wrap founder">
-      <img src="/media/piblo-founder.webp" width="160" height="160" loading="lazy" decoding="async" alt="Maz, the founder of Piblo">
-      <div>
-        <h2 id="founder-title">Built by Maz. Shaped with you.</h2>
-        <p>Catching a thought shouldn&rsquo;t mean opening a screen full of distractions. I also run <a class="link" href="https://mazworks.uk/about">Maz Works</a>, building websites and practical software. Piblo is a working prototype today, with a Windows PC doing the heavy work, and there&rsquo;s still testing to do.</p>
-        <p><a class="link" href="/timeline/">Read the build timeline</a> &middot; <a class="link" href="/roadmap/">Roadmap</a></p>
-      </div>
+      </aside>
     </div>
   </section>
 </main>
 
 <footer class="footer">
   <div class="wrap footer-inner">
-    <a class="logo" href="#top" aria-label="Piblo home"><img src="/media/brand/piblo-wordmark-light.svg" alt="Piblo" width="61" height="26"></a>
-    <nav class="footer-links" aria-label="Footer"><a href="https://discord.gg/DaxywF3SQf" target="_blank" rel="noopener noreferrer">Discord</a><a href="https://github.com/manazoid4/piblo" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://x.com/Piblo_UK" target="_blank" rel="noopener noreferrer">X</a><a href="/roadmap/">Roadmap</a><a href="/timeline/">Timeline</a><a href="mailto:info@piblo.co.uk">Contact</a><a href="/privacy/">Privacy</a></nav>
-    <p class="legal">Designed in the UK. Working prototype; product designs shown are concepts. Independent, not affiliated with any other brand.</p>
+    <a class="logo" href="#top" aria-label="Piblo home"><img src="/media/brand/piblo-wordmark.svg" alt="Piblo" width="61" height="26"></a>
+    <p class="founder-line">Built by Maz, who also runs <a class="link" href="https://mazworks.uk/about">Maz Works</a>. <a class="link" href="/timeline/">Build timeline</a> &middot; <a class="link" href="/roadmap/">Roadmap</a></p>
+    <nav class="footer-links" aria-label="Footer"><a href="https://discord.gg/DaxywF3SQf" target="_blank" rel="noopener noreferrer">Discord</a><a href="https://github.com/manazoid4/piblo" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://x.com/Piblo_UK" target="_blank" rel="noopener noreferrer">X</a><a href="mailto:info@piblo.co.uk">Contact</a><a href="/privacy/">Privacy</a></nav>
+    <p class="legal">Designed in the UK. Working prototype; hardware in design. Independent, not affiliated with any other brand.</p>
   </div>
 </footer>
 </body>
