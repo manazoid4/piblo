@@ -21,6 +21,7 @@ python scripts/piblo_remote.py open settings        # open an app by id, prints 
 - Never print or commit the token. Flashing firmware needs Maz's explicit OK each time.
 
 ## Rules
+- Before writing a firmware driver, audio pipeline, pairing flow or UI state machine, check the reference repos in `docs/REFERENCE-REPOS.md` (`bash scripts/clone_refs.sh`). Copy only from MIT/BSD/Apache code, with attribution; GPL/AGPL repos are read-only.
 - The product is Piblo. Never show Nod, MAZ, Maz Core, Maz Pocket or Cardputer to users.
 - Never show Maz's location beyond "UK" in anything public.
 - Protocol contracts live in `docs/protocol/`. Change one only with the orchestrator, because Core, firmware, Android and the app all build against them.
