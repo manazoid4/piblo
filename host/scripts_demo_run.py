@@ -88,6 +88,8 @@ if which in ("both", "1"):
             break
     time.sleep(2)
     note("window", title=foreground_window()["title"])
+    if "Budget" not in foreground_window()["title"]:
+        sys.exit("Budget.ods is not in front; not typing into another window")
     type_text("Phone\n42\n")                    # an unsaved edit, like real work in progress
     time.sleep(1)
     before = sheet.stat().st_mtime
