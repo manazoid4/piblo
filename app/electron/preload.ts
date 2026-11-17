@@ -35,6 +35,7 @@ const bridge: PibloBridge = {
   audio: (path, body) => invoke('api:audio', path, body),
   settings: { get: () => invoke('settings:get'), set: (patch) => invoke('settings:set', patch) },
   env: { get: () => invoke('env:get'), set: (key, value) => invoke('env:set', key, value) },
+  usage: { get: () => invoke('usage:get'), setKey: (key) => invoke('usage:set-key', key) },
   openExternal: (url) => invoke('shell:open-external', url),
   saveScreenshot: (png) => invoke('screen:save', png),
   onPairingPending(cb) {

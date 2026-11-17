@@ -42,6 +42,8 @@ uint32_t gNextOutboxTry = 0;
 uint32_t gOutboxBackoffMs = 15000;
 uint32_t gNextBeamPoll = 0;
 uint32_t gNextCoreInfo = 0;
+bool gConfirmAfterCheck = false;  // a pushed "update" is waiting for fresh CoreInfo
+bool gWasWifi = false;
 bool gSystemRequested = false;
 bool gWorkRequested = false;
 bool gTodayRequested = false;
@@ -352,7 +354,13 @@ void update() {
             }
             case host_worker::JobKind::CoreInfo: {
                 host::CoreInfo r;
-                if (host_worker::takeCoreInfoResult(r)) host::setCoreInfo(r);
+                if (host_worker::takeCoreInfoResult(r)) {
+                    host::setCoreInfo(r);
+                    if (gConfirmAfterCheck) {
+                        gConfirmAfterCheck = false;
+                        shell::confirmFwUpdate();  // opens the confirm, or says the firmware is current
+                    }
+                }
                 break;
             }
             case host_worker::JobKind::SystemStatus: {
@@ -385,8 +393,12 @@ void update() {
         refreshCounts();
     }
 
+    const bool wifiUp = WiFi.status() == WL_CONNECTED;
+    if (wifiUp && !gWasWifi) gNextCoreInfo = millis() + 2000u;  // Wi-Fi (re)connected: check firmware soon
+    gWasWifi = wifiUp;
+
     if (host_worker::state() != host_worker::State::Idle ||
-        !host::configured() || WiFi.status() != WL_CONNECTED)
+        !host::configured() || !wifiUp)
         return;
 
     if (gSystemRequested) {
@@ -418,6 +430,11 @@ void update() {
         gNextBeamPoll = millis() + nod::backoffMs(Cfg.fieldMode ? 45000u : 15000u, offlinePolls, 30000u);
         host_worker::submitBeamPull();
     }
+}
+
+void checkFirmwareNow(bool confirmAfter) {
+    gNextCoreInfo = millis();
+    if (confirmAfter) gConfirmAfterCheck = true;
 }
 
 void armContext(const std::string& appId, const std::string& snapshot) {

@@ -72,6 +72,7 @@ struct Settings {
     // Easy Mode: beginner home, plain words, no Fn needed. On by default so a
     // first-time user gets it; the classic home is one toggle away.
     bool        easyMode = true;
+    bool        autoUpdate = false;  // install staged firmware by itself while charging and idle
 
     // Four quick keys are stable action IDs from a fixed list; they are never
     // shell commands. CALL remains quick slot 1 by default.

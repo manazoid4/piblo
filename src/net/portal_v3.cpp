@@ -8,6 +8,7 @@
 #include "../audio/sfx.h"
 #include "../audio/voice.h"
 #include "../core/approvals.h"
+#include "../core/field.h"
 #include "../core/notify.h"
 #include "../input/keyboard.h"
 #include "../core/launcher.h"
@@ -272,6 +273,7 @@ String statusJson(bool unlocked) {
     String j;
     j.reserve(2100);
     j += "{\"ok\":true,\"version\":\"" NOD_FW_VERSION "\"";
+    j += ",\"kind\":\"cardputer\"";  // lets Core/MCP label the board instead of guessing from geometry
     j += ",\"token_id\":\"" + jsonEscape(tokenId()) + "\"";
     j += ",\"unlocked\":"; j += unlocked ? "true" : "false";
     j += ",\"app\":\"" + jsonEscape(shell::currentId()) + "\"";
@@ -349,6 +351,7 @@ ActionResult runAction(const String& body) {
         gUpdateAt = millis() + 800;  // let this reply leave before opening the confirmation
         return {202, "Confirm the update on Piblo."};
     }
+    if (action == "fwcheck") { field::checkFirmwareNow(false); return {202, "Checking for updates."}; }
     if (action.startsWith("key:")) {  // key:<hid code>,<ascii>,<mods> from the hub's live view
         const String rest = action.substring(4);
         const int a = rest.indexOf(','), b = rest.indexOf(',', a + 1);
@@ -714,7 +717,7 @@ void update() {
     if (gUpdateAt && static_cast<int32_t>(millis() - gUpdateAt) >= 0) {
         gUpdateAt = 0;
         if (gClient) closeClient();
-        shell::confirmFwUpdate();
+        field::checkFirmwareNow(true);  // fresh CoreInfo first, then the confirm opens
         shell::invalidate();
     }
     if (WiFi.status() != WL_CONNECTED) {

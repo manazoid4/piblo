@@ -146,7 +146,7 @@ def test_flow_due_done_undo_later_and_cards(stack, monkeypatch):
 
 def test_three_cards_and_unknown_or_foreign_ids(stack, monkeypatch):
     c, buddy = stack()
-    a = confirm(c, note="a", due=future(60)).json()["id"]
+    a = confirm(c, note="a", due=future(90)).json()["id"]
     b = confirm(c, note="b", due=future(120)).json()["id"]
     confirm(c, note="c", due=future(86400))
     real = time.time
@@ -164,7 +164,7 @@ def test_three_cards_and_unknown_or_foreign_ids(stack, monkeypatch):
 def test_survives_core_restart_without_losing_or_renagging(stack, monkeypatch):
     c, _ = stack()
     pending = confirm(c, note="still to do", due=future(3600)).json()["id"]
-    finished = confirm(c, note="already done", due=future(60)).json()["id"]
+    finished = confirm(c, note="already done", due=future(90)).json()["id"]
     real = time.time
     monkeypatch.setattr(time, "time", lambda: real() + 120)
     c.get("/promises/today")

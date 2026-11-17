@@ -71,6 +71,15 @@ export interface UpdateStatus {
   version: string;
 }
 
+export type DayTotal = { day: string; tokens: number };
+
+export interface UsageSnapshot {
+  generatedAt: string;
+  claude: { status: 'ok' | 'not-connected'; fiveHour: { tokens: number; start: string; end: string } | null; week: { tokens: number }; daily: DayTotal[] };
+  codex: { status: 'ok' | 'not-connected'; today: number; week: number; daily: DayTotal[] };
+  openrouter: { status: 'ok' | 'not-connected' | 'error'; totalCredits?: number; totalUsage?: number; message?: string };
+}
+
 export interface PibloBridge {
   platform: string;
   version: string;
@@ -97,6 +106,11 @@ export interface PibloBridge {
   env: {
     get(): Promise<CoreEnvView>;
     set(key: EnvKey, value: string): Promise<{ ok: boolean; message: string }>;
+  };
+  usage: {
+    get(): Promise<UsageSnapshot>;
+    /** Saves (or clears with '') the OpenRouter key; it is never sent back to the page. */
+    setKey(key: string): Promise<boolean>;
   };
   openExternal(url: string): Promise<void>;
   /** Main-process pairing poll (5s cadence) forwards the pending list to the renderer. */
