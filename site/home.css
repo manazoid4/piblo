@@ -239,6 +239,9 @@ section[id] { scroll-margin-top: 116px; }
 .tile-stage .scr-keys b { border-color: rgba(29,27,24,.25); }
 .tile-stage .scr-list--lined dt, .tile-stage .scr-list--lined dd { border-top-color: rgba(29,27,24,.12); }
 
+.tile-stage { display: flex; justify-content: center; overflow: hidden; padding: 8px 0 4px; }
+.tile-stage .device { --u: 2.9px; }
+
 /* A concrete prototype moment, using the existing site colours and type. */
 .proof { display: grid; gap: 24px; padding-top: 72px; padding-bottom: 24px; align-items: center; }
 .proof h2 { max-width: 13ch; margin: 16px 0; text-align: left; }
@@ -275,7 +278,7 @@ section[id] { scroll-margin-top: 116px; }
 .steps li:nth-child(2) { background: #e2f0e4; }
 .steps li:nth-child(3) { background: #f9e5d7; }
 .tile { box-shadow: none; border: 1px solid var(--line); }
-.tile:nth-child(2) .tile-stage, .tile:nth-child(3) .tile-stage { background: #e1eee1; }
+.tile-stage { background: #e1eee1; border-radius: 18px; }
 .proof-example { background: #e0efdf; }
 .join-card { background: #f9e5d7; box-shadow: none; }
 .join-card .waitlist-input { background: #fffdfa; }

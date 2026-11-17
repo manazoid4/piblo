@@ -113,10 +113,9 @@ button, input { font: inherit; color: inherit; }
   position: absolute; inset: 3em; border-radius: 2.4em; overflow: hidden; display: flex; flex-direction: column; padding: 2.6em 3.2em 2.8em;
   background: radial-gradient(130% 90% at 50% -10%, #3b281a 0%, var(--scr-bg) 68%);
   color: var(--scr-ink); font-family: var(--font-mono);
-  box-shadow: 0 0 6em rgba(255,226,205,.1);
-  animation: scr-glow 5s ease-in-out infinite alternate;
+  box-shadow: none;
+  animation: none;
 }
-@keyframes scr-glow { from { box-shadow: 0 0 4em rgba(255,226,205,.07); } to { box-shadow: 0 0 9em rgba(255,226,205,.2); } }
 .scr-bar { display: flex; align-items: center; gap: .9em; font-size: 2.3em; color: var(--scr-dim); letter-spacing: .06em; }
 .scr-bar span:first-child { margin-right: auto; color: var(--scr-ink); }
 .scr-bat { width: 1.9em; height: .9em; border: .12em solid var(--scr-dim); border-radius: .22em; position: relative; }
@@ -128,7 +127,7 @@ button, input { font: inherit; color: inherit; }
 .scr-keys b { display: inline-block; min-width: 1.7em; padding: .12em .3em; margin-right: .35em; text-align: center; font-weight: 600; color: var(--scr-ink); border: .1em solid rgba(255,244,224,.3); border-radius: .35em; }
 .scr-keys span:first-child b { background: var(--tomato); border-color: var(--tomato); color: #2a1208; }
 .scr-label { font-size: 2.3em; letter-spacing: .12em; text-transform: uppercase; color: var(--scr-dim); }
-.scr-label--hot { color: var(--tomato); }
+.scr-label--hot { color: #ffa285; }
 .scr-label--ok { color: var(--mint); }
 .scr-title { font-family: var(--font-sans); font-weight: 600; font-size: 5.4em; line-height: 1.1; letter-spacing: -.02em; }
 .scr-title--xl { font-size: 7.4em; letter-spacing: -.03em; }
