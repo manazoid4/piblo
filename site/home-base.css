@@ -1,4 +1,4 @@
-/* Shared by both preview directions: fonts, the CSS product render, the device-screen mocks,
+/* Shared by both preview directions: fonts, the device-screen mocks,
    scroll reveal and the few form bits the waitlist script relies on. Page look lives in a.css / b.css. */
 @font-face { font-family: "Manrope"; src: url("/fonts/manrope-variable.ttf") format("truetype"); font-weight: 200 800; font-display: swap; }
 
@@ -31,84 +31,7 @@ button, input { font: inherit; color: inherit; }
 .js [data-reveal] { transition: opacity .4s ease-out, transform .4s ease-out; }
 .js [data-reveal].in { opacity: 1; transform: none; }
 
-/* ---------- product render ----------
-   1em = 1 mm of the concept device (70 x 120). Set --u to scale it. */
-.device {
-  --u: 3.6px;
-  --dv-hi: #ecebe6; --dv-mid: #d9d6ce; --dv-lo: #bdb9af; --dv-spec: rgba(255,255,255,.95); --dv-edge: rgba(255,255,255,.45);
-  --k-hi: #403f3c; --k-lo: #1d1c1b; --k-ink: #e6e3dc; --k-spec: rgba(255,255,255,.2); --k-drop: rgba(0,0,0,.32);
-  position: relative; flex: none; width: 70em; height: 120em; font-size: var(--u); font-family: var(--font-mono);
-}
-.device--ceramic {
-  --dv-hi: #fefdfb; --dv-mid: #f1eee8; --dv-lo: #d9d5cc;
-  --k-hi: #fdfcfa; --k-lo: #ddd9d0; --k-ink: #55524c; --k-spec: rgba(255,255,255,1); --k-drop: rgba(60,50,40,.22);
-}
-.device--alu {
-  --dv-hi: #eceef0; --dv-mid: #c9ccd0; --dv-lo: #9da1a7; --dv-edge: rgba(255,255,255,.7);
-  --k-hi: #f1f2f3; --k-lo: #c3c6ca; --k-ink: #3d3f42; --k-spec: rgba(255,255,255,1); --k-drop: rgba(30,35,40,.3);
-}
-.device--graphite {
-  --dv-hi: #55555a; --dv-mid: #2f2f32; --dv-lo: #19191b; --dv-spec: rgba(255,255,255,.28); --dv-edge: rgba(255,255,255,.12);
-  --k-hi: #3a3a3d; --k-lo: #161617; --k-ink: #d9d7d2; --k-spec: rgba(255,255,255,.16); --k-drop: rgba(0,0,0,.5);
-}
-.dv-body {
-  position: absolute; inset: 0; border-radius: 9em;
-  background: linear-gradient(152deg, var(--dv-hi) 0%, var(--dv-mid) 42%, var(--dv-lo) 100%);
-  box-shadow:
-    inset 0 .5em .5em -.15em var(--dv-spec),
-    inset 0 -1em 1.2em -.4em rgba(0,0,0,.2),
-    inset .5em 0 .8em -.5em rgba(255,255,255,.5),
-    inset -.6em 0 .9em -.5em rgba(0,0,0,.14),
-    inset 0 0 0 .12em var(--dv-edge),
-    0 .5em 1em rgba(24,20,16,.1),
-    0 3.5em 5em -1.5em rgba(24,20,16,.34),
-    0 8em 10em -4em rgba(24,20,16,.26);
-}
-.device--alu .dv-body {
-  background:
-    repeating-linear-gradient(90deg, rgba(255,255,255,.07) 0 1px, rgba(0,0,0,.035) 1px 2px),
-    linear-gradient(152deg, var(--dv-hi) 0%, var(--dv-mid) 42%, var(--dv-lo) 100%);
-}
-/* speaker slot */
-.dv-body::before {
-  content: ""; position: absolute; top: 2.5em; left: 50%; width: 11em; height: .9em; margin-left: -5.5em; border-radius: 1em;
-  background: rgba(0,0,0,.42); box-shadow: inset 0 .2em .25em rgba(0,0,0,.5), 0 .12em 0 rgba(255,255,255,.4);
-}
-.dv-glass {
-  position: absolute; left: 4em; right: 4em; top: 6em; height: 52em; border-radius: 5em;
-  background: linear-gradient(160deg, #2b2b2d 0%, #0d0d0e 38%, #050505 100%);
-  box-shadow: inset 0 0 0 .14em rgba(255,255,255,.07), 0 .16em 0 rgba(255,255,255,.5), 0 -.12em 0 rgba(0,0,0,.28);
-}
-.dv-glass::after { /* soft window reflection across the glass */
-  content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
-  background: linear-gradient(118deg, rgba(255,255,255,.09) 0%, rgba(255,255,255,.025) 30%, rgba(255,255,255,0) 30.4%);
-}
-.dv-nav { position: absolute; left: 4em; right: 4em; top: 61.2em; height: 8.6em; display: grid; grid-template-columns: 1fr 1fr 9.4em 1fr 1fr; gap: 1.1em; }
-.dv-nav i, .dv-keys i {
-  display: flex; align-items: center; justify-content: center; font-style: normal; font-weight: 600; font-size: 2.5em; line-height: 1; color: var(--k-ink);
-  border-radius: .55em .55em .8em .8em;
-  background: linear-gradient(var(--k-ang, 180deg), var(--k-hi), var(--k-lo));
-  box-shadow: inset 0 .1em .08em var(--k-spec), inset 0 -.16em .16em rgba(0,0,0,.2), 0 .14em .12em var(--k-drop), 0 0 0 .04em rgba(0,0,0,.16);
-}
-.dv-nav i { border-radius: .8em; }
-.dv-nav b { /* trackpad */
-  border-radius: 2.2em; background: radial-gradient(circle at 50% 35%, #2c2c2e, #0a0a0b 75%);
-  box-shadow: inset 0 0 0 .2em rgba(255,255,255,.08), inset 0 0 0 1.5em rgba(0,0,0,.25), 0 .16em 0 rgba(255,255,255,.4), 0 0 0 .1em rgba(0,0,0,.25);
-}
-.dv-keys { position: absolute; left: 4em; right: 4em; top: 72.4em; bottom: 5.2em; display: grid; grid-template-columns: repeat(10, 1fr); grid-template-rows: repeat(4, 1fr); gap: 1.15em .95em; }
-/* sculpted like a thumb keyboard: each half leans towards the centre ridge */
-.dv-keys i:nth-child(10n+1), .dv-keys i:nth-child(10n+2), .dv-keys i:nth-child(10n+3), .dv-keys i:nth-child(10n+4), .dv-keys i:nth-child(10n+5) { --k-ang: 118deg; }
-.dv-keys i:nth-child(10n+6), .dv-keys i:nth-child(10n+7), .dv-keys i:nth-child(10n+8), .dv-keys i:nth-child(10n+9), .dv-keys i:nth-child(10n) { --k-ang: 242deg; }
-.dv-keys .k-space { grid-column: span 4; --k-ang: 180deg; }
-.dv-keys .k-mic { --k-ang: 180deg; --k-hi: #f47a57; --k-lo: #dc4a26; --k-spec: rgba(255,255,255,.45); color: #2a1208; }
-.dv-keys .k-sm { font-size: 1.9em; border-radius: .72em .72em 1.05em 1.05em; }
-/* bigger-screen edition: taller glass, no nav row */
-.device--pro .dv-glass { height: 62em; }
-.device--pro .dv-nav { display: none; }
-.device--pro .dv-keys { top: 71.5em; grid-template-rows: repeat(4, 1fr); }
-.device--mini .dv-keys i, .device--mini .dv-nav i { color: transparent; }
-
-/* ---------- device screen ---------- */
+/* ---------- screen cards ---------- */
 .scr {
   position: absolute; inset: 3em; border-radius: 2.4em; overflow: hidden; display: flex; flex-direction: column; padding: 2.6em 3.2em 2.8em;
   background: radial-gradient(130% 90% at 50% -10%, #3b281a 0%, var(--scr-bg) 68%);
@@ -151,16 +74,6 @@ button, input { font: inherit; color: inherit; }
 .scr-list--lined dt { padding-right: 1.6em; }
 .scr-list--lined dt { padding-right: 1.6em; }
 .scr-list--lined dt, .scr-list--lined dd { padding-top: .62em; padding-bottom: .62em; border-top: .06em solid rgba(242,239,230,.14); }
-
-/* cropped top of the device, for feature sections */
-.device.shot { height: 60.5em; }
-.shot .dv-body { bottom: -30em; }
-.k-mic::after { content: ""; width: .5em; height: .5em; border-radius: 50%; background: currentColor; opacity: .75; }
-.device--mini .scr-bar { font-size: 3.4em; }
-.device--mini .scr-label { font-size: 3.6em; }
-.device--mini .scr-buddy { width: 14em; height: 12.6em; }
-.device--mini .scr-main { align-items: center; gap: 3em; }
-.device--mini .scr { animation: none; }
 
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }

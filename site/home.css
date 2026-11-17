@@ -62,15 +62,6 @@ section[id] { scroll-margin-top: 116px; }
 .hero-fig { margin-top: 30px; }
 .stage { background: radial-gradient(70% 55% at 50% 30%, var(--stage-glow), transparent 70%), linear-gradient(180deg, var(--stage-a), var(--stage-b)); }
 .hero-stage { display: flex; justify-content: center; padding: 40px 0 60px; border-radius: 32px; overflow: hidden; }
-.hero-stage .device { --u: 3.6px; }
-.device--tilt { transform: perspective(1500px) rotateY(-17deg) rotateX(7deg) rotate(3deg); }
-/* a visible side wall, so the tilted device has thickness */
-.device--tilt .dv-body {
-  box-shadow:
-    inset 0 .5em .5em -.15em var(--dv-spec), inset 0 -1em 1.2em -.4em rgba(0,0,0,.16), inset .5em 0 .8em -.5em rgba(255,255,255,.5), inset 0 0 0 .12em var(--dv-edge),
-    .5em .25em 0 #e4e0d8, 1em .5em 0 #d8d3ca, 1.5em .75em 0 #cbc5ba, 2em 1em 0 #bdb6aa, 2.4em 1.2em .2em #aca598,
-    5em 7em 6em -1em rgba(40,30,18,.3), 9em 14em 12em -4em rgba(40,30,18,.28);
-}
 .hero-fig figcaption { margin-top: 14px; font-size: 13px; color: var(--ink-3); }
 
 /* sections */
@@ -88,13 +79,12 @@ section[id] { scroll-margin-top: 116px; }
 .needs strong { color: var(--ink); }
 
 /* feature grid */
-.tiles { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.tiles { display: grid; grid-template-columns: 1fr; gap: 14px; }
 .tile { display: flex; flex-direction: column; padding: 20px 20px 18px; background: var(--card); border-radius: 22px; box-shadow: var(--shadow); }
 .tile h3 { font-size: 18px; letter-spacing: -.02em; line-height: 1.2; margin-bottom: 8px; }
 .tile > p { color: var(--ink-2); font-size: 15.5px; line-height: 1.45; }
 .tile-status { margin-top: auto; padding-top: 14px; align-self: flex-start; }
 .legend { margin: 0 auto 24px; max-width: 34em; text-align: center; font-size: 14.5px; color: var(--ink-2); }
-@media (max-width: 359px) { .tiles { grid-template-columns: 1fr; } }
 
 /* compact grid */
 .key { display: grid; justify-content: center; gap: 6px; margin: -8px 0 20px; font-size: 13.5px; color: var(--ink-2); }
@@ -124,15 +114,6 @@ section[id] { scroll-margin-top: 116px; }
 .band { margin-top: 48px; padding: 48px 0; background: var(--band); color: var(--band-ink); --chip-line: var(--band-line); }
 .band h2 { margin-bottom: 10px; }
 .band-lede { text-align: center; color: var(--band-2); margin-bottom: 22px; }
-.editions { display: grid; gap: 12px; }
-.edition { display: grid; grid-template-columns: 96px 1fr; align-items: center; gap: 14px; padding: 12px 18px 12px 10px; border-radius: 24px; background: var(--band-card); box-shadow: inset 0 0 0 1px var(--band-line); }
-.ed-stage { display: flex; justify-content: center; padding: 6px 0; }
-.ed-stage .device { --u: 1px; }
-.ed-tag { font-family: var(--font-mono); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--band-2); }
-.edition-pro .ed-tag { color: var(--accent-ink); }
-.edition h3 { margin: 6px 0 8px; font-size: 20px; letter-spacing: -.02em; }
-.ed-copy > p:last-child { font-size: 15.5px; line-height: 1.45; color: var(--band-2); }
-.device--graphite .dv-body { box-shadow: inset 0 .5em .5em -.15em var(--dv-spec), inset 0 0 0 .14em rgba(255,255,255,.2), 0 3em 5em -1.5em rgba(40,30,18,.35); }
 .ed-note { margin: 24px auto 8px; max-width: 40em; text-align: center; font-size: 15px; }
 .band .fine { text-align: center; color: var(--band-2); }
 
@@ -181,7 +162,6 @@ section[id] { scroll-margin-top: 116px; }
   .btn-big { min-height: 54px; padding: 0 28px; font-size: 16.5px; }
   .own p { font-size: 13.5px; }
   .hero-stage { border-radius: 44px; padding: 64px 0 96px; }
-  .hero-stage .device { --u: 4.6px; }
   .steps { grid-template-columns: repeat(3, 1fr); gap: 14px; }
   .steps li { flex-direction: column; padding: 26px; border-radius: 28px; }
   .tiles { gap: 18px; }
@@ -192,10 +172,6 @@ section[id] { scroll-margin-top: 116px; }
   .grid p { padding-right: 0; }
   .key { display: flex; flex-wrap: wrap; gap: 8px 28px; }
   .own { grid-template-columns: repeat(4, 1fr); gap: 14px; }
-  .editions { grid-template-columns: repeat(3, 1fr); gap: 16px; }
-  .edition { grid-template-columns: 1fr; align-items: start; align-content: start; gap: 8px; padding: 12px 26px 28px; border-radius: 32px; text-align: center; }
-  .ed-stage { padding: 28px 0 24px; }
-  .ed-stage .device { --u: 2.2px; }
   .waitlist-fields { grid-template-columns: 1fr 1fr; }
   .join-card { padding: 48px 44px 32px; }
 }
@@ -205,10 +181,10 @@ section[id] { scroll-margin-top: 116px; }
   .header-inner { height: 64px; padding-top: 0; }
   section[id] { scroll-margin-top: 72px; }
   .hero { padding-top: 64px; }
-  .hero-stage .device { --u: 5px; }
   .sec { padding-top: 112px; }
   .sec > h2 { margin-bottom: 44px; }
-  .tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+  .tiles .tile:last-child:nth-child(odd) { grid-column: 1 / -1; }
   .tile { padding: 24px 24px 22px; }
   .grid { grid-template-columns: repeat(3, 1fr); }
   .grid li:nth-child(3) { border-top: 0; }
@@ -239,8 +215,12 @@ section[id] { scroll-margin-top: 116px; }
 .tile-stage .scr-keys b { border-color: rgba(29,27,24,.25); }
 .tile-stage .scr-list--lined dt, .tile-stage .scr-list--lined dd { border-top-color: rgba(29,27,24,.12); }
 
-.tile-stage { display: flex; justify-content: center; overflow: hidden; padding: 8px 0 4px; }
-.tile-stage .device { --u: 2.9px; }
+.tile-stage { display: flex; justify-content: center; overflow: hidden; padding: 8px 0 4px; container-type: inline-size; }
+/* landscape screen card, 16:7, text sized to the card width */
+.tile-stage .scr { position: relative; inset: auto; width: 100%; aspect-ratio: 16 / 7; font-size: 1.3cqi; border-radius: 2.2em; padding: 2.4em 3em 2.4em; }
+.tile-stage .scr-title { font-size: 4.2em; }
+.tile-stage .scr-title--xl { font-size: 5.4em; }
+.tile-stage .scr-main { gap: 1em; }
 
 /* A concrete prototype moment, using the existing site colours and type. */
 .proof { display: grid; gap: 24px; padding-top: 72px; padding-bottom: 24px; align-items: center; }
@@ -288,5 +268,4 @@ section[id] { scroll-margin-top: 116px; }
   .hero-copy, .hero-fig { padding: 0; }
   .hero-fig { margin: 0; }
   .hero-stage { min-height: 600px; align-items: center; padding: 58px 0 76px; }
-  .hero-stage .device { --u: 4.2px; }
 }
