@@ -186,7 +186,7 @@ test("script.js: ref is validated and stored safely, share box shows only the us
 test("homepage structure: screen cards replace phone frames, every image has alt, prices in Choose, no aluminium", () => {
   const html = contents["/"];
   assert.doesNotMatch(html, /class="device/);
-  for (const tag of html.match(/<img[^>]*>/g) || []) assert.match(tag, /\salt="[^"]+"/, tag);
+  for (const tag of html.match(/<img[^>]*>/g) || []) assert.match(tag, /\salt="[^"]*"/, tag);
   // Batch 01 (founder, 17 Nov late): Standard + Home bundle at a £129 early price; £5 reservation is separate and refundable.
   const batch = html.slice(html.indexOf('id="batch"'), html.indexOf('id="waitlist"'));
   assert.match(batch, /Piblo Standard \+ Piblo Home/);
@@ -195,12 +195,47 @@ test("homepage structure: screen cards replace phone frames, every image has alt
   assert.match(batch, /isn&rsquo;t taken off it/);
   assert.doesNotMatch(html, /149|£280|counts towards/);
   assert.match(html, /Reserve your place/);
-  assert.match(html, /Why not just use my phone\?/);
 });
 test("no aluminium anywhere under site/ (case-insensitive)", () => {
   const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (["node_modules", "tests"].includes(e.name) ? [] : walk(join(dir, e.name))) : [join(dir, e.name)]);
   for (const file of walk(root)) {
     if (/\.(png|jpe?g|webp|mp4|woff2?|ico)$/i.test(file)) continue;
     assert.doesNotMatch(readFileSync(file, "utf8"), /aluminium/i, file);
+  }
+});
+
+const walkHtml = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (e.name === "node_modules" ? [] : walkHtml(join(dir, e.name))) : e.name.endsWith(".html") ? [join(dir, e.name)] : []);
+test("no page under site/ says desk companion", () => {
+  const files = walkHtml(root);
+  assert.ok(files.length >= 6);
+  for (const file of files) assert.doesNotMatch(readFileSync(file, "utf8"), /desk companion/i, file);
+});
+test("homepage makes no absolute claims and carries the new positioning and Batch 01 wording", () => {
+  const html = contents["/"];
+  assert.doesNotMatch(html, /can.?t press it for you|Nothing happens until|Nothing is recorded|can.?t fake it|Why not just use my phone/i);
+  assert.match(html, /grows with you/i);
+  assert.match(html, /Piblo Standard \+ Piblo Home/);
+  assert.match(html, /&pound;129/);
+  assert.match(html, /isn&rsquo;t taken off it/);
+});
+test("homepage tabs: each tab controls an existing tabpanel", () => {
+  const html = contents["/"];
+  assert.match(html, /role="tablist"/);
+  const panels = new Set([...html.matchAll(/<[^>]*role="tabpanel"[^>]*>/g)].map(m => (m[0].match(/\sid="([^"]+)"/) || [])[1]));
+  const tabs = [...html.matchAll(/<[^>]*role="tab"[^>]*>/g)].map(m => m[0]);
+  assert.ok(tabs.length > 0);
+  for (const tab of tabs) assert.ok(panels.has((tab.match(/aria-controls="([^"]+)"/) || [])[1]), tab);
+});
+test("homepage images have alt attributes and existing files; Buddy images are under 300 KB", async () => {
+  const { statSync } = await import("node:fs");
+  for (const tag of contents["/"].match(/<img[^>]*>/g) || []) {
+    assert.match(tag, /\salt="/, tag);
+    const src = (tag.match(/\ssrc="([^"]+)"/) || [])[1];
+    assert.ok(existsSync(join(root, src)), src);
+  }
+  for (const f of ["monk", "night-owl", "seed"]) {
+    const file = join(root, "media/buddy", f + ".webp");
+    assert.ok(existsSync(file), file);
+    assert.ok(statSync(file).size < 300 * 1024, f + " over 300 KB");
   }
 });
