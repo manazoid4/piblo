@@ -180,6 +180,7 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   { id: 'nav:ask', label: 'Go to Ask', group: 'Sections', keywords: 'ask chat voice question', shortcut: 'Ctrl+3' },
   { id: 'nav:memory', label: 'Go to Memory', group: 'Sections', keywords: 'memory dumps notes library search', shortcut: 'Ctrl+4' },
   { id: 'nav:actions', label: 'Go to Actions', group: 'Sections', keywords: 'actions approvals needs focus quiet', shortcut: 'Ctrl+5' },
+  { id: 'nav:usage', label: 'Go to Usage', group: 'Sections', keywords: 'usage tokens claude codex openrouter credits' },
   { id: 'nav:settings', label: 'Go to Settings', group: 'Sections', keywords: 'settings pairing privacy keys theme', shortcut: 'Ctrl+6' },
   { id: 'dev:today', label: 'Piblo Dev: Today', group: 'Piblo Dev', keywords: 'dev today overview founder needs now', shortcut: 'Ctrl+7' },
   { id: 'dev:checklists', label: 'Piblo Dev: Checklists', group: 'Piblo Dev', keywords: 'dev checklists founder today feature tests kickstarter gates tick' },

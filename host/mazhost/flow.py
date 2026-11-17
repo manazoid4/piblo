@@ -10,6 +10,7 @@ from pathlib import Path
 import httpx
 
 from . import private_mode
+from .ledger import append_ledger
 
 log = logging.getLogger("mazhost.flow")
 
@@ -149,6 +150,10 @@ class Flow:
                 self._append("reminders-pending.md", f"- {time.strftime('%Y-%m-%d %H:%M')} {body}")
             self._append("latency.log", f"{time.strftime('%Y-%m-%dT%H:%M:%S')} dictate intent={intent} "
                          f"stt={ms['stt']} clean={ms['clean']} total={ms['total']} via={provider} stt_via={engine} chars={len(body)}")
+            try:
+                append_ledger("dictation", body)
+            except (OSError, UnicodeError, ValueError):
+                pass
         return {"text": body, "intent": intent, "raw": raw, "ms": ms}
 
     def _append(self, name: str, line: str) -> None:

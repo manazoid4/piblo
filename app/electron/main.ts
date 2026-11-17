@@ -1,3 +1,4 @@
+import { realUsageDeps, scanUsage } from './usage';
 import { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
@@ -271,6 +272,18 @@ function setupIpc() {
         applyTheme(settings.theme);
         return settings;
       });
+  const keyFile = () => path.join(app.getPath('userData'), 'openrouter-key.txt');
+  ipcMain.handle('usage:get', () => {
+    let saved: string | undefined;
+    try { saved = fs.readFileSync(keyFile(), 'utf8'); } catch { /* no saved key */ }
+    return scanUsage(realUsageDeps(saved), Date.now());
+  });
+  ipcMain.handle('usage:set-key', (_e, key: unknown) => {
+    if (typeof key !== 'string') return false;
+    fs.mkdirSync(path.dirname(keyFile()), { recursive: true });
+    fs.writeFileSync(keyFile(), key.trim(), { mode: 0o600 });
+    return true;
+  });
   ipcMain.handle('env:get', () => viewEnv(locate().envFile ? realFs.read(locate().envFile!) : null));
   ipcMain.handle('env:set', (_e, key: EnvKey, value: string) => {
     const loc = locate();

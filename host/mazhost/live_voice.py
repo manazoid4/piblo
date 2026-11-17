@@ -157,8 +157,8 @@ class Resampler24to16:
 class LiveBridge:
     """One device session: owns the upstream realtime socket and the per-turn state machine."""
 
-    def __init__(self, ws: WebSocket, cfg: Settings, timings=None, command_handler=None) -> None:
-        self.ws, self.cfg, self.timings = ws, cfg, timings
+    def __init__(self, ws: WebSocket, cfg: Settings, timings=None, command_handler=None, stt=None) -> None:
+        self.ws, self.cfg, self.timings, self.stt = ws, cfg, timings, stt
         self.command_handler = command_handler
         from .wakeword import load
         self.wakeword = load(cfg)
@@ -182,7 +182,7 @@ class LiveBridge:
         # Private mode forces the local LFM3 speech-to-speech path (no cloud model).
         self.cloud = cfg.live_brain == "cloud" and not private_mode.enabled()
         self.kokoro = self.cloud and cfg.tts_provider == "kokoro"
-        self.brain = LiveBrain(cfg) if self.cloud else None
+        self.brain = LiveBrain(cfg, stt=self.stt) if self.cloud else None
         self._turn: list[bytes] = []
         self._cloud: asyncio.Task | None = None
         self._tts_done = asyncio.Event()
@@ -416,7 +416,7 @@ class LiveBridge:
     async def _connect(self) -> None:
         private_mode.guard(self.url)
         self.cloud = self.cfg.live_brain == "cloud" and not private_mode.enabled()
-        self.brain = LiveBrain(self.cfg) if self.cloud else None
+        self.brain = LiveBrain(self.cfg, stt=self.stt) if self.cloud else None
         url = self.url + ("?" + urlencode({"model": self.cfg.live_model}) if self.cfg.live_model else "")
         self.up = await _PrivateSafeConnect(url, max_size=None, open_timeout=5, proxy=None if private_mode.enabled() else True)
         await self._expect("session.created")
@@ -528,7 +528,7 @@ class LiveBridge:
             self.timings.add(row)
 
 
-def install_live_voice(api, cfg: Settings, security, timings=None, command_handler=None) -> None:
+def install_live_voice(api, cfg: Settings, security, timings=None, command_handler=None, stt=None) -> None:
     """Register /voice/live. Plain Starlette route: the app-wide HTTP auth dependency can't take a WebSocket."""
 
     async def endpoint(ws: WebSocket) -> None:
@@ -539,7 +539,7 @@ def install_live_voice(api, cfg: Settings, security, timings=None, command_handl
             await ws.close(4401)
             return
         try:
-            bridge = LiveBridge(ws, cfg, timings, command_handler)
+            bridge = LiveBridge(ws, cfg, timings, command_handler, stt)
         except Exception as error:
             log.error("live: session setup failed: %s", error)
             try:
