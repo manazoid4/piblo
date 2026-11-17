@@ -98,6 +98,12 @@ def install_control_routes(
     def work_cardputer():
         return work_service.cardputer_payload()
 
+    # The Today card in the Piblo app calls this root path; /control/work/today needs a phone session.
+    @api.get("/work/today")
+    def work_today_app():
+        today = work_service.today()
+        return {**today, "items": today["recommendations"]}  # app reads `items`
+
     @api.post("/work/cardputer/increment")
     def work_cardputer_increment(body: CardputerWorkIncrement):
         try:
