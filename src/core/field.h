@@ -28,6 +28,9 @@ void toggleShift();
 void toggleHalt(); // Fn+H: immediately pause or resume new nod-mediated asks
 std::string shiftElapsedText();
 
+// Re-read Core firmware info now (worker permitting); confirmAfter opens the install confirm when done.
+void checkFirmwareNow(bool confirmAfter);
+
 void requestSystemStatus();
 void requestWorkSummary();
 void requestToday();             // refresh the Today screen data

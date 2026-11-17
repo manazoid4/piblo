@@ -149,7 +149,7 @@ def _strip_facts_tag(text: str) -> str:
     return text
 
 
-_DEVICE_ACTION = re.compile(r"update|reboot|key:\d{1,3},\d{1,3},\d{1,2}|open:[a-z_]{1,24}")
+_DEVICE_ACTION = re.compile(r"update|fwcheck|reboot|key:\d{1,3},\d{1,3},\d{1,2}|open:[a-z_]{1,24}")
 
 
 class ExtractRequest(BaseModel):
@@ -294,6 +294,21 @@ def create_app(
             except Exception:
                 logging.getLogger("uvicorn.error").info("brain warmup skipped", exc_info=True)
         threading.Thread(target=run, name="brain-warm", daemon=True).start()
+
+    fw_push_stop = threading.Event()
+
+    @api.on_event("startup")
+    def start_fw_push() -> None:
+        pusher = fw.FwPusher(core_service.cardputer_action)
+
+        def run() -> None:
+            while not fw_push_stop.wait(30):
+                pusher.tick(getattr(core_service, "device_ip", None))
+        threading.Thread(target=run, name="fw-push", daemon=True).start()
+
+    @api.on_event("shutdown")
+    def stop_fw_push() -> None:
+        fw_push_stop.set()
 
     @api.on_event("startup")
     def warm_projects() -> None:

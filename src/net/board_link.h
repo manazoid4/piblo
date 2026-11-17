@@ -42,5 +42,8 @@ void rediscover();
 // Returns the board MAC as a string (e.g., "aa:bb:cc:dd:ee:ff").
 std::string macString();
 
+// One-line link diagnostic for the System screen, e.g. "radio up, key ok, 12 hello".
+std::string diag();
+
 }  // namespace board
 }  // namespace maz

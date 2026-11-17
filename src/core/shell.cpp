@@ -92,6 +92,17 @@ void pollPower() {
     }
     wasCharging = Sys.charging;
 
+    // Opt-in (Settings > Auto-update on charger): install staged firmware while charging and idle.
+    static uint32_t autoTryAt = 0;
+    if (Cfg.autoUpdate && Sys.charging && host::updateReady() && !gFwConfirm && !Sys.recording &&
+        !host_worker::busy() && !approvals::active() &&
+        (strcmp(currentId(), "home") == 0 || strcmp(currentId(), "charge") == 0) &&
+        millis() - gLastInput > 120000u && static_cast<int32_t>(millis() - autoTryAt) >= 0) {
+        autoTryAt = millis() + 600000u;  // a failed attempt waits 10 min instead of looping
+        host::fwUpdate();                // reboots on success; the rollback guard covers a bad image
+        invalidate();
+    }
+
     if (Sys.batteryPct >= 0 && Sys.batteryPct <= 10 && !Sys.charging &&
         !Sys.lowBatteryWarned) {
         Sys.lowBatteryWarned = true;

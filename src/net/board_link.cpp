@@ -36,6 +36,9 @@ uint32_t gLastRx = 0;
 uint32_t gNextHello = 0;
 uint32_t gNextPing = 0;
 bool gDiscovering = false;
+bool gNowUp = false;      // esp_now_init succeeded (retried from update() until Wi-Fi is up)
+uint32_t gNextInit = 0;
+uint32_t gHelloSent = 0;
 
 // ---------- Upload state ----------
 enum UploadState : uint8_t { Idle, SendingBegin, SendingData, WaitingResult, Done };
@@ -134,6 +137,7 @@ void sendToPeer(const uint8_t* data, size_t len) {
 // Broadcast discovery HELLO
 void sendHello() {
     if (!gKeyed) return;
+    ++gHelloSent;
     uint8_t mac[6];
     ownMac(mac);
     uint8_t frame[10] = {T_DISC, D_HELLO};
@@ -412,13 +416,11 @@ void uploadTask(void*) {
 
 // ---------- Public API ----------
 
-void begin() {
-    deriveKey();
-
-    // Initialize ESP-NOW
+bool initNow() {
+    if (WiFi.getMode() == WIFI_OFF) return false;  // ESP-NOW needs the Wi-Fi driver started
     if (esp_now_init() != ESP_OK) {
         Serial.println("[board] esp_now_init failed");
-        return;
+        return false;
     }
     esp_now_register_recv_cb(onReceive);
     esp_now_register_send_cb(onSend);
@@ -437,16 +439,32 @@ void begin() {
         // ESP-NOW will follow the station channel when peer channel = 0
     }
 
-    // Create mutex for upload
-    gUpMutex = xSemaphoreCreateMutex();
-
-    // Start discovery
+    gNowUp = true;
+    Serial.println("[board] ESP-NOW up, discovering");
     gDiscovering = true;
     gNextHello = millis();
     sendHello();
+    return true;
+}
+
+void begin() {
+    deriveKey();
+    if (!gUpMutex) gUpMutex = xSemaphoreCreateMutex();
+    initNow();
 }
 
 void update() {
+    if (gNowUp && WiFi.getMode() == WIFI_OFF) {  // Wi-Fi switched off: ESP-NOW must be re-initialised later
+        esp_now_deinit();
+        gNowUp = false;
+        gHavePeer = false;
+        gState.linked = gState.healthy = false;
+    }
+    if (!gNowUp) {  // boot ran before Wi-Fi, or Wi-Fi was switched off: retry every 2 s
+        if ((int32_t)(millis() - gNextInit) < 0) return;
+        gNextInit = millis() + 2000;
+        if (!initNow()) return;
+    }
     if (!gKeyed) {
         deriveKey();
         if (!gKeyed) return;
@@ -576,6 +594,13 @@ std::string macString() {
              gState.boardMac[0], gState.boardMac[1], gState.boardMac[2],
              gState.boardMac[3], gState.boardMac[4], gState.boardMac[5]);
     return buf;
+}
+
+std::string diag() {
+    char b[64];
+    snprintf(b, sizeof b, "radio %s, key %s, %lu hello", gNowUp ? "up" : "down", gKeyed ? "ok" : "missing",
+             (unsigned long)gHelloSent);
+    return b;
 }
 
 }  // namespace board
