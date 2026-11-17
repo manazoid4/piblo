@@ -434,3 +434,19 @@ def test_rules_api_endpoints():
     r = client.get("/promises/rules", headers=headers)
     assert not any(x["id"] == rid for x in r.json()["rules"])
 
+
+
+def test_rule_falls_back_to_plain_parser_when_local_model_is_down(tmp_path, monkeypatch):
+    # Regression: a RouteError from the model router escaped _llm_parse, so POST /promises/rules
+    # answered 503 LOCAL_UNAVAILABLE on any PC without a working local model.
+    from mazhost.errors import ErrorCode, RouteError
+
+    class DownRouter:
+        def chat(self, *a, **k):
+            raise RouteError(ErrorCode.LOCAL_UNAVAILABLE, "local", retryable=True)
+
+    monkeypatch.setenv("PIBLO_LEDGER_DIR", str(tmp_path / "ledger"))
+    engine = Promises(FakeBuddy(), model_router=DownRouter(), settings=Settings(data_dir=str(tmp_path)))
+    assert engine._llm_parse("Recycling weekly Thursday") is None
+    rule = engine.create_rule("Recycling weekly Thursday", None, True)
+    assert rule["active"] is True

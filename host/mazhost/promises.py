@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 
 from .buddy import MAX_DELAY_S, AlertIn, Buddy, SnoozeBody
 from .config import Settings
+from .errors import RouteError
 from .ledger import append_ledger
 
 log = logging.getLogger("uvicorn.error")
@@ -396,7 +397,7 @@ class Promises:
             reply, _provider = self.router.chat(
                 [{"role": "system", "content": prompt}, {"role": "user", "content": text}], "local"
             )
-        except (OSError, RuntimeError, ValueError):
+        except (OSError, RuntimeError, ValueError, RouteError):  # model down: fall back to the plain parser
             return None
         try:
             data = json.loads(self._json_block(reply))
