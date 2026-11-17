@@ -13,7 +13,9 @@ import difflib
 import io
 import json
 import logging
+import os
 import re
+import tempfile
 import time
 import wave
 from collections.abc import AsyncIterator, Callable
@@ -132,8 +134,9 @@ def pick_model(models: list[dict], patterns: list[str]) -> str | None:
 
 
 class LiveBrain:
-    def __init__(self, cfg: Settings, transport: httpx.AsyncBaseTransport | None = None) -> None:
+    def __init__(self, cfg: Settings, transport: httpx.AsyncBaseTransport | None = None, stt=None) -> None:
         self.cfg, self._transport = cfg, transport
+        self.stt = stt  # Core's SpeechToText: local fallback when the LFM3 ASR server is down
         self.dir = resolve_data_dir(cfg)
         self.memory_notes = MemoryNotes(self.dir)
         self.history: list[dict] = []  # last ~8 turns (16 messages)
@@ -178,7 +181,25 @@ class LiveBrain:
             return (r.json()["choices"][0]["message"]["content"] or "").strip()
         except (httpx.HTTPError, KeyError, IndexError, ValueError) as error:
             log.warning("live: ASR failed: %r", error)
+        if self.stt is None:
             return ""
+        try:  # same local STT as Flow, so Talk still hears you without the LFM3 server
+            return await asyncio.to_thread(self._local_stt, buf.getvalue())
+        except Exception as error:  # noqa: BLE001 - a dropped turn beats a dead session
+            log.warning("live: local STT fallback failed: %r", error)
+            return ""
+
+    def _local_stt(self, wav: bytes) -> str:
+        fd, name = tempfile.mkstemp(suffix=".wav")
+        try:
+            with os.fdopen(fd, "wb") as f:
+                f.write(wav)
+            return self.stt.transcribe_local(Path(name))[0].strip()
+        finally:
+            try:
+                os.unlink(name)
+            except OSError:
+                pass
 
     # ---- model choice ------------------------------------------------------
     async def _models(self) -> list[dict]:

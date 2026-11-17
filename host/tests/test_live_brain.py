@@ -21,7 +21,7 @@ class FakeBrain:
     text, chunks, hang, stream_closed = "tell me a joke", [], False, False
     asked = threading.Event()
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, stt=None):
         self.meta, self.on_slow = {"model": "fake/model:free", "fallback": None, "brain_first_token_ms": 5}, None
 
     async def transcribe(self, pcm):
@@ -196,3 +196,30 @@ def test_first_clause_starts_speech_early():
     assert first_clause("How about something snappy, like Bleep or Zip") == (["How about something snappy,"], "like Bleep or Zip")
     assert first_clause("Sure, like Bleep") == ([], "Sure, like Bleep")  # too short to be worth a TTS call
     assert first_clause("No comma yet here") == ([], "No comma yet here")
+
+
+class _FakeStt:
+    def __init__(self):
+        self.paths = []
+
+    def transcribe_local(self, path):
+        self.paths.append(path)
+        assert path.read_bytes()[:4] == b"RIFF"  # a real wav reaches the local model
+        return " remind me to call mum ", "parakeet"
+
+
+def _asr_down(request):
+    raise httpx.ConnectError("All connection attempts failed", request=request)
+
+
+def test_asr_server_down_falls_back_to_local_stt(tmp_path):
+    stt = _FakeStt()
+    brain = LiveBrain(Settings(data_dir=str(tmp_path)), transport=httpx.MockTransport(_asr_down), stt=stt)
+    text = asyncio.run(brain.transcribe(b"\x00\x01" * 1600))
+    assert text == "remind me to call mum"
+    assert len(stt.paths) == 1 and not stt.paths[0].exists()  # temp wav cleaned up
+
+
+def test_asr_server_down_without_local_stt_drops_turn(tmp_path):
+    brain = LiveBrain(Settings(data_dir=str(tmp_path)), transport=httpx.MockTransport(_asr_down))
+    assert asyncio.run(brain.transcribe(b"\x00\x01" * 1600)) == ""

@@ -469,3 +469,18 @@ def test_history_bounded_to_seven_days(tmp_path):
     resp = client.get("work/history?days=7")
     assert resp.status_code == 200
     assert len(resp.json()["history"]) == 7
+
+
+def test_app_today_card_route_answers_with_bearer_token(tmp_path):
+    # Regression: the Piblo app Today card polls /work/today on the main api;
+    # it was 404 because the route only existed under the phone-session /control mount.
+    from mazhost.app import create_app
+
+    _, settings = _mounted_app(tmp_path)
+    api = create_app(settings)
+    client = TestClient(api)
+    headers = {"Authorization": f"Bearer {settings.token}"}
+    resp = client.get("/work/today", headers=headers)
+    assert resp.status_code == 200
+    assert "items" in resp.json()
+    assert client.get("/work/today").status_code == 401

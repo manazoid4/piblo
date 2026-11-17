@@ -47,11 +47,13 @@ from .discovery import DiscoveryResponder
 from . import fw
 from . import private_mode
 from .errors import ErrorCode, RouteError
+from .bodydouble import BodyDouble, build_bodydouble_router
 from .focus import Focus, install_focus_routes
 from .maker import install_maker_routes
 from .where import build_where_router
 from .memory_notes import (MAX_MEMORY_CHARS, NO_SECRETS, REDACTED, TOO_LONG, MemoryNotes, build_memory_router,
                            is_sensitive, parse_remember)
+from .ledger import build_ledger_router
 from .learning import Learning
 from .speaks_first import SpeaksFirst
 from .rescue import install_rescue_routes
@@ -1250,6 +1252,10 @@ def create_app(
     api.include_router(build_dev_router(resolve_data_dir(cfg), Path(cfg.repo_dir) if cfg.repo_dir else Path(__file__).resolve().parents[2]))
     api.include_router(build_features_router(resolve_data_dir(cfg)))
     api.include_router(build_flow_router(flow_service))
+    body_double = BodyDouble(buddy, resolve_data_dir(cfg) / "body_double.json")
+    api.include_router(build_bodydouble_router(body_double))
+    api.on_event("startup")(body_double.start)
+    api.on_event("shutdown")(body_double.stop)
     api.include_router(build_dump_router(cfg, model_router))
     api.include_router(webui_router)
     api.include_router(build_library_router(cfg, model_router))
@@ -1258,6 +1264,7 @@ def create_app(
     install_focus_routes(api, focus, buddy.sync_focus)
     api.include_router(build_where_router(cfg, buddy, focus))
     api.include_router(build_memory_router(memory_notes))
+    api.include_router(build_ledger_router())
     install_rescue_routes(api, security.authorize, resolve_data_dir(cfg))
     api.include_router(build_agent_router(
         AgentBuilder(cfg, SkillVault(cfg, model_router), resolve_data_dir(cfg), llm=model_router, buddy=buddy)))
@@ -1271,7 +1278,8 @@ def create_app(
     async def feature_voice_command(text):
         return await run_in_threadpool(feature_commands.handle, text)
 
-    install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command)
+    install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command,
+                      stt=speech if isinstance(speech, SpeechToText) else None)
     # ------------------------------------------------------------ SUBTITLES
     install_subtitle_routes(api, subtitle_jobs)
 
