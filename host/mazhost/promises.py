@@ -29,6 +29,7 @@ from pydantic import BaseModel, Field
 
 from .buddy import MAX_DELAY_S, AlertIn, Buddy, SnoozeBody
 from .config import Settings
+from .ledger import append_ledger
 
 log = logging.getLogger("uvicorn.error")
 
@@ -342,12 +343,8 @@ class Promises:
     # ---- ledger -------------------------------------------------------
     def _ledger(self, line: str) -> None:
         try:
-            from . import ledger  # optional daily ledger
-        except ImportError:
-            return
-        try:
-            ledger.append(self.settings, None, line)
-        except (OSError, ImportError):
+            append_ledger("reminder", line)  # the one daily ledger (ledger.py)
+        except (OSError, UnicodeError, ValueError):
             pass
 
     # ---- phrase parsing ----------------------------------------------

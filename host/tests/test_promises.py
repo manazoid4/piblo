@@ -400,13 +400,13 @@ def test_upcoming_next_14_days(tmp_path):
     assert any("Black Bin" in x["title"] for x in data["by_date"]["2026-11-18"])
 
 
-def test_ledger_line_written(tmp_path):
+def test_ledger_line_written(tmp_path, monkeypatch):
+    monkeypatch.setenv("PIBLO_LEDGER_DIR", str(tmp_path / "ledger"))
     engine = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path)))
     engine.create_rule("Recycling weekly Thursday")
-    files = [f for f in os.listdir(engine.dir) if f.startswith("ledger-")]
+    files = list((tmp_path / "ledger").glob("*.md"))
     assert files, "no daily ledger file was written"
-    content = (engine.dir / files[0]).read_text(encoding="utf-8")
-    assert "REMINDER DRAFT" in content
+    assert "REMINDER DRAFT" in files[0].read_text(encoding="utf-8")
 
 
 def test_rules_api_endpoints():
