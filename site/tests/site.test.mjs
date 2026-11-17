@@ -187,15 +187,15 @@ test("homepage structure: screen cards replace phone frames, every image has alt
   const html = contents["/"];
   assert.doesNotMatch(html, /class="device/);
   for (const tag of html.match(/<img[^>]*>/g) || []) assert.match(tag, /\salt="[^"]+"/, tag);
-  const choose = html.slice(html.indexOf('id="choose"'), html.indexOf('id="waitlist"'));
-  assert.match(choose, /149/);
-  assert.doesNotMatch(choose, /£280/);
-  assert.match(choose, /class="price"/);
-  assert.match(choose, /Coming later/);
-  assert.match(html, /Things it does before you ask/);
+  // Batch 01 (founder, 17 Nov late): Standard + Home bundle at a £129 early price; £5 reservation is separate and refundable.
+  const batch = html.slice(html.indexOf('id="batch"'), html.indexOf('id="waitlist"'));
+  assert.match(batch, /Piblo Standard \+ Piblo Home/);
+  assert.match(batch, /&pound;129/);
+  assert.match(batch, /class="price"/);
+  assert.match(batch, /isn&rsquo;t taken off it/);
+  assert.doesNotMatch(html, /149|£280|counts towards/);
   assert.match(html, /Reserve your place/);
-  assert.match(html, /Do I need both pieces\?/);
-  assert.match(html, /Does it work when I&rsquo;m out\?/);
+  assert.match(html, /Why not just use my phone\?/);
 });
 test("no aluminium anywhere under site/ (case-insensitive)", () => {
   const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (["node_modules", "tests"].includes(e.name) ? [] : walk(join(dir, e.name))) : [join(dir, e.name)]);
