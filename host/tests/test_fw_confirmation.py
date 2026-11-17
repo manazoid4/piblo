@@ -14,7 +14,13 @@ ROOT = Path(__file__).resolve().parents[2]
 def test_update_entry_points_require_shell_confirmation(relative):
     source = (ROOT / relative).read_text(encoding="utf-8-sig")
     assert "host::fwUpdate(" not in source, "Only the shell confirmation may install firmware"
-    assert "shell::confirmFwUpdate();" in source
+    if relative == "src/net/portal_v3.cpp":
+        # The hub's Update button refreshes CoreInfo first; field.cpp then opens the same confirmation.
+        assert "field::checkFirmwareNow(true);" in source
+        field = (ROOT / "src/core/field.cpp").read_text(encoding="utf-8-sig")
+        assert "host::fwUpdate(" not in field and "shell::confirmFwUpdate();" in field
+    else:
+        assert "shell::confirmFwUpdate();" in source
 
 
 def test_confirmation_requires_physical_u_or_y(tmp_path):

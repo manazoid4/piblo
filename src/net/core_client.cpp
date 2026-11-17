@@ -73,15 +73,21 @@ bool updateReady() {
 
 CoreInfo fetchCoreInfo() {
     CoreInfo out;
-    NodHttp http;
-    const bool viaRemote = onRemoteLink();
-    if (!coreBegin(http, "/health?fw_version=" NOD_FW_VERSION, true, true)) return out;
-    const int status = http.GET();
-    const String body = status > 0 ? http.getString() : String();
-    http.end();
     JsonDocument doc;
-    if (status != 200 || deserializeJson(doc, body)) return out;
-    out.ok = true;
+    // LAN Core first: the remote URL may point at a different PC's Core. Remote only if LAN fails.
+    bool viaRemote = false;
+    for (int pass = 0; pass < 2 && !out.ok; ++pass) {
+        viaRemote = pass == 1;
+        if (viaRemote && !onRemoteLink()) break;
+        NodHttp http;
+        if (!coreBegin(http, "/health?fw_version=" NOD_FW_VERSION, viaRemote, true)) continue;
+        const int status = http.GET();
+        const String body = status > 0 ? http.getString() : String();
+        http.end();
+        doc.clear();
+        out.ok = status == 200 && !deserializeJson(doc, body);
+    }
+    if (!out.ok) return out;
     out.version = doc["version"] | "";
     out.fwVersion = doc["fw_latest"]["version"] | "";
     out.fwSha = doc["fw_latest"]["sha"] | "";

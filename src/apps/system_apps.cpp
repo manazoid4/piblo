@@ -187,12 +187,12 @@ private:
                 const std::string boardMac = bs.haveMac ? board::macString() : "unknown";
                 snprintf(buf, sizeof(buf),
                          "Piblo v" NOD_FW_VERSION " (" NOD_FW_SHA ")\nCore %s%s\nChip     %s "
-                         "rev%d\nCores    %d\nKeyboard %s\nUptime   %s\nBoard    %s (%s)\nBuild    " PIBLO_LABEL,
+                         "rev%d\nCores    %d\nKeyboard %s\nUptime   %s\nBoard    %s (%s)\nLink     %s\nBuild    " PIBLO_LABEL,
                          cv.empty() ? "offline" : ("v" + cv).c_str(), upd.c_str(), ESP.getChipModel(),
                          (int)ESP.getChipRevision(), (int)ESP.getChipCores(),
                          KB.ok() ? "TCA8418 ok" : "NOT DETECTED",
                          ui::hhmmss(Sys.uptimeSeconds()).c_str(),
-                         boardStatus, boardMac.c_str());
+                         boardStatus, boardMac.c_str(), board::diag().c_str());
                 _detail = buf;
                 break;
             }
@@ -313,7 +313,7 @@ const char* SET_NAMES[] = {"Brightness",    "Volume",        "UI sounds",
                            "Screen timeout", "Mic gain",     "Storage",
                            "Time zone",      "Wi-Fi & host", "Keys & help",
                            "Voice",           "Quiet mode", "Quiet for",
-                           "Easy mode"};
+                           "Easy mode",      "Auto-update on charger"};
 constexpr int SET_COUNT = sizeof(SET_NAMES) / sizeof(SET_NAMES[0]);
 
 class SettingsApp : public App {
@@ -394,6 +394,9 @@ public:
             case 12:
                 if (e.code == KEY_ENTER) Cfg.easyMode = !Cfg.easyMode;
                 break;
+            case 13:
+                if (e.code == KEY_ENTER) Cfg.autoUpdate = !Cfg.autoUpdate;
+                break;
             default:
                 break;
         }
@@ -457,6 +460,8 @@ private:
                 return quiet::durLabel(Cfg.quietDur);
             case 12:
                 return Cfg.easyMode ? "on" : "off";
+            case 13:
+                return Cfg.autoUpdate ? "on" : "off";
             default:
                 return "";
         }

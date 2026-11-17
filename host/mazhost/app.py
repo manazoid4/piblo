@@ -47,6 +47,7 @@ from .discovery import DiscoveryResponder
 from . import fw
 from . import private_mode
 from .errors import ErrorCode, RouteError
+from .bodydouble import BodyDouble, build_bodydouble_router
 from .focus import Focus, install_focus_routes
 from .maker import install_maker_routes
 from .where import build_where_router
@@ -150,7 +151,7 @@ def _strip_facts_tag(text: str) -> str:
     return text
 
 
-_DEVICE_ACTION = re.compile(r"update|reboot|key:\d{1,3},\d{1,3},\d{1,2}|open:[a-z_]{1,24}")
+_DEVICE_ACTION = re.compile(r"update|fwcheck|reboot|key:\d{1,3},\d{1,3},\d{1,2}|open:[a-z_]{1,24}")
 
 
 class ExtractRequest(BaseModel):
@@ -295,6 +296,21 @@ def create_app(
             except Exception:
                 logging.getLogger("uvicorn.error").info("brain warmup skipped", exc_info=True)
         threading.Thread(target=run, name="brain-warm", daemon=True).start()
+
+    fw_push_stop = threading.Event()
+
+    @api.on_event("startup")
+    def start_fw_push() -> None:
+        pusher = fw.FwPusher(core_service.cardputer_action)
+
+        def run() -> None:
+            while not fw_push_stop.wait(30):
+                pusher.tick(getattr(core_service, "device_ip", None))
+        threading.Thread(target=run, name="fw-push", daemon=True).start()
+
+    @api.on_event("shutdown")
+    def stop_fw_push() -> None:
+        fw_push_stop.set()
 
     @api.on_event("startup")
     def warm_projects() -> None:
@@ -1245,6 +1261,10 @@ def create_app(
     api.include_router(build_dev_router(resolve_data_dir(cfg), Path(cfg.repo_dir) if cfg.repo_dir else Path(__file__).resolve().parents[2]))
     api.include_router(build_features_router(resolve_data_dir(cfg)))
     api.include_router(build_flow_router(flow_service))
+    body_double = BodyDouble(buddy, resolve_data_dir(cfg) / "body_double.json")
+    api.include_router(build_bodydouble_router(body_double))
+    api.on_event("startup")(body_double.start)
+    api.on_event("shutdown")(body_double.stop)
     api.include_router(build_dump_router(cfg, model_router))
     api.include_router(webui_router)
     api.include_router(build_library_router(cfg, model_router))
@@ -1267,7 +1287,8 @@ def create_app(
     async def feature_voice_command(text):
         return await run_in_threadpool(feature_commands.handle, text)
 
-    install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command)
+    install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command,
+                      stt=speech if isinstance(speech, SpeechToText) else None)
     # ------------------------------------------------------------ SUBTITLES
     install_subtitle_routes(api, subtitle_jobs)
 

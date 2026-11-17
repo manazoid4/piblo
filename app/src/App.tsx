@@ -14,6 +14,7 @@ import { Memory } from './pages/Memory';
 import { Onboarding } from './pages/Onboarding';
 import { PibloDev, type DevTab } from './pages/PibloDev';
 import { Settings } from './pages/Settings';
+import { Usage } from './pages/Usage';
 import { Teach } from './pages/Teach';
 import { StoreProvider, usePoll, useStore } from './lib/store';
 import { useUpdate } from './lib/useUpdate';
@@ -72,7 +73,7 @@ function useTheme() {
 
 export { useTheme };
 
-type Section = 'home' | 'live' | 'ask' | 'memory' | 'actions' | 'settings' | 'teach' | 'dev';
+type Section = 'home' | 'live' | 'ask' | 'memory' | 'actions' | 'settings' | 'usage' | 'teach' | 'dev';
 
 const isDev = import.meta.env.DEV;
 const NAV: { id: Section; label: string; icon: string }[] = [
@@ -82,6 +83,7 @@ const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'memory', label: 'Memory', icon: 'memory' },
   { id: 'actions', label: 'Actions', icon: 'actions' },
   { id: 'settings', label: 'Settings', icon: 'settings' },
+  { id: 'usage', label: 'Usage', icon: 'actions' },
   ...(isDev ? [{ id: 'dev' as const, label: 'Piblo Dev', icon: 'dev' }] : []),
   { id: 'teach', label: 'Show me once', icon: 'screen' },
 ];
@@ -170,16 +172,24 @@ function Shell() {
     window.setTimeout(() => setNotice(null), 6000);
   };
 
-  const needsCore = section !== 'settings' && !running;
-  const Page = { home: Home, live: LiveView, ask: Ask, memory: Memory, actions: Actions, settings: Settings, teach: Teach }[section === 'dev' ? 'home' : section];
+  const needsCore = section !== 'settings' && section !== 'usage' && !running;
+  const Page = { home: Home, live: LiveView, ask: Ask, memory: Memory, actions: Actions, settings: Settings, usage: Usage, teach: Teach }[section === 'dev' ? 'home' : section];
 
   return (
     <div className="shell">
       <header className="titlebar">
-        <div className="brand">
+        <button
+          type="button"
+          className="brand"
+          aria-label="Piblo: go to Home"
+          onClick={() => {
+            setSection('home');
+            setWelcome(false);
+          }}
+        >
           <img className="brand-icon" src={iconUrl} alt="" aria-hidden="true" />
           Piblo
-        </div>
+        </button>
         <span className="spacer" />
         <button type="button" className="btn sm ghost" aria-label="Jump anywhere (Ctrl+K)" onClick={() => setPaletteOpen(true)}>
           <Icon name="search" size={14} /> Jump <kbd style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-xs)' }}>Ctrl+K</kbd>
