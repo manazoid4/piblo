@@ -252,3 +252,16 @@ test('honeypot and consent still block before any referral work', async () => {
   assert.equal(r.statusCode, 400);
   assert.equal(f.calls.length, 0);
 });
+
+
+test('only recognised campaign sources appear in owner alerts', async () => {
+  for (const [source, expected] of [['reddit', 'Source: reddit'], ['discord', 'Source: discord'], ['x', 'Source: x'], ['reddit\nBCC: attacker', '']]) {
+    const f = recordingFetch();
+    await handler(fakeReq({ email: 'visitor@example.com', consent: true, source }), fakeRes(), f.impl);
+    const body = f.calls[1].body.text;
+    if (expected) assert.ok(body.includes(expected));
+    else assert.ok(!body.includes('Source:') && !body.includes('attacker'));
+    assert.equal(Object.hasOwn(f.calls[0].body, 'source'), false);
+    assert.equal(Object.hasOwn(f.calls[0].body.properties, 'source'), false);
+  }
+});

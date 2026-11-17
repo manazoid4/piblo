@@ -1,13 +1,14 @@
-.tl-wrap{max-width:46rem;margin:0 auto;padding:var(--space-5) 1rem 4rem}
-.tl-lead{font-size:1.15rem;color:var(--ink-soft);max-width:36rem}
-.tl-list{list-style:none;margin:2.5rem 0 0;padding:0;border-left:3px solid var(--ink)}
-.tl-step{position:relative;margin:0 0 1.75rem 1.5rem;padding:1.1rem 1.25rem;background:var(--card);border:var(--stroke);border-radius:var(--radius-m);box-shadow:var(--shadow-s)}
-.tl-step::before{content:"";position:absolute;left:-2.05rem;top:1.4rem;width:.9rem;height:.9rem;border-radius:50%;background:var(--paper-2);border:3px solid var(--ink)}
-.tl-step[data-state="done"]::before{background:var(--mint)}
-.tl-step[data-state="now"]::before{background:var(--sun)}
-.tl-step h2{margin:.35rem 0 .4rem;font-size:1.3rem}
-.tl-step p{margin:0;color:var(--ink-soft)}
-.tl-chip{display:inline-block;font-family:var(--font-mono);font-size:.75rem;letter-spacing:.06em;text-transform:uppercase;padding:.15rem .6rem;border-radius:var(--radius-pill);border:2px solid var(--ink);background:var(--paper-2)}
-.tl-step[data-state="done"] .tl-chip{background:var(--mint)}
-.tl-step[data-state="now"] .tl-chip{background:var(--sun)}
-.tl-note{margin-top:2rem;color:var(--ink-soft)}
+/* Timeline in the homepage design: white rounded cards with status chips (Working / In testing / Planned). */
+.tl-wrap { max-width: 46rem; margin: 0 auto; padding: 40px 16px 48px; text-align: center; }
+.tl-wrap .eyebrow { margin-bottom: 18px; }
+.tl-list { margin: 36px 0 0; display: grid; gap: 12px; text-align: left; }
+.tl-step { padding: 22px 24px; margin: 0; }
+.tl-step h2 { margin: 12px 0 6px; font-size: 21px; letter-spacing: -.02em; line-height: 1.2; text-align: left; }
+.tl-step p { color: var(--ink-2); font-size: 16px; }
+.tl-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 10px 4px 8px; border-radius: 999px; background: transparent; box-shadow: inset 0 0 0 1px var(--line); font-family: var(--font-mono); font-size: 11px; line-height: 1.3; color: var(--ink-2); }
+.tl-chip::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; }
+.tl-step[data-state="done"] .tl-chip { background: var(--done-bg); color: var(--done-ink); box-shadow: none; }
+.tl-step[data-state="done"] .tl-chip::before { background: currentColor; }
+.tl-step[data-state="now"] .tl-chip { background: var(--tint); box-shadow: none; }
+.tl-step[data-state="now"] .tl-chip::before { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }
+.tl-note { margin: 28px 0 18px; color: var(--ink-3); font-size: 14px; }
