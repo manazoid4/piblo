@@ -25,7 +25,7 @@ pyttsx3==2.98
 # "Hey Piblo" wake word in Live voice (MAZ_WAKEWORD, on by default). Apache-2.0. The model is
 # fetched separately by scripts/setup-wakeword.py; without it Live voice simply listens ungated.
 sherpa-onnx==2.0.1
-openwakeword==0.6.0  # default wake word engine (Apache-2.0); tflite-runtime is Linux-only, onnx is used
+openwakeword==0.6.0; platform_system == "Windows"  # wake word (Apache-2.0); on Linux it pulls tflite-runtime, which has no wheels for our Python
 vosk==0.3.45  # optional offline STT: MAZ_STT_PROVIDER=vosk + scripts/setup-vosk.py
 pyperclip>=1.8
 sounddevice>=0.4
