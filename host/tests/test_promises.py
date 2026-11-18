@@ -1,17 +1,20 @@
 """Promise Keeper: deterministic British date proposals, confirm-only saving, Today cards, restart safety."""
 from __future__ import annotations
 
+import os
 import time
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from mazhost import promises
+from mazhost.app import create_app
+from mazhost.config import Settings
 from mazhost.buddy import Buddy
 from mazhost.buddy_store import BuddyStore
-from mazhost.promises import PromiseError, Promises, build_promises_router, propose
+from mazhost.promises import BANK_HOLIDAYS, PromiseError, Promises, build_promises_router, next_date, propose
 
 NOW = datetime(2027, 1, 4, 12, 0, tzinfo=timezone.utc)   # Monday
 
@@ -253,3 +256,197 @@ def test_in_n_hours_is_elapsed_time_across_the_clock_change():
     # 00:30 GMT on 28 Mar 2027 + 2h elapsed = 03:30 BST (01:30 never happens).
     now = datetime(2027, 3, 28, 0, 30, tzinfo=timezone.utc)
     assert due_of("in 2 hours", now) == ["2027-03-28T03:30"]
+
+
+# ---- Bin day + home reminders (recurring rules) ----
+
+class FakeBuddy(Buddy):
+    def __init__(self) -> None:
+        super().__init__()
+        self.posted = []
+
+    def post_alert(self, a) -> dict:
+        self.posted.append(a)
+        return {"ok": True, "routed": "alert", "id": a.idempotency_key or "al-test", "scheduled": False}
+
+    def posted_alerts(self) -> dict:
+        return {"posts": self.posted}
+
+    def alert_outcome(self, aid: str, action: str, minutes: int = 0) -> dict:
+        return {"ok": True, "id": aid, "outcome": action}
+
+
+def test_fortnightly_maths():
+    spec = {"frequency": "fortnightly", "interval_weeks": 2, "weekday": 1, "anchor": "2026-11-18",
+            "fixed_dates": [], "shift": False}
+    assert next_date(spec) == date(2026, 11, 18)
+    assert next_date(spec, after=date(2026, 11, 18)) == date(2026, 12, 2)
+    assert next_date(spec, after=date(2026, 12, 2)) == date(2026, 12, 16)
+
+
+def test_weekly_rolls():
+    spec = {"frequency": "weekly", "interval_weeks": 1, "weekday": 0, "anchor": "2026-11-16",
+            "fixed_dates": [], "shift": False}  # Monday
+    assert next_date(spec, after=date(2026, 11, 16)) == date(2026, 11, 23)
+
+
+def test_fixed_yearly():
+    spec = {"frequency": "fixed", "interval_weeks": 1, "weekday": None, "anchor": None,
+            "fixed_dates": ["2026-06-14"], "shift": False}
+    assert next_date(spec, after=date(2026, 6, 14)) == date(2027, 6, 14)
+
+
+def test_bank_holiday_shift():
+    from mazhost.promises import BANK_HOLIDAYS
+    shifted = {"frequency": "weekly", "interval_weeks": 1, "weekday": 0, "anchor": "2026-04-27",
+               "fixed_dates": [], "shift": True}
+    assert date(2026, 5, 4) in BANK_HOLIDAYS  # early May bank holiday, a Monday
+    assert next_date(shifted, after=date(2026, 4, 27)) == date(2026, 5, 5)
+    unshifted = dict(shifted, shift=False)
+    assert next_date(unshifted, after=date(2026, 4, 27)) == date(2026, 5, 4)
+
+
+def test_phrase_parse_deterministic(tmp_path):
+    d = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path))).parse_phrase("Black bin every other Tuesday, next one 18 Nov")
+    assert d["kind"] == "bin"
+    assert d["title"] == "Black Bin"
+    assert d["spec"]["frequency"] == "fortnightly"
+    assert d["spec"]["weekday"] == 1  # Tuesday
+    assert d["spec"]["anchor"] == "2026-11-18"
+
+
+def test_phrase_parse_recycling(tmp_path):
+    d = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path))).parse_phrase("Recycling weekly Thursday")
+    assert d["spec"]["frequency"] == "weekly"
+    assert d["spec"]["weekday"] == 3  # Thursday
+
+
+def test_phrase_parse_home_fixed(tmp_path):
+    d = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path))).parse_phrase("Car MOT 14 June")
+    assert d["kind"] == "home"
+    assert d["spec"]["frequency"] == "fixed"
+    expected = date(2026, 6, 14)
+    if expected < date.today():
+        expected = date(2027, 6, 14)
+    assert d["spec"]["fixed_dates"] == [expected.isoformat()]
+
+
+def test_phrase_parse_llm_preferred(tmp_path):
+    class FakeRouter:
+        def chat(self, messages, route):
+            return (
+                '{"kind":"bin","title":"Recycling","frequency":"weekly","interval_weeks":1,'
+                '"weekday":3,"next_due":null,"desc":"Recycling, weekly on Thursdays"}',
+                "local",
+            )
+
+    engine = Promises(FakeBuddy(), model_router=FakeRouter(), settings=Settings(data_dir=str(tmp_path)))
+    d = engine.parse_phrase("Recycling weekly Thursday")
+    assert d["title"] == "Recycling"
+    assert d["spec"]["frequency"] == "weekly"
+
+
+def test_create_rule_then_cardputer_confirmation(tmp_path):
+    buddy = FakeBuddy()
+    engine = Promises(buddy, settings=Settings(data_dir=str(tmp_path)))
+    res = engine.create_rule("Black bin every other Tuesday, next one 18 Nov")
+    assert res["pending"] is True
+    assert buddy.posted  # confirmation alert sent to the Cardputer
+    rules = [engine._rule_view(r) for r in engine._list_rules()]
+    assert len(rules) == 1 and rules[0]["active"] is False and rules[0]["pending"] is True
+    engine.on_alert_acked(res["alert_id"])  # Enter pressed on the Cardputer
+    rule = engine._get_rule(rules[0]["id"])
+    assert rule["active"]
+    assert rule["next_due"] == "2026-11-18"
+
+
+def test_create_rule_confirmed_directly(tmp_path):
+    engine = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path)))
+    res = engine.create_rule("Recycling weekly Thursday", confirmed=True)
+    assert res["active"] is True
+    rule = engine._get_rule(res["id"])
+    d = date.today()
+    while d.weekday() != 3:  # Thursday
+        d = date.fromordinal(d.toordinal() + 1)
+    assert rule["next_due"] == d.isoformat()
+
+
+def test_occurrence_done_advances_fortnightly(tmp_path):
+    engine = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path)))
+    engine.create_rule("Black bin every other Tuesday, next one 18 Nov", confirmed=True)
+    rule = engine._list_rules(active_only=True)[0]
+    engine._occurrence_done(rule)
+    rule = engine._get_rule(rule["id"])
+    assert rule["next_due"] == "2026-12-02"
+
+
+def test_upcoming_next_14_days(tmp_path):
+    engine = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path)))
+    engine.create_rule("Black bin every other Tuesday, next one 18 Nov", confirmed=True)
+    engine.create_rule("Recycling weekly Thursday", confirmed=True)
+    data = engine.upcoming(14)
+    today = date.today()
+    limit = today + timedelta(days=13)
+    keys = sorted(data["by_date"])
+    assert today.isoformat() <= keys[0]
+    assert keys[-1] <= limit.isoformat()
+    d = today
+    while d.weekday() != 3:
+        d = date.fromordinal(d.toordinal() + 1)
+    last_thu = d
+    while last_thu + timedelta(days=7) <= limit:
+        last_thu = last_thu + timedelta(days=7)
+    assert keys[-1] == last_thu.isoformat()
+    assert any("Black Bin" in x["title"] for x in data["by_date"]["2026-11-18"])
+
+
+def test_ledger_line_written(tmp_path, monkeypatch):
+    monkeypatch.setenv("PIBLO_LEDGER_DIR", str(tmp_path / "ledger"))
+    engine = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path)))
+    engine.create_rule("Recycling weekly Thursday")
+    files = list((tmp_path / "ledger").glob("*.md"))
+    assert files, "no daily ledger file was written"
+    assert "REMINDER DRAFT" in files[0].read_text(encoding="utf-8")
+
+
+def test_rules_api_endpoints():
+    settings_kwargs = {"token": "test-token-that-is-not-default", "_env_file": None}
+    app = create_app(settings=Settings(**settings_kwargs))
+    client = TestClient(app)
+    headers = {"Authorization": "Bearer test-token-that-is-not-default"}
+    r = client.post("/promises/rules", headers=headers,
+                    json={"text": "Recycling weekly Thursday", "confirmed": True})
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["active"] is True and "next_due" in body
+    rid = body["id"]
+    r = client.get("/promises/rules", headers=headers)
+    assert r.status_code == 200
+    assert any(x["id"] == rid for x in r.json()["rules"])
+    r = client.patch(f"/promises/rules/{rid}", headers=headers, json={"shift": True})
+    assert r.status_code == 200 and r.json()["shift"] is True
+    r = client.get("/promises/upcoming?days=14", headers=headers)
+    assert r.status_code == 200 and "by_date" in r.json()
+    r = client.get("/promises/next", headers=headers)
+    assert r.status_code == 200 and isinstance(r.json()["text"], str)
+    r = client.delete(f"/promises/rules/{rid}", headers=headers)
+    assert r.status_code == 200
+    r = client.get("/promises/rules", headers=headers)
+    assert not any(x["id"] == rid for x in r.json()["rules"])
+
+
+
+def test_rule_falls_back_to_plain_parser_when_local_model_is_down(tmp_path, monkeypatch):
+    # Regression: a RouteError from the model router escaped _llm_parse, so POST /promises/rules
+    # answered 503 LOCAL_UNAVAILABLE on any PC without a working local model.
+    from mazhost.errors import ErrorCode, RouteError
+
+    class DownRouter:
+        def chat(self, *a, **k):
+            raise RouteError(ErrorCode.LOCAL_UNAVAILABLE, "local", retryable=True)
+
+    monkeypatch.setenv("PIBLO_LEDGER_DIR", str(tmp_path / "ledger"))
+    engine = Promises(FakeBuddy(), model_router=DownRouter(), settings=Settings(data_dir=str(tmp_path)))
+    assert engine._llm_parse("Recycling weekly Thursday") is None
+    rule = engine.create_rule("Recycling weekly Thursday", None, True)
+    assert rule["active"] is True
