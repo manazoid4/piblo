@@ -21,6 +21,7 @@ from .accessories import Accessories
 from .buddy import AlertIn, Buddy
 from .config import Settings
 from .voices import resolve_data_dir
+from .nowindow import no_window
 
 
 class PrinterSource(Protocol):
@@ -63,7 +64,7 @@ class EnderForgeSource:
             raise ValueError("Unsupported printer observation")
         private_mode.guard_subprocess("EnderForge observation", local=True)
         result = subprocess.run([*self.command, operation, "--json"], capture_output=True,
-                                text=True, stdin=subprocess.DEVNULL, timeout=25, check=False)
+                                text=True, stdin=subprocess.DEVNULL, timeout=25, check=False, **no_window())
         if result.returncode == 3:
             return {"unavailable": True}
         if result.returncode != 0:
