@@ -1,6 +1,6 @@
 # Training on Kaggle (free GPU)
 
-`hey_piblo_train.ipynb` trains the "Hey Piblo" wake word with openWakeWord. Output: `hey_piblo.onnx`.
+Notebooks: `hey_piblo_train.ipynb` (PC wake word), `hey_piblo_micro.ipynb` (on-device wake word), `piblo_persona_lora.ipynb` (Talk persona). Plan: `PLAN.md`.
 Core uses `%LOCALAPPDATA%\Piblo\wakeword-model\hey_piblo.onnx` when it exists; otherwise it uses `hey_jarvis`.
 
 By hand: kaggle.com → Create → Import Notebook → this file → GPU T4 + Internet On → Run All → Output tab.
