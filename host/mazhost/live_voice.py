@@ -22,7 +22,7 @@ from websockets.asyncio.client import connect
 
 from .config import Settings
 from .live_brain import LiveBrain, is_noise, split_sentences, first_clause
-from . import private_mode
+from . import kokoro_pcm, private_mode
 
 log = logging.getLogger("mazhost.live")
 
@@ -370,7 +370,7 @@ class LiveBridge:
     async def _tts(self, sentence: str) -> None:
         if self.kokoro:
             async with private_mode.async_client(timeout=20, trust_env=False) as client:
-                async with client.stream("GET", "http://127.0.0.1:8880/", params={"text": sentence}) as response:
+                async with client.stream("GET", f"http://127.0.0.1:{kokoro_pcm.port(self.cfg)}/", params={"text": sentence}) as response:
                     response.raise_for_status()
                     pending = b""
                     async for chunk in response.aiter_bytes(1024):

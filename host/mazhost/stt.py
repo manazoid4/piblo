@@ -31,7 +31,7 @@ class SpeechToText:
             return False
 
     def available(self) -> bool:
-        for mod in ("onnx_asr", "faster_whisper"):
+        for mod in ("onnx_asr", "vosk", "faster_whisper"):
             try:
                 __import__(mod)
                 return True
@@ -83,6 +83,27 @@ class SpeechToText:
         # onnx-asr resamples any wav rate to 16 kHz itself; the model punctuates and capitalises.
         return str(self._get_onnx().recognize(str(path))).strip()
 
+    def _vosk(self, path: Path) -> str:
+        """Vosk (Apache-2.0, alphacephei.com/vosk): offline Kaldi, fast on CPU. 16-bit mono wav."""
+        import json
+        import os
+        import wave
+
+        with self._lock:
+            if getattr(self, "_vosk_model", None) is None:
+                import vosk
+                vosk.SetLogLevel(-1)
+                folder = self.settings.vosk_model_dir or str(
+                    Path(os.environ.get("LOCALAPPDATA") or Path.home()) / "Piblo" / "vosk-model")
+                if not Path(folder).is_dir():
+                    raise FileNotFoundError(folder)
+                self._vosk_model = vosk.Model(folder)
+        with wave.open(str(path), "rb") as w:
+            rec = __import__("vosk").KaldiRecognizer(self._vosk_model, w.getframerate())
+            while data := w.readframes(4000):
+                rec.AcceptWaveform(data)
+        return json.loads(rec.FinalResult()).get("text", "").strip()
+
     def transcribe_local(self, path: Path) -> tuple[str, str]:
         """Flow dictation only: (text, engine). Parakeet when selected and loadable, else local Whisper."""
         if self.settings.stt_provider == "parakeet":
@@ -90,6 +111,11 @@ class SpeechToText:
                 return self._parakeet(path), "parakeet"
             except Exception:  # noqa: BLE001 - already logged once at load; stay local
                 pass
+        if self.settings.stt_provider == "vosk":
+            try:
+                return self._vosk(path), "vosk"
+            except Exception as e:  # noqa: BLE001 - model missing: stay local with Whisper
+                log.warning("vosk failed (%s); using Whisper", type(e).__name__)
         return self.transcribe(path), "whisper"
 
     def _get_model(self, model_name: str | None = None, device: str | None = None,
