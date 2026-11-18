@@ -1,1 +1,7 @@
-/* Roadmap styling lives in /styles.css so the whole site shares one look. */
+/* Roadmap look comes from /home-base.css, /home.css and /pages.css (the homepage design). Status chips only here. */
+.road-baseline > div:nth-child(1) .road-meta { background: var(--done-bg); color: var(--done-ink); }
+.road-baseline > div:nth-child(2) .road-meta { background: var(--tint); }
+.road-baseline > div:nth-child(3) .road-meta { background: transparent; box-shadow: inset 0 0 0 1px var(--line); }
+.road-meta::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; }
+.road-baseline > div:nth-child(1) .road-meta::before { background: currentColor; }
+.road-baseline > div:nth-child(2) .road-meta::before { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }

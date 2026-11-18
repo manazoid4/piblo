@@ -36,6 +36,8 @@ from .buddy_companion import install_companion_routes
 from .buddy_store import BuddyStore
 from .needs_routes import build_needs_router
 from .commands import parse_command
+from .compound import parse_compound
+from .compound_run import CompoundRunner
 from .config import Settings
 from .control_routes import install_control_routes
 from .core import CoreError, MazCore
@@ -227,6 +229,7 @@ def create_app(
     sessions = SessionStore(cfg.max_turns, cfg.session_ttl_minutes)
     memory_notes = MemoryNotes(resolve_data_dir(cfg))
     catchup = None  # set once buddy exists; answer() reads it at call time
+    compound_runner = None  # same: set once buddy and promises exist
     authority = AuthorityBroker(cfg)
     elevated_executor = ElevatedExecutor(cfg, authority)
     debug_capsules = DebugCapsules(cfg)
@@ -511,6 +514,12 @@ def create_app(
             }
         # Context Ask is informational: selected-screen context must never turn
         # an ordinary question into an executable PC/reminder command.
+        steps = None if pocket_context else parse_compound(refined.text)
+        if steps and compound_runner is not None:
+            started = compound_runner.start(refined.text, steps)
+            sessions.add_turn(session_id, refined.text, started["reply"])
+            return {"text": refined.text, "reply": started["reply"], "provider": "piblo-local",
+                    "actions": refined.actions, "compound": started["run"], "timings": {"llm_ms": 0}}
         command = None if pocket_context else parse_command(refined.text)
         if command:
             return deterministic_command(session_id, refined.text, command, refined.actions)
@@ -1039,6 +1048,7 @@ def create_app(
     @api.post("/dictate")
     async def dictate(request: Request, target: str = "text"):
         """wav in -> cleaned text out. target=pc-paste also pastes on the PC."""
+        t_in = time.perf_counter()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             size = 0
             async for chunk in request.stream():
@@ -1048,16 +1058,19 @@ def create_app(
                     raise HTTPException(413, "audio_too_large")
                 tmp.write(chunk)
             path = Path(tmp.name)
+        upload_ms = round((time.perf_counter() - t_in) * 1000)
         try:
             security.validate_upload(path, size)
             armed = flow_foreground() if target == "pc-paste" else 0  # focus when the audio landed
             try:
                 result = await asyncio.wait_for(
-                    run_in_threadpool(flow_service.dictate, path), timeout=flow_service.dictate_timeout)
+                    run_in_threadpool(flow_service.dictate, path, log=False), timeout=flow_service.dictate_timeout)
             except asyncio.TimeoutError:
                 flow_service._cancel.set()
                 raise HTTPException(504, "stt_timeout")
+            insert_ms, pc = 0, ""
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
+                t_ins = time.perf_counter()
                 prefs = read_settings(flow_service)
                 enter = result["intent"] == "claude" or bool(prefs["press_enter"])
 
@@ -1071,6 +1084,11 @@ def create_app(
                 except Exception:  # noqa: BLE001 - clipboard busy/locked: still return the text
                     result["pc"] = "failed"
                 result["reply"] = result["pc"]  # firmware decodeReply reads `reply` as the outcome
+                insert_ms, pc = round((time.perf_counter() - t_ins) * 1000), result["pc"]
+            if result["text"]:
+                flow_service.log_result(result, upload_ms, insert_ms, pc)
+            else:
+                result["ms"]["upload"] = upload_ms
             return result
         finally:
             try:
@@ -1291,6 +1309,12 @@ def create_app(
     catchup = Catchup(resolve_data_dir(cfg), buddy, inbox_dir(cfg) / "library")
     api.include_router(build_catchup_router(catchup))
     api.include_router(build_promises_router(promises_engine))
+    compound_runner = CompoundRunner(buddy, promises_engine, focus, pc_controller)
+
+    @api.get("/compound/last")
+    def compound_last():
+        return compound_runner.last or {"state": "none"}
+
     api.include_router(build_share_router(cfg, model_router))
     api.include_router(build_onboarding_router(onboarding))
     api.include_router(build_buddy_forms_router(onboarding=onboarding))

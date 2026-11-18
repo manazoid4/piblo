@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /readiness/
+Disallow: /api/
+Disallow: /reserved/
 Sitemap: https://piblo.co.uk/sitemap.xml

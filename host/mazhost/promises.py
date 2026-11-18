@@ -48,6 +48,7 @@ _DAY = re.compile(rf"\b(?:(next|this)\s+)?({'|'.join(_DAYS)})\b")
 _IN = re.compile(r"\bin (\d{1,3}) (hour|day|week)s?\b")
 _AMPM = re.compile(r"\b(?:at\s+)?(\d{1,2})(?::([0-5]\d))?\s*(am|pm)\b")
 _H24 = re.compile(r"\b(?:at\s+)?([01]?\d|2[0-3]):([0-5]\d)\b")
+_BARE_HOUR = re.compile(r"\bat\s+(\d{1,2})\b")   # only read for "tonight": "tonight at 9" means 21:00
 
 # --- bin-day / home recurrence -----------------------------------------
 WKDAY = {name: i for i, name in enumerate(_DAYS)} | {name[:3]: i for i, name in enumerate(_DAYS)}
@@ -162,7 +163,7 @@ def label(dt: datetime) -> str:
     return f"{dt:%a} {dt.day} {dt:%b %Y}, {dt:%H:%M} {dt.tzname()}"
 
 
-def _time(text: str) -> tuple[int, int, bool]:
+def _time(text: str, night: bool = False) -> tuple[int, int, bool]:
     if m := _AMPM.search(text):
         h = int(m[1])
         if not 1 <= h <= 12:
@@ -170,7 +171,12 @@ def _time(text: str) -> tuple[int, int, bool]:
         return h % 12 + (12 if m[3] == "pm" else 0), int(m[2] or 0), False
     if m := _H24.search(text):
         return int(m[1]), int(m[2]), False
-    return DEFAULT_HOUR, 0, True
+    if night and (m := _BARE_HOUR.search(text)):
+        h = int(m[1])
+        if h > 23:
+            raise PromiseError("invalid_time", "That time is not valid.")
+        return (h + 12 if 1 <= h <= 11 else h), 0, False
+    return (20 if night else DEFAULT_HOUR), 0, True
 
 
 def _year(raw: str) -> int:
@@ -188,7 +194,7 @@ def propose(note: str, now: datetime | None = None) -> dict:
     text, today = note.lower(), now.date()
     days: list[date] = []
     exact: datetime | None = None
-    today_word = False
+    today_word = night = False
     if m := _NUM.search(text):
         y = _year(m[3])
         reads = [_date(y, int(m[2]), int(m[1])), _date(y, int(m[1]), int(m[2]))]   # British first, then US
@@ -215,6 +221,8 @@ def propose(note: str, now: datetime | None = None) -> dict:
             days = [today + timedelta(days=n * (7 if m[2] == "week" else 1))]
     elif "tomorrow" in text:
         days = [today + timedelta(days=1)]
+    elif "tonight" in text:
+        days, today_word, night = [today], True, True
     elif "today" in text:
         days, today_word = [today], True
     elif m := _DAY.search(text):
@@ -225,16 +233,17 @@ def propose(note: str, now: datetime | None = None) -> dict:
             days.append(days[0] + timedelta(days=7))
     else:
         raise PromiseError("no_date", "I could not find a date. Say when, for example 'by 3 April' or 'Friday at 5pm'.")
-    hh, mm, default_time = _time(text)
+    hh, mm, default_time = _time(text, night)
     if exact:
         cands, default_time = [exact], False
     else:
         cands = [_local(d, hh, mm, zone) for d in days]
         if today_word and default_time and cands[0] <= now:
-            # No time said and 09:00 has gone: end of the working day, or an hour from now if that has gone too.
+            # No time said and the default has gone: "tonight" and "today" each fall back to an hour from now,
+            # and "today" first tries end of the working day.
+            hour_on = (now.astimezone(timezone.utc) + timedelta(hours=1)).astimezone(zone).replace(second=0, microsecond=0)
             late = _local(today, 17, 0, zone)
-            cands = [late if late > now else (now.astimezone(timezone.utc) + timedelta(hours=1))
-                     .astimezone(zone).replace(second=0, microsecond=0)]
+            cands = [hour_on] if night else [late if late > now else hour_on]
     if cands[0] <= now:   # the first (British) reading is past: say so, never fall through to the US one
         raise PromiseError("in_the_past", "That time has already passed.")
     out = [{"due": c.replace(tzinfo=None).isoformat(timespec="minutes"), "label": label(c)}

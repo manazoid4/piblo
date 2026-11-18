@@ -431,13 +431,15 @@ public:
         switch (dictate::state()) {
             case dictate::State::Listening: return _toggle ? "tap SPACE: type  ESC cancel" : "release SPACE: type  ESC cancel";
             case dictate::State::Working:   return "sending...  ESC cancel";
-            default: return "hold or tap SPACE to speak";
+            default: return "hold Y or SPACE to speak";
         }
     }
 
     void onEnter() override {
-        _held = KB.held(KEY_SPACE);  // arrived by holding SPACE: start at once
-        if (_held) begin();
+        // One gesture from Home: hold Y (this app's Home shortcut) or SPACE, speak, release.
+        _talk = KB.held(KEY_Y) ? KEY_Y : KEY_SPACE;
+        _held = KB.held(_talk);  // arrived by holding the key: start at once
+        if (_held) { begin(); _downAt = millis(); }
         invalidate();
     }
 
@@ -447,7 +449,7 @@ public:
 
     bool onKey(const KeyEvent& e) override {
         const bool mine = dictate::active(this);
-        if (e.code == KEY_SPACE) {
+        if (e.code == KEY_SPACE || e.code == KEY_Y) {  // the hint promises both keys
             const bool listening = mine && dictate::state() == dictate::State::Listening;
             if (e.down && !mine) {
                 begin();
@@ -547,6 +549,7 @@ private:
     }
 
     bool        _held    = false;
+    uint8_t     _talk    = KEY_SPACE;  // key held on arrival (Y from Home, or SPACE)
     bool        _toggle  = false;   // started by a tap: next tap ends it
     uint32_t    _downAt  = 0;
     bool        _wasMine = false;
