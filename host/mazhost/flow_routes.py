@@ -24,6 +24,7 @@ CLEANUPS = ("auto", "rules", "groq", "local")
 STT_CHOICES = ("auto", "parakeet", "whisper")
 DEFAULTS = {"input_mode": "paste", "press_enter": False, "cleanup": "auto", "stt": "auto"}
 LATENCY_KEEP = 50
+TARGET_MS = 1500  # first audio byte -> text typed, CPU
 DICTIONARY_MAX = 500
 _DICTIONARY_LOCK = threading.Lock()
 _SETTINGS_LOCK = threading.Lock()
@@ -177,9 +178,12 @@ def recent_dictations(flow, limit: int = 10) -> list[dict]:
             {
                 "when": line.split(" ")[0],
                 "intent": fields.get("intent", ""),
+                "upload_ms": _int(fields.get("upload")),
                 "stt_ms": _int(fields.get("stt")),
                 "clean_ms": _int(fields.get("clean")),
+                "insert_ms": _int(fields.get("insert")),
                 "total_ms": _int(fields.get("total")),
+                "pc": fields.get("pc", "-"),
                 "cleanup": fields.get("via", ""),
                 "stt_engine": fields.get("stt_via", ""),
                 "chars": _int(fields.get("chars")),
@@ -373,9 +377,15 @@ def build_flow_router(flow) -> APIRouter:
             errors = [line.strip()[-120:] for line in raw[-5:] if line.strip()]
         except OSError:
             pass
+        stages = {k: round(sum(r[k + "_ms"] for r in rows) / len(rows)) if rows else 0
+                  for k in ("upload", "stt", "clean", "insert")}
         return {
             "recent": rows,
             "count": len(rows),
+            "last": rows[0] if rows else None,
+            "avg_stage_ms": stages,
+            "target_ms": TARGET_MS,
+            "within_target": sum(1 for t in totals if t <= TARGET_MS),
             "avg_total_ms": round(sum(totals) / len(totals)) if totals else 0,
             "p95_total_ms": p95,
             "errors": errors,
