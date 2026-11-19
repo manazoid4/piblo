@@ -12,6 +12,16 @@ interface Dump {
   source?: string;
   claimed_by?: string;
 }
+interface SavedReference {
+  id: string;
+  kind: string;
+  url?: string;
+  title?: string;
+  author?: string;
+  tags?: string[];
+  when?: string;
+}
+
 interface Hit {
   id: string;
   kind: string;
@@ -107,10 +117,42 @@ function Inbox() {
   );
 }
 
+/** Share a Reel from Instagram to Piblo. We only claim link/caption capture, never that its video was watched. */
+function FeedVault() {
+  const saved = usePoll<{ items: SavedReference[] }>('/library/recent?kind=instagram&limit=20', 8000);
+  const rows = saved.data?.items ?? [];
+  return (
+    <section className="card stack" aria-labelledby="feed-h">
+      <div className="row">
+        <h2 id="feed-h" className="grow">Feed Vault</h2>
+        <span className="tag">{rows.length} recent</span>
+      </div>
+      <p className="sub">Share an Instagram post or Reel to Piblo from your phone. It saves the link and any text you share. Video understanding is not active.</p>
+      {saved.error && <p role="alert">{saved.error}</p>}
+      <div className="list">
+        {rows.map((item) => (
+          <div className="list-item" key={item.id}>
+            <div className="grow">
+              <div className="title selectable">{item.title || item.url || 'Saved Instagram link'}</div>
+              <div className="detail">
+                {item.tags?.includes('captions_provided') ? 'Captions supplied' : item.tags?.includes('transcript_provided') ? 'Transcript supplied' : 'Link or shared text only — not watched'}
+              </div>
+            </div>
+            {item.url && <button className="btn sm ghost" onClick={() => void window.piblo.openExternal(item.url!)}>Open source</button>}
+          </div>
+        ))}
+        {!saved.loading && !rows.length && <Empty title="Nothing shared yet"><p>In Instagram, choose Share, then Piblo. You can also save a Reel link below.</p></Empty>}
+      </div>
+    </section>
+  );
+}
+
 function Library() {
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [url, setUrl] = useState('');
+  const [reason, setReason] = useState('');
+  const [receipt, setReceipt] = useState('');
   const act = useAct();
 
   const search = async () => {
@@ -120,8 +162,19 @@ function Library() {
   };
   const ingest = async () => {
     if (!/^https?:\/\//i.test(url.trim())) return;
-    const r = await act('POST', '/ingest', { kind: 'url', url: url.trim() }, 'Saved to your library');
-    if (r.ok) setUrl('');
+    const r = await act<{ kind: string; unified_memory?: { state?: string } }>(
+      'POST', '/share', { url: url.trim(), text: reason.trim() || url.trim(), title: '' },
+    );
+    if (r.ok) {
+      setUrl('');
+      setReason('');
+      const state = r.data.unified_memory?.state;
+      setReceipt(state === 'local_checkout'
+        ? 'Saved in Piblo and local Unified Memory. GitHub sync is still pending.'
+        : r.data.kind === 'github'
+          ? 'Saved on this PC. Configure Unified Memory to sync GitHub references.'
+          : 'Saved in Piblo on this PC.');
+    }
   };
 
   return (
@@ -147,8 +200,12 @@ function Library() {
         </div>
       )}
       <div className="row">
-        <input className="input" placeholder="Save a link to your library (https://...)" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void ingest()} aria-label="Link to save" />
+        <input className="input" placeholder="Paste a GitHub repo or Instagram Reel URL (https://...)" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void ingest()} aria-label="Link to save" />
         <button className="btn" onClick={ingest} disabled={!/^https?:\/\//i.test(url.trim())}>Save link</button>
+      </div>
+      <input className="input" placeholder="Why save this? (optional)" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} aria-label="What could Piblo use this for?" />
+      {receipt && <p role="status" className="meta">{receipt}</p>}
+      <div className="row" style={{ display: 'none' }}>
       </div>
     </section>
   );
@@ -159,6 +216,7 @@ export function Memory() {
     <div className="page">
       <PageHead title="Memory" sub="Everything your Piblo heard and everything you saved, in one place." />
       <Inbox />
+      <FeedVault />
       <Library />
       <FileVault />
     </div>
