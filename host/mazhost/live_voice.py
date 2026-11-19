@@ -319,15 +319,15 @@ class LiveBridge:
                 log.info("live: dropped noise turn %r", text)
                 self._rearm()
                 return  # still "listening": the device never saw a state change
-            dictated = None
+            dictated, armed = None, False
             if self.dictate_handler is not None and self.brain.dictating():
                 woke, words = split_wake(text)
-                if not (woke or time.monotonic() < self._woke_until or is_mode_command(text)):
+                spoke_at = t0 - (t.get("speech_ms", 0) + t.get("end_detect_ms", 0)) / 1000  # when this utterance began
+                if not (woke or spoke_at < self._woke_until or is_mode_command(text)):
                     log.info("live: dictation mode, no wake phrase: ignored")
                     self._rearm()
                     return  # room talk, TV: never pasted
-                dictated = words if woke else text
-                self._woke_until = time.monotonic() + WAKE_WINDOW_S if woke and not words else 0.0
+                dictated, armed, self._woke_until = (words if woke else text), woke and not words, 0.0
             await self._send({"type": "text", "role": "user", "text": text})
             await self._set_state("thinking")
             self.brain.on_slow = lambda: sentences.put_nowait("One sec.")
@@ -347,6 +347,8 @@ class LiveBridge:
                 producer = asyncio.create_task(self._think(text, sentences))
             while (sentence := await sentences.get()) is not None:
                 await self._tts(sentence)
+            if armed:  # the window opens once "Yes?" has been said, and the next utterance must start inside it
+                self._woke_until = time.monotonic() + WAKE_WINDOW_S
             self._q.put_nowait(None)
             if "first" not in t:  # nothing was spoken
                 self._end_turn_tasks()

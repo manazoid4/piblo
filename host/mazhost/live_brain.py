@@ -38,7 +38,7 @@ OLLAMA_FIRST_TOKEN_S = 30.0
 MODELS_TTL_S = 24 * 3600
 MEMORY_TTL_S = 3600
 ASR_RETRY_S = 60  # Windows takes ~2.4 s to refuse a dead localhost port; retry LFM3 ASR this often, not every turn
-_asr_down_until = 0.0
+_asr_down: dict[str, float] = {}  # LFM3 ASR url -> monotonic time to try it again
 
 SYSTEM = ("You are Piblo, a warm, quick pocket voice assistant talking out loud to Maz. Speak naturally in "
           "UK English. Reply in 1 to 3 short sentences unless asked for more. Never use markdown, lists, "
@@ -114,12 +114,14 @@ _DICTATE_OFF = re.compile(r"(?:(?:switch|change|go) (?:back |over )?to |back to 
 
 def split_wake(text: str) -> tuple[bool, str]:
     """'Hey Piblo, open my notes' -> (True, 'open my notes'). Speech-to-text spells Piblo many ways (Pablo,
-    Peblo, Pebble, Plu, people), so after a greeting any short P/B word counts; without one it must be close."""
-    m = re.match(r"\W*(?:(hey|hi|hay|ok|okay|a)\W+)?([a-z]+)\b\W*(.*)", text.strip(), re.S | re.I)
+    Peblo, Pebble, Plu), so after hey/hi/hello a short P/B word half-like Piblo counts; without one it must be
+    close. 'Ok' and 'a' are not greetings here: 'Ok but the TV...' and 'A bit of rain' are room talk."""
+    m = re.match(r"\W*(?:(hey|hi|hay|hello|ok|okay)\W+)?([a-z]+)\b\W*(.*)", text.strip(), re.S | re.I)
     if m:
         name = m[2].lower()
         close = difflib.SequenceMatcher(None, name, "piblo").ratio()
-        if close >= 0.8 or (m[1] and (close >= 0.6 or (name[0] in "pb" and 3 <= len(name) <= 7))):
+        greeted = (m[1] or "").lower() in ("hey", "hi", "hay", "hello")
+        if close >= 0.8 or (greeted and close >= 0.5 and name[0] in "pb" and 3 <= len(name) <= 7):
             return True, m[3].strip()
     return False, text.strip()
 
@@ -127,7 +129,7 @@ def split_wake(text: str) -> tuple[bool, str]:
 def normalise(text: str) -> str:
     """Lower-case command text without the wake phrase, polite fillers or a trailing 'please/now'."""
     low = split_wake(text.strip().replace("’", "'"))[1].lower().rstrip(".!?,").strip()
-    low = re.sub(r"^(?:(?:can|could|would|will) you |please |i want you to |i'd like you to )+", "", low)
+    low = re.sub(r"^(?:(?:can|could|would|will) you |please |i want you to |i'd like you to |(?:ok|okay|so),? )+", "", low)
     return re.sub(r"(?:,? (?:please|now|right now|for me|instead))+$", "", low)
 
 
@@ -214,21 +216,21 @@ class LiveBrain:
             {"role": "system", "content": "Perform ASR in English."},
             {"role": "user", "content": [{"type": "input_audio", "input_audio": {
                 "data": base64.b64encode(buf.getvalue()).decode(), "format": "wav"}}]}]}
-        global _asr_down_until
+        url = self.cfg.llamacpp_url.rstrip("/")
         try:
-            if self.stt is not None and time.monotonic() < _asr_down_until:
+            if self.stt is not None and time.monotonic() < _asr_down.get(url, 0.0):
                 raise httpx.ConnectError("LFM3 ASR was down a moment ago")  # skip the slow refusal
-            url = self.cfg.llamacpp_url.rstrip("/")
             local = httpx.URL(url).host in ("127.0.0.1", "localhost", "::1")  # a live local server accepts in <1 ms
             async with self.client(20, connect=0.5 if local else 5) as c:
                 r = await c.post(url + "/v1/chat/completions", json=body)
             r.raise_for_status()
+            _asr_down.pop(url, None)
             return (r.json()["choices"][0]["message"]["content"] or "").strip()
         except (httpx.ConnectError, httpx.ConnectTimeout) as error:
-            if time.monotonic() >= _asr_down_until:
+            if time.monotonic() >= _asr_down.get(url, 0.0):
                 log.warning("live: ASR failed: %r", error)
-                _asr_down_until = time.monotonic() + ASR_RETRY_S
-        except (httpx.HTTPError, KeyError, IndexError, ValueError) as error:
+                _asr_down[url] = time.monotonic() + ASR_RETRY_S
+        except (httpx.HTTPError, httpx.InvalidURL, KeyError, IndexError, ValueError) as error:
             log.warning("live: ASR failed: %r", error)
         if self.stt is None:
             return ""
@@ -296,7 +298,7 @@ class LiveBrain:
 
     # ---- voice commands ------------------------------------------------------
     async def command(self, text: str, strict: bool = False) -> str | None:
-        """Voice commands. strict=True (dictation): an unknown model name is not a command, so it gets pasted."""
+        """Voice commands. strict=True (dictation): only the mode switches count; everything else is dictated text."""
         low = normalise(text)
         if _DICTATE_ON.fullmatch(low):
             self._write_json("talk-mode.json", {"dictate": True})
@@ -304,13 +306,16 @@ class LiveBrain:
         if _DICTATE_OFF.fullmatch(low):
             self._write_json("talk-mode.json", {"dictate": False})
             return DICTATE_OFF
+        if strict:
+            return None
         if m := re.match(r"(?:use|switch(?: over| back)? to|change(?: over)? to)(?: the| a)?(?: model)? "
                          r"(.{2,30}?)(?: model| mode| brain)?$", low):
             if got := await self.switch(m[1]):
                 return f"Okay, I'm using {got['label']} now."
-            return None if strict or low.startswith("use") else f"Sorry, I don't know a model called {m[1]}."
-        if (re.search(r"\b(?:what|which)\b.{0,25}\b(?:model|brain|llm)s?\b", low)
-                and re.search(r"\b(?:you|your|you're|this|it|using|running)\b", low)):
+            return None if low.startswith("use") else f"Sorry, I don't know a model called {m[1]}."
+        if re.search(r"\b(?:what|which)\b.{0,25}\b(?:model|brain|llm)s?\b.{0,15}"
+                     r"\b(?:are you|you're|you are|using|running|is this|is it|is that)\b"
+                     r"|\bwhat(?:'s| is) your (?:\w+ )?(?:model|brain|llm)\b", low):
             cur = await self.current()
             label = cur["label"].split("/")[-1].split(":")[0]  # spoken: never read out a raw model id
             return f"I'm using {label}, a free cloud model." if cur["model"].endswith(":free") else f"I'm using {label}."
