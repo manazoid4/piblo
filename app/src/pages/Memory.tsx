@@ -190,6 +190,15 @@ function Library() {
     }
   };
 
+  const syncRepos = async () => {
+    const r = await act<{ state: string; saved?: number; note_added?: number; already_saved?: number; reason?: string }>('POST', '/share/repo-sync');
+    if (!r.ok) return;
+    if (r.data.state !== 'local_checkout') {
+      setReceipt('Repos remain saved in Piblo on this PC. Set MAZ_UNIFIED_MEMORY_ROOT to your Unified Memory checkout to sync.');
+    } else {
+      setReceipt(`Local Unified Memory checkout updated: ${(r.data.saved ?? 0) + (r.data.note_added ?? 0)} additions and ${r.data.already_saved ?? 0} previously saved. No GitHub push performed.`);
+    }
+  };
   return (
     <section className="card stack" aria-labelledby="lib-h">
       <h2 id="lib-h">Library</h2>
@@ -218,6 +227,7 @@ function Library() {
       </div>
       <input className="input" placeholder="Why save this? (optional)" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} aria-label="What could Piblo use this for?" />
       {receipt && <p role="status" className="meta">{receipt}</p>}
+      <button className="btn sm ghost" onClick={() => void syncRepos()}>Sync saved GitHub links to local Unified Memory</button>
     </section>
   );
 }
