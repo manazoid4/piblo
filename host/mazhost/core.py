@@ -27,6 +27,7 @@ import httpx
 from .config import Settings
 from .security import is_lan_ip
 from . import private_mode
+from .nowindow import no_window
 
 
 PROJECT_MARKERS = (
@@ -478,6 +479,7 @@ class MazCore:
                 shell=False,
                 encoding="utf-8",
                 errors="replace",
+                **no_window(),
             )
         except (OSError, subprocess.TimeoutExpired) as error:
             return {"ok": False, "returncode": -1, "output": str(error)[:12000]}

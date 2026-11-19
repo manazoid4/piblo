@@ -11,6 +11,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+from .nowindow import no_window
 import threading
 import time
 import uuid
@@ -127,6 +128,7 @@ class BeamStore:
                 capture_output=True,
                 timeout=3,
                 check=False,
+                **no_window(),
             )
             return completed.returncode == 0
         except (OSError, subprocess.SubprocessError):

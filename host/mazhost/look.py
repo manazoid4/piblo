@@ -13,6 +13,7 @@ from .config import Settings
 from .stt import SpeechToText
 from .teach_capture import Display, TeachCapture, TeachError
 from . import private_mode
+from .nowindow import no_window
 
 
 class LookError(RuntimeError):
@@ -64,6 +65,7 @@ class LookService:
                 capture_output=True,
                 text=True,
                 timeout=20,
+                **no_window(),
                 creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
             if result.returncode != 0 or not target.exists():
