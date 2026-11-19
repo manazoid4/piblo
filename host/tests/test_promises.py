@@ -306,13 +306,17 @@ def test_bank_holiday_shift():
     assert next_date(unshifted, after=date(2026, 4, 27)) == date(2026, 5, 4)
 
 
+NEXT_BIN = date.today() + timedelta(days=7)  # relative, so these tests don't expire on a fixed date
+BIN_PHRASE = f"Black bin every other Tuesday, next one {NEXT_BIN.day} {NEXT_BIN:%b}"
+
+
 def test_phrase_parse_deterministic(tmp_path):
-    d = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path))).parse_phrase("Black bin every other Tuesday, next one 18 Nov")
+    d = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path))).parse_phrase(BIN_PHRASE)
     assert d["kind"] == "bin"
     assert d["title"] == "Black Bin"
     assert d["spec"]["frequency"] == "fortnightly"
     assert d["spec"]["weekday"] == 1  # Tuesday
-    assert d["spec"]["anchor"] == "2026-11-18"
+    assert d["spec"]["anchor"] == NEXT_BIN.isoformat()
 
 
 def test_phrase_parse_recycling(tmp_path):
@@ -349,7 +353,7 @@ def test_phrase_parse_llm_preferred(tmp_path):
 def test_create_rule_then_cardputer_confirmation(tmp_path):
     buddy = FakeBuddy()
     engine = Promises(buddy, settings=Settings(data_dir=str(tmp_path)))
-    res = engine.create_rule("Black bin every other Tuesday, next one 18 Nov")
+    res = engine.create_rule(BIN_PHRASE)
     assert res["pending"] is True
     assert buddy.posted  # confirmation alert sent to the Cardputer
     rules = [engine._rule_view(r) for r in engine._list_rules()]
@@ -357,7 +361,7 @@ def test_create_rule_then_cardputer_confirmation(tmp_path):
     engine.on_alert_acked(res["alert_id"])  # Enter pressed on the Cardputer
     rule = engine._get_rule(rules[0]["id"])
     assert rule["active"]
-    assert rule["next_due"] == "2026-11-18"
+    assert rule["next_due"] == NEXT_BIN.isoformat()
 
 
 def test_create_rule_confirmed_directly(tmp_path):
@@ -373,16 +377,16 @@ def test_create_rule_confirmed_directly(tmp_path):
 
 def test_occurrence_done_advances_fortnightly(tmp_path):
     engine = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path)))
-    engine.create_rule("Black bin every other Tuesday, next one 18 Nov", confirmed=True)
+    engine.create_rule(BIN_PHRASE, confirmed=True)
     rule = engine._list_rules(active_only=True)[0]
     engine._occurrence_done(rule)
     rule = engine._get_rule(rule["id"])
-    assert rule["next_due"] == "2026-12-02"
+    assert rule["next_due"] == (NEXT_BIN + timedelta(days=14)).isoformat()
 
 
 def test_upcoming_next_14_days(tmp_path):
     engine = Promises(FakeBuddy(), settings=Settings(data_dir=str(tmp_path)))
-    engine.create_rule("Black bin every other Tuesday, next one 18 Nov", confirmed=True)
+    engine.create_rule(BIN_PHRASE, confirmed=True)
     engine.create_rule("Recycling weekly Thursday", confirmed=True)
     data = engine.upcoming(14)
     today = date.today()
@@ -397,7 +401,7 @@ def test_upcoming_next_14_days(tmp_path):
     while last_thu + timedelta(days=7) <= limit:
         last_thu = last_thu + timedelta(days=7)
     assert keys[-1] == last_thu.isoformat()
-    assert any("Black Bin" in x["title"] for x in data["by_date"]["2026-11-18"])
+    assert any("Black Bin" in x["title"] for x in data["by_date"][NEXT_BIN.isoformat()])
 
 
 def test_ledger_line_written(tmp_path, monkeypatch):
