@@ -370,6 +370,8 @@ class LiveBrain:
         body = {"model": model, "messages": msgs, "stream": True, "max_tokens": 220, "temperature": 0.7}
         if base == OPENROUTER:  # thinking models spend the whole budget reasoning and say nothing
             body["reasoning"] = {"enabled": False}
+        elif base == self.cfg.ollama_url.rstrip("/") + "/v1":  # same for local Ollama (qwen3.5: 31 s of silence)
+            body["reasoning_effort"] = "none"
         headers = {"Authorization": f"Bearer {key}"} if key else {}
         try:
             async with self.client(60) as c, c.stream("POST", f"{base}/chat/completions", json=body, headers=headers) as r:

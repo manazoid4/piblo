@@ -183,6 +183,26 @@ def test_openrouter_429_falls_back_to_ollama(tmp_path):
     assert brain.history[-1] == {"role": "assistant", "content": "Local answer."}
 
 
+def test_local_ollama_brain_turns_thinking_off(tmp_path):
+    # qwen3.5 on Ollama otherwise spends the whole max_tokens budget reasoning and speaks nothing
+    bodies = []
+
+    def handler(req):
+        bodies.append((req.url.host, json.loads(req.content)))
+        return sse("Hello ", "Maz.")
+
+    brain = brain_for(tmp_path, handler, live_ollama_model="qwen3.5:4b")
+    assert asyncio.run(brain.command("switch to local")) == "Okay, I'm using the local model now."
+
+    async def run():
+        return "".join([p async for p in brain.stream("who are you")])
+
+    assert asyncio.run(run()) == "Hello Maz."
+    host, body = bodies[-1]
+    assert host == "127.0.0.1" and body["model"] == "qwen3.5:4b"
+    assert body["reasoning_effort"] == "none" and "reasoning" not in body
+
+
 def test_transcript_noise_filter_and_sentence_cutting():
     assert all(is_noise(t) for t in ("", ".", "you", "Thank you.", "um, yeah", "(silence)"))
     assert not any(is_noise(t) for t in ("hello", "what time is it", "switch to deepseek"))
