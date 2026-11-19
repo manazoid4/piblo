@@ -12,13 +12,13 @@ from starlette.websockets import WebSocketDisconnect
 
 from mazhost import live_brain, live_voice
 from mazhost.config import Settings
-from mazhost.live_brain import LiveBrain, is_noise, split_sentences
+from mazhost.live_brain import DICTATE_OFF, DICTATE_ON, LiveBrain, is_noise, split_sentences, split_wake
 from test_live_voice import REPLY_SAMPLES_24K, TOKEN, FakeRealtime, make_client, speak, text
 
 
 class FakeBrain:
     """Scripted stand-in for LiveBrain: no network. Class attrs are set per test."""
-    text, chunks, hang, stream_closed = "tell me a joke", [], False, False
+    text, chunks, hang, stream_closed, dictate = "tell me a joke", [], False, False, False
     asked = threading.Event()
 
     def __init__(self, cfg, stt=None):
@@ -29,8 +29,11 @@ class FakeBrain:
         type(self).asked.set()
         return type(self).text
 
-    async def command(self, text):
+    async def command(self, text, strict=False):
         return None
+
+    def dictating(self):
+        return type(self).dictate
 
     async def stream(self, text):
         self.meta = {"model": "fake/model:free", "fallback": None, "brain_first_token_ms": 5}
@@ -285,3 +288,90 @@ def test_what_model_reply_is_short_to_speak(tmp_path):
 def test_asr_server_down_without_local_stt_drops_turn(tmp_path):
     brain = LiveBrain(Settings(data_dir=str(tmp_path)), transport=httpx.MockTransport(_asr_down))
     assert asyncio.run(brain.transcribe(b"\x00\x01" * 1600)) == ""
+
+
+# ---- dictation mode: "Hey Piblo, <words>" is pasted on the PC ---------------------------------------
+
+@pytest.mark.parametrize("heard,woke,rest", [
+    ("Hey Piblo, buy milk.", True, "buy milk."), ("Hey, Pablo. Open my notes", True, "Open my notes"),
+    ("hey peeblo send the report", True, "send the report"), ("Piblo, stop", True, "stop"),
+    ("Hey Piblo.", True, ""), ("Hey people, listen up", False, "Hey people, listen up"),
+    ("Pick up the kids", False, "Pick up the kids"), ("Hey there, Piblo", False, "Hey there, Piblo")])
+def test_split_wake_tolerates_how_speech_to_text_spells_piblo(heard, woke, rest):
+    assert split_wake(heard) == (woke, rest)
+
+
+def test_dictation_mode_is_switched_by_voice_and_persists(tmp_path):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    assert not brain.dictating()
+    assert asyncio.run(brain.command("Hey Piblo, dictation mode.")) == DICTATE_ON
+    assert LiveBrain(brain.cfg).dictating()  # survives a new Talk session
+    assert asyncio.run(brain.command("switch to talk mode")) == DICTATE_OFF
+    assert not LiveBrain(brain.cfg).dictating()
+    # dictating "switch to the other branch" must paste, not answer "I don't know a model called..."
+    assert asyncio.run(brain.command("switch to the other branch", strict=True)) is None
+
+
+def dictation_client(monkeypatch, tmp_path, heard):
+    fake, pasted = FakeRealtime(), []
+    brain = type("B", (FakeBrain,), {"text": heard, "chunks": ["Chat answer. "], "hang": False,
+                                     "stream_closed": False, "dictate": True, "asked": threading.Event()})
+    monkeypatch.setattr(live_voice, "LiveBrain", brain)
+    from mazhost import app as app_mod
+    monkeypatch.setattr(app_mod, "flow_foreground", lambda: 7)
+    monkeypatch.setattr(app_mod, "flow_safe_paste",
+                        lambda text, enter, armed, typer=None: pasted.append((text, enter, armed)) or "pasted")
+    return make_client(fake, live_brain="cloud", flow_dir=str(tmp_path / "flow")), brain, pasted
+
+
+def until_listening(ws):
+    """Play out one spoken reply like the device does; returns the states seen."""
+    states = []
+    while True:
+        m = text(ws)
+        if isinstance(m, bytes):
+            continue
+        if m.get("type") == "state":
+            states.append(m["state"])
+            if m["state"] == "speaking":
+                ws.send_text(json.dumps({"type": "playback_done"}))
+            elif m["state"] == "listening":
+                return states
+
+
+def test_dictation_pastes_the_words_after_hey_piblo(monkeypatch, tmp_path):
+    client, brain, pasted = dictation_client(monkeypatch, tmp_path, "Hey Piblo, um, buy milk and eggs")
+    with client.websocket_connect(f"/voice/live?token={TOKEN}") as ws:
+        assert text(ws)["state"] == "listening"
+        speak(ws)
+        assert until_listening(ws) == ["thinking", "speaking", "listening"]  # Piblo says "Pasted."
+        ws.send_text(json.dumps({"type": "bye"}))
+    assert pasted == [("Buy milk and eggs.", False, 7)]  # Flow cleanup ran, into the focused window
+    assert "dictate intent=paste" in (tmp_path / "flow" / "latency.log").read_text()
+
+
+def test_dictation_ignores_speech_without_the_wake_phrase(monkeypatch, tmp_path):
+    client, brain, pasted = dictation_client(monkeypatch, tmp_path, "and then the TV said something")
+    with client.websocket_connect(f"/voice/live?token={TOKEN}") as ws:
+        assert text(ws)["state"] == "listening"
+        speak(ws)
+        assert brain.asked.wait(3)
+        time.sleep(0.3)
+        ws.send_text(json.dumps({"type": "bye"}))
+        with pytest.raises(WebSocketDisconnect):
+            ws.receive_text()  # no thinking, no reply: still listening
+    assert pasted == []
+
+
+def test_bare_wake_phrase_makes_the_next_utterance_the_dictation(monkeypatch, tmp_path):
+    client, brain, pasted = dictation_client(monkeypatch, tmp_path, "Hey Piblo.")
+    with client.websocket_connect(f"/voice/live?token={TOKEN}") as ws:
+        assert text(ws)["state"] == "listening"
+        speak(ws)
+        until_listening(ws)  # "Yes?"
+        assert pasted == []
+        brain.text = "Claude, fix the failing test"
+        speak(ws)
+        until_listening(ws)  # "Sent."
+        ws.send_text(json.dumps({"type": "bye"}))
+    assert pasted == [("fix the failing test.", True, 7)]  # "Claude ..." pastes and presses Enter

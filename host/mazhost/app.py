@@ -1058,6 +1058,41 @@ def create_app(
     flow_service = Flow(cfg, speech, model_router)
     api.state._flow = flow_service  # test hook: tweak dictate_timeout, _cancel, etc.
 
+    async def paste_on_pc(result: dict, armed: int) -> tuple[int, bool]:
+        """Paste result["text"] into the window focused when the audio landed; sets result["pc"].
+        Returns (ms taken, whether Enter was pressed)."""
+        t_ins = time.perf_counter()
+        prefs = read_settings(flow_service)
+        enter = result["intent"] == "claude" or bool(prefs["press_enter"])
+
+        def type_and_enter(text, enter=False):
+            insert_text(text, enter, flow_service)
+
+        typer = type_and_enter if prefs["input_mode"] == "type" else None
+        try:
+            result["pc"] = await run_in_threadpool(flow_safe_paste, result["text"], enter, armed, typer)
+        except Exception:  # noqa: BLE001 - clipboard busy/locked: still return the text
+            result["pc"] = "failed"
+        return round((time.perf_counter() - t_ins) * 1000), enter
+
+    async def live_dictate(words: str) -> str:
+        """Talk dictation mode: the words after "Hey Piblo" go through Flow and onto the PC. Returns what Piblo says."""
+        armed = flow_foreground()
+        result = await run_in_threadpool(flow_service.finish, words)
+        if not result["text"]:
+            return "I didn't catch any words."
+        if result["intent"] == "note":
+            return "Saved to your notes."
+        if result["intent"] == "remind":
+            return "Saved as a reminder."
+        insert_ms, entered = await paste_on_pc(result, armed)
+        flow_service.log_result(result, 0, insert_ms, result["pc"])
+        if result["pc"] == "clipboard":
+            return "It's on the clipboard. Click where it goes and press Control V."
+        if result["pc"] == "failed":
+            return "The clipboard was busy, so nothing was pasted. Try again."
+        return "Sent." if entered else "Pasted."
+
     @api.post("/dictate")
     async def dictate(request: Request, target: str = "text"):
         """wav in -> cleaned text out. target=pc-paste also pastes on the PC."""
@@ -1083,21 +1118,8 @@ def create_app(
                 raise HTTPException(504, "stt_timeout")
             insert_ms, pc = 0, ""
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
-                t_ins = time.perf_counter()
-                prefs = read_settings(flow_service)
-                enter = result["intent"] == "claude" or bool(prefs["press_enter"])
-
-                def type_and_enter(text, enter=False):
-                    insert_text(text, enter, flow_service)
-
-                typer = type_and_enter if prefs["input_mode"] == "type" else None
-                try:
-                    result["pc"] = await run_in_threadpool(
-                        flow_safe_paste, result["text"], enter, armed, typer)
-                except Exception:  # noqa: BLE001 - clipboard busy/locked: still return the text
-                    result["pc"] = "failed"
-                result["reply"] = result["pc"]  # firmware decodeReply reads `reply` as the outcome
-                insert_ms, pc = round((time.perf_counter() - t_ins) * 1000), result["pc"]
+                insert_ms, _ = await paste_on_pc(result, armed)
+                result["reply"] = pc = result["pc"]  # firmware decodeReply reads `reply` as the outcome
             if result["text"]:
                 flow_service.log_result(result, upload_ms, insert_ms, pc)
             else:
@@ -1335,7 +1357,7 @@ def create_app(
         return await run_in_threadpool(feature_commands.handle, text)
 
     install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command,
-                      stt=speech if isinstance(speech, SpeechToText) else None)
+                      stt=speech if isinstance(speech, SpeechToText) else None, dictate_handler=live_dictate)
     # ------------------------------------------------------------ SUBTITLES
     install_subtitle_routes(api, subtitle_jobs)
 

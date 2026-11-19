@@ -102,6 +102,19 @@ def split_sentences(buf: str, final: bool = False, min_len: int = 20) -> tuple[l
     return out, rest
 
 
+DICTATE_ON = "Dictation on. Say Hey Piblo, then your words, and I'll paste them on the laptop."
+DICTATE_OFF = "Talk mode. I'll chat with you again."
+
+
+def split_wake(text: str) -> tuple[bool, str]:
+    """'Hey Piblo, open my notes' -> (True, 'open my notes'). Speech-to-text spells Piblo many ways
+    (Pablo, Peeblo, Pueblo), so the name is matched loosely after a greeting and closely without one."""
+    m = re.match(r"\W*(?:(hey|hi|hay|ok|okay|a)\W+)?([a-z]+)\b\W*(.*)", text.strip(), re.S | re.I)
+    if m and difflib.SequenceMatcher(None, m[2].lower(), "piblo").ratio() >= (0.6 if m[1] else 0.8):
+        return True, m[3].strip()
+    return False, text.strip()
+
+
 def first_clause(buf: str, min_words: int = 4) -> tuple[list[str], str]:
     """Cut the reply's opening clause at a comma/dash once it has min_words, so speech starts early."""
     m = re.search(r"^(.+?[,—–])\s+(.*)$", buf, re.S)
@@ -163,8 +176,11 @@ class LiveBrain:
     def memory_path(self) -> Path:
         return Path(self.cfg.live_memory_file).expanduser() if self.cfg.live_memory_file else self.dir / "piblo-memory.md"
 
-    def client(self, timeout: float = 15) -> httpx.AsyncClient:
-        return private_mode.async_client(transport=self._transport, timeout=httpx.Timeout(timeout, connect=5))
+    def client(self, timeout: float = 15, connect: float = 5) -> httpx.AsyncClient:
+        return private_mode.async_client(transport=self._transport, timeout=httpx.Timeout(timeout, connect=connect))
+
+    def dictating(self) -> bool:
+        return bool(self._read_json("talk-mode.json").get("dictate"))
 
     # ---- ASR -------------------------------------------------------------
     async def transcribe(self, pcm16k: bytes) -> str:
@@ -180,11 +196,13 @@ class LiveBrain:
         try:
             if self.stt is not None and time.monotonic() < _asr_down_until:
                 raise httpx.ConnectError("LFM3 ASR was down a moment ago")  # skip the slow refusal
-            async with self.client(20) as c:
-                r = await c.post(self.cfg.llamacpp_url.rstrip("/") + "/v1/chat/completions", json=body)
+            url = self.cfg.llamacpp_url.rstrip("/")
+            local = httpx.URL(url).host in ("127.0.0.1", "localhost", "::1")  # a live local server accepts in <1 ms
+            async with self.client(20, connect=0.5 if local else 5) as c:
+                r = await c.post(url + "/v1/chat/completions", json=body)
             r.raise_for_status()
             return (r.json()["choices"][0]["message"]["content"] or "").strip()
-        except httpx.ConnectError as error:
+        except (httpx.ConnectError, httpx.ConnectTimeout) as error:
             if time.monotonic() >= _asr_down_until:
                 log.warning("live: ASR failed: %r", error)
                 _asr_down_until = time.monotonic() + ASR_RETRY_S
@@ -255,16 +273,25 @@ class LiveBrain:
         return got
 
     # ---- voice commands ------------------------------------------------------
-    async def command(self, text: str) -> str | None:
+    async def command(self, text: str, strict: bool = False) -> str | None:
+        """Voice commands. strict=True (dictation): an unknown model name is not a command, so it gets pasted."""
         t = text.strip().rstrip(".!?").strip()
-        low = re.sub(r"^(?:(?:hey|hi|ok|okay)\W+)?(?:piblo|peeblo)\W+", "", t.lower().replace("’", "'"))
+        low = split_wake(t.replace("’", "'"))[1].lower().rstrip(".!?,")
         low = re.sub(r"^(?:(?:can|could|would|will) you |please |i want you to |i'd like you to )+", "", low)
         low = re.sub(r"(?:,? (?:please|now|right now|for me|instead))+$", "", low)
+        if re.fullmatch(r"(?:(?:switch|change|go) (?:over )?to |turn on |start )?(?:the )?(?:dictation|dictate|typing) mode"
+                        r"(?: on)?|start dictating", low):
+            self._write_json("talk-mode.json", {"dictate": True})
+            return DICTATE_ON
+        if re.fullmatch(r"(?:(?:switch|change|go) (?:back |over )?to |back to |start )?(?:the )?(?:talk|chat|conversation) mode"
+                        r"|stop dictating|(?:dictation|dictate|typing) mode off", low):
+            self._write_json("talk-mode.json", {"dictate": False})
+            return DICTATE_OFF
         if m := re.match(r"(?:use|switch(?: over| back)? to|change(?: over)? to)(?: the| a)?(?: model)? "
                          r"(.{2,30}?)(?: model| mode| brain)?$", low):
             if got := await self.switch(m[1]):
                 return f"Okay, I'm using {got['label']} now."
-            return None if low.startswith("use") else f"Sorry, I don't know a model called {m[1]}."
+            return None if strict or low.startswith("use") else f"Sorry, I don't know a model called {m[1]}."
         if (re.search(r"\b(?:what|which)\b.{0,25}\b(?:model|brain|llm)s?\b", low)
                 and re.search(r"\b(?:you|your|you're|this|it|using|running)\b", low)):
             cur = await self.current()
