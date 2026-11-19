@@ -12,6 +12,7 @@ from fastapi import APIRouter
 from pydantic import BaseModel, Field, model_validator
 
 from . import library
+from .repo_capture import find_references, github_reference, mirror_to_unified_memory
 from .dump_routes import inbox_dir
 
 MAX_SUMMARY_CHARS = 800
@@ -37,6 +38,7 @@ class Share(BaseModel):
     text: str = Field(default="", max_length=50_000)
     title: str = Field(default="", max_length=200)
     captions: str = Field(default="", max_length=50_000)
+    idempotency_id: str = Field(default="", max_length=100)  # Backwards-compatible phone retry hint; URL identity is canonicalised by Library.
 
     @model_validator(mode="after")
     def validate_content(self):
@@ -55,10 +57,12 @@ def _bounded(text: str) -> str:
 
 
 class ShareIn:
-    def __init__(self, root, llm=None, transcriber: Transcriber | None = None):
+    def __init__(self, root, llm=None, transcriber: Transcriber | None = None,
+                 unified_memory_root: str = ""):
         self.root = Path(root)
         self.llm = llm
         self.transcriber = transcriber
+        self.unified_memory_root = unified_memory_root
 
     def save(self, share: Share) -> dict:
         content = share.captions.strip()
@@ -79,11 +83,36 @@ class ShareIn:
                 summary = _bounded(answer) or summary
             except Exception:
                 log.warning("Share summary model unavailable; using first sentences")
+        url = share.url
+        refs = find_references(" ".join((url, share.text, share.captions)))
+        main_repo = github_reference(url)
+        instagram = bool(library._POST.match(url))
+        # Explicit provenance: a shared Reel URL is NOT evidence of video or audio inspection.
+        evidence = "captions_provided" if share.captions.strip() else (
+            "transcript_provided" if source == "transcript" else
+            "shared_text_only" if (share.text.strip() and share.text.strip() != url) else "link_only"
+        )
+        tags = ["shared", source]
+        if instagram:
+            tags += ["instagram", "feed-vault", evidence]
+        if main_repo:
+            tags += ["github", "repo-inbox"]
         result = library.save_item(
             self.root, url=share.url, text="\n\n".join(filter(None, (share.title.strip(), content))),
-            notes=summary, tags=["shared", source], source="android-share",
+            notes=summary, tags=tags, source="android-share",
         )
-        return {**result, "summary": summary}
+        # Core is the confirmed local copy. A Unified Memory checkout is optional and
+        # never git-pushed by this endpoint. Never confuse local with cloud sync.
+        memory = {"state": "not_a_github_repo"}
+        if main_repo:
+            sanitized_note = (share.text or share.title or "Shared link").replace(url, main_repo["url"])
+            memory = mirror_to_unified_memory(self.unified_memory_root, main_repo, sanitized_note)
+        return {
+            **result, "summary": summary, "evidence": evidence,
+            "kind": "instagram" if instagram else "github" if main_repo else "link",
+            "github_candidates": [r["url"] for r in refs],
+            "unified_memory": memory,
+        }
 
     def resurface(self, context_text: str) -> list[dict]:
         return library.search(self.root, context_text)
@@ -96,7 +125,8 @@ def resurface(root, context_text: str) -> list[dict]:
 def build_share_router(cfg, model_router=None, transcriber: Transcriber | None = None) -> APIRouter:
     """Mounted on Core so the app's global bearer-token dependency applies."""
     router = APIRouter(tags=["share"])
-    service = ShareIn(inbox_dir(cfg) / "library", model_router, transcriber)
+    service = ShareIn(inbox_dir(cfg) / "library", model_router, transcriber,
+                      unified_memory_root=cfg.unified_memory_root)
 
     @router.post("/share")
     def share(body: Share):
