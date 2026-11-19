@@ -19,6 +19,7 @@ interface SavedReference {
   title?: string;
   author?: string;
   tags?: string[];
+  github_candidates?: string[];
   when?: string;
 }
 
@@ -119,7 +120,14 @@ function Inbox() {
 
 /** Share a Reel from Instagram to Piblo. We only claim link/caption capture, never that its video was watched. */
 function FeedVault() {
+  const act = useAct();
   const saved = usePoll<{ items: SavedReference[] }>('/library/recent?kind=instagram&limit=20', 8000);
+  const saveRepo = async (url: string, fromUrl: string) => {
+    const result = await act('POST', '/share', {
+      url, text: `Found in a Reel shared to Piblo: ${fromUrl}`,
+    }, 'Saved GitHub reference to Piblo on this PC');
+    if (result.ok) saved.reload();
+  };
   const rows = saved.data?.items ?? [];
   return (
     <section className="card stack" aria-labelledby="feed-h">
@@ -138,7 +146,12 @@ function FeedVault() {
                 {item.tags?.includes('captions_provided') ? 'Captions supplied' : item.tags?.includes('transcript_provided') ? 'Transcript supplied' : 'Link or shared text only — not watched'}
               </div>
             </div>
-            {item.url && <button className="btn sm ghost" onClick={() => void window.piblo.openExternal(item.url!)}>Open source</button>}
+            <div className="row wrap">
+              {(item.github_candidates ?? []).map((repo) => (
+                <button className="btn sm" key={repo} onClick={() => void saveRepo(repo, item.url || '')}>Save GitHub repo</button>
+              ))}
+              {item.url && <button className="btn sm ghost" onClick={() => void window.piblo.openExternal(item.url!)}>Open source</button>}
+            </div>
           </div>
         ))}
         {!saved.loading && !rows.length && <Empty title="Nothing shared yet"><p>In Instagram, choose Share, then Piblo. You can also save a Reel link below.</p></Empty>}
