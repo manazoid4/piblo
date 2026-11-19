@@ -13,3 +13,4 @@ _home = tempfile.mkdtemp(prefix=f"piblo-test-{os.environ.get('PYTEST_XDIST_WORKE
 os.environ["HOME"] = os.environ["USERPROFILE"] = _home
 os.environ["MAZ_DATA_DIR"] = os.path.join(_home, "data")
 os.environ["MAZ_BUDDY_DB"] = "off"  # existing suites assume a fresh in-memory Buddy; persistence tests pass buddy_db explicitly
+os.environ["MAZ_WAKEWORD"] = "0"  # live tests feed speech directly; a real installed wake word engine would gate them forever (gate tests pass cfgs explicitly)
