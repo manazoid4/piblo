@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630" role="img" aria-labelledby="t">
+  <title id="t">PibloCraft. Run your coding agents side by side. See what needs you.</title>
+  <rect width="1200" height="630" fill="#fbfaf7"/>
+  <rect x="48" y="48" width="1104" height="534" rx="40" fill="#f0ece5"/>
+  <g font-family="system-ui,-apple-system,'Segoe UI',Roboto,Arial,sans-serif" fill="#1d1b18">
+    <text x="96" y="130" font-family="ui-monospace,Consolas,monospace" font-size="24" letter-spacing="1" fill="#4d4943">FROM PIBLO</text>
+    <text x="96" y="248" font-size="108" font-weight="800" letter-spacing="-4">PibloCraft</text>
+    <text x="96" y="330" font-size="40" font-weight="600" fill="#4d4943">Run your coding agents side by side.</text>
+    <text x="96" y="384" font-size="40" font-weight="600" fill="#b3301a">See what needs you.</text>
+    <text x="96" y="520" font-family="ui-monospace,Consolas,monospace" font-size="26" fill="#4d4943">piblo.co.uk/piblocraft</text>
+  </g>
+  <g font-family="ui-monospace,Consolas,monospace" font-size="22">
+    <rect x="760" y="120" width="344" height="390" rx="24" fill="#2a1a12"/>
+    <circle cx="790" cy="152" r="6" fill="#ee5a36"/><circle cx="812" cy="152" r="6" fill="#ffc93c"/><circle cx="834" cy="152" r="6" fill="#8fdcb8"/>
+    <text x="790" y="226" fill="#fff4e0" font-weight="bold">Claude 1</text><text x="1074" y="226" text-anchor="end" fill="#8fdcb8">working</text>
+    <text x="790" y="282" fill="#fff4e0" font-weight="bold">Codex</text><text x="1074" y="282" text-anchor="end" fill="#8fdcb8">working</text>
+    <text x="790" y="338" fill="#fff4e0" font-weight="bold">Hermes</text><text x="1074" y="338" text-anchor="end" fill="#ffc93c">needs you</text>
+    <line x1="790" y1="380" x2="1074" y2="380" stroke="#4a3322"/>
+    <text x="790" y="430" fill="#8fdcb8">pc ?</text>
+    <text x="790" y="468" fill="#b89a6e">1 waiting for you</text>
+  </g>
+</svg>
