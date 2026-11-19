@@ -117,6 +117,29 @@ class ShareIn:
             "unified_memory": memory,
         }
 
+    def sync_repo_inbox(self) -> dict:
+        """Reconcile previously saved GitHub links with an opt-in local memory checkout.
+
+        No network, no automatic git commit or push; reports local state truthfully.
+        """
+        if not self.unified_memory_root.strip():
+            return {"state": "core_only", "reason": "unified_memory_root_not_configured",
+                    "saved": 0, "already_saved": 0}
+        counters = {"saved": 0, "already_saved": 0, "note_added": 0}
+        for row in library.recent(self.root, limit=1000, kind="web"):
+            repo = github_reference(row.get("url") or "")
+            if repo is None:
+                continue
+            text = str(row.get("text") or "")
+            note = text.replace(row.get("url") or "", repo["url"])
+            result = mirror_to_unified_memory(self.unified_memory_root, repo, note)
+            if result["state"] != "local_checkout":
+                return {"state": "core_only", "reason": result.get("reason", "write_failed"),
+                        **counters}
+            state = result["status"]
+            counters[state] = counters.get(state, 0) + 1
+        return {"state": "local_checkout", "pushed": False, **counters}
+
     def resurface(self, context_text: str) -> list[dict]:
         return library.search(self.root, context_text)
 
@@ -134,5 +157,9 @@ def build_share_router(cfg, model_router=None, transcriber: Transcriber | None =
     @router.post("/share")
     def share(body: Share):
         return service.save(body)
+
+    @router.post("/share/repo-sync")
+    def repo_sync():
+        return service.sync_repo_inbox()
 
     return router
