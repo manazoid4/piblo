@@ -21,7 +21,7 @@ from starlette.routing import WebSocketRoute
 from websockets.asyncio.client import connect
 
 from .config import Settings
-from .live_brain import LiveBrain, is_noise, split_sentences, first_clause, split_wake
+from .live_brain import LiveBrain, is_mode_command, is_noise, split_sentences, first_clause, split_wake
 from . import kokoro_pcm, private_mode
 
 log = logging.getLogger("mazhost.live")
@@ -322,7 +322,7 @@ class LiveBridge:
             dictated = None
             if self.dictate_handler is not None and self.brain.dictating():
                 woke, words = split_wake(text)
-                if not (woke or time.monotonic() < self._woke_until):
+                if not (woke or time.monotonic() < self._woke_until or is_mode_command(text)):
                     log.info("live: dictation mode, no wake phrase: ignored")
                     self._rearm()
                     return  # room talk, TV: never pasted

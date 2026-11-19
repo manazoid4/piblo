@@ -295,7 +295,8 @@ def test_asr_server_down_without_local_stt_drops_turn(tmp_path):
 @pytest.mark.parametrize("heard,woke,rest", [
     ("Hey Piblo, buy milk.", True, "buy milk."), ("Hey, Pablo. Open my notes", True, "Open my notes"),
     ("hey peeblo send the report", True, "send the report"), ("Piblo, stop", True, "stop"),
-    ("Hey Piblo.", True, ""), ("Hey people, listen up", False, "Hey people, listen up"),
+    ("Hey Piblo.", True, ""), ("Hey Plu, the quick fox", True, "the quick fox"), ("Hey people", True, ""),
+    ("Hey Pebble", True, ""), ("Hey everyone, listen up", False, "Hey everyone, listen up"),
     ("Pick up the kids", False, "Pick up the kids"), ("Hey there, Piblo", False, "Hey there, Piblo")])
 def test_split_wake_tolerates_how_speech_to_text_spells_piblo(heard, woke, rest):
     assert split_wake(heard) == (woke, rest)
@@ -361,6 +362,12 @@ def test_dictation_ignores_speech_without_the_wake_phrase(monkeypatch, tmp_path)
         with pytest.raises(WebSocketDisconnect):
             ws.receive_text()  # no thinking, no reply: still listening
     assert pasted == []
+
+
+def test_mode_commands_are_recognised_without_the_wake_phrase():
+    from mazhost.live_brain import is_mode_command
+    assert is_mode_command("Talk mode.") and is_mode_command("Hey Piblo, dictation mode")
+    assert not is_mode_command("the talk mode button is broken")
 
 
 def test_bare_wake_phrase_makes_the_next_utterance_the_dictation(monkeypatch, tmp_path):

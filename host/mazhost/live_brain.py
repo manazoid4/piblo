@@ -106,13 +106,35 @@ DICTATE_ON = "Dictation on. Say Hey Piblo, then your words, and I'll paste them 
 DICTATE_OFF = "Talk mode. I'll chat with you again."
 
 
+_DICTATE_ON = re.compile(r"(?:(?:switch|change|go) (?:over )?to |turn on |start )?(?:the )?(?:dictation|dictate|typing)"
+                         r" mode(?: on)?|start dictating")
+_DICTATE_OFF = re.compile(r"(?:(?:switch|change|go) (?:back |over )?to |back to |start )?(?:the )?(?:talk|chat|conversation)"
+                          r" mode|stop dictating|(?:dictation|dictate|typing) mode off")
+
+
 def split_wake(text: str) -> tuple[bool, str]:
-    """'Hey Piblo, open my notes' -> (True, 'open my notes'). Speech-to-text spells Piblo many ways
-    (Pablo, Peeblo, Pueblo), so the name is matched loosely after a greeting and closely without one."""
+    """'Hey Piblo, open my notes' -> (True, 'open my notes'). Speech-to-text spells Piblo many ways (Pablo,
+    Peblo, Pebble, Plu, people), so after a greeting any short P/B word counts; without one it must be close."""
     m = re.match(r"\W*(?:(hey|hi|hay|ok|okay|a)\W+)?([a-z]+)\b\W*(.*)", text.strip(), re.S | re.I)
-    if m and difflib.SequenceMatcher(None, m[2].lower(), "piblo").ratio() >= (0.6 if m[1] else 0.8):
-        return True, m[3].strip()
+    if m:
+        name = m[2].lower()
+        close = difflib.SequenceMatcher(None, name, "piblo").ratio()
+        if close >= 0.8 or (m[1] and (close >= 0.6 or (name[0] in "pb" and 3 <= len(name) <= 7))):
+            return True, m[3].strip()
     return False, text.strip()
+
+
+def normalise(text: str) -> str:
+    """Lower-case command text without the wake phrase, polite fillers or a trailing 'please/now'."""
+    low = split_wake(text.strip().replace("’", "'"))[1].lower().rstrip(".!?,").strip()
+    low = re.sub(r"^(?:(?:can|could|would|will) you |please |i want you to |i'd like you to )+", "", low)
+    return re.sub(r"(?:,? (?:please|now|right now|for me|instead))+$", "", low)
+
+
+def is_mode_command(text: str) -> bool:
+    """'Dictation mode' / 'talk mode' said on its own works in dictation mode without the wake phrase."""
+    low = normalise(text)
+    return bool(_DICTATE_ON.fullmatch(low) or _DICTATE_OFF.fullmatch(low))
 
 
 def first_clause(buf: str, min_words: int = 4) -> tuple[list[str], str]:
@@ -275,16 +297,11 @@ class LiveBrain:
     # ---- voice commands ------------------------------------------------------
     async def command(self, text: str, strict: bool = False) -> str | None:
         """Voice commands. strict=True (dictation): an unknown model name is not a command, so it gets pasted."""
-        t = text.strip().rstrip(".!?").strip()
-        low = split_wake(t.replace("’", "'"))[1].lower().rstrip(".!?,")
-        low = re.sub(r"^(?:(?:can|could|would|will) you |please |i want you to |i'd like you to )+", "", low)
-        low = re.sub(r"(?:,? (?:please|now|right now|for me|instead))+$", "", low)
-        if re.fullmatch(r"(?:(?:switch|change|go) (?:over )?to |turn on |start )?(?:the )?(?:dictation|dictate|typing) mode"
-                        r"(?: on)?|start dictating", low):
+        low = normalise(text)
+        if _DICTATE_ON.fullmatch(low):
             self._write_json("talk-mode.json", {"dictate": True})
             return DICTATE_ON
-        if re.fullmatch(r"(?:(?:switch|change|go) (?:back |over )?to |back to |start )?(?:the )?(?:talk|chat|conversation) mode"
-                        r"|stop dictating|(?:dictation|dictate|typing) mode off", low):
+        if _DICTATE_OFF.fullmatch(low):
             self._write_json("talk-mode.json", {"dictate": False})
             return DICTATE_OFF
         if m := re.match(r"(?:use|switch(?: over| back)? to|change(?: over)? to)(?: the| a)?(?: model)? "
