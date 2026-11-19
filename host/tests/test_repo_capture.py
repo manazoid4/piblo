@@ -115,3 +115,20 @@ def test_feed_vault_recent_endpoint_shows_source_and_repos(tmp_path):
     assert items[0]["github_candidates"] == ["https://github.com/Example/UsefulTools"]
     assert "path" not in items[0]
     assert items[0]["url"] == "https://www.instagram.com/reel/XYZ789/"
+
+
+def test_late_local_memory_checkout_can_reconcile_prior_core_saves(tmp_path):
+    core = tmp_path / "core"
+    svc = ShareIn(core)
+    svc.save(Share(url="https://github.com/Example/SomeRepo", text="For Piblo"))
+    svc.save(Share(url="https://www.instagram.com/reel/AABBCC/", text="Reel without repo"))
+    assert svc.sync_repo_inbox()["state"] == "core_only"
+    memory = memory_tree(tmp_path)
+    svc.unified_memory_root = str(memory)
+    first = svc.sync_repo_inbox()
+    assert first["state"] == "local_checkout"
+    assert first["saved"] == 1 and first["pushed"] is False
+    second = svc.sync_repo_inbox()
+    assert second["already_saved"] == 1
+    assert (memory / "library/piblo-repos/example--somerepo.md").is_file()
+    assert not (memory / "library/piblo-repos/instagram--reel.md").exists()
