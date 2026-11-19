@@ -37,6 +37,8 @@ FIRST_TOKEN_S = 3.5
 OLLAMA_FIRST_TOKEN_S = 30.0
 MODELS_TTL_S = 24 * 3600
 MEMORY_TTL_S = 3600
+ASR_RETRY_S = 60  # Windows takes ~2.4 s to refuse a dead localhost port; retry LFM3 ASR this often, not every turn
+_asr_down_until = 0.0
 
 SYSTEM = ("You are Piblo, a warm, quick pocket voice assistant talking out loud to Maz. Speak naturally in "
           "UK English. Reply in 1 to 3 short sentences unless asked for more. Never use markdown, lists, "
@@ -174,11 +176,18 @@ class LiveBrain:
             {"role": "system", "content": "Perform ASR in English."},
             {"role": "user", "content": [{"type": "input_audio", "input_audio": {
                 "data": base64.b64encode(buf.getvalue()).decode(), "format": "wav"}}]}]}
+        global _asr_down_until
         try:
+            if self.stt is not None and time.monotonic() < _asr_down_until:
+                raise httpx.ConnectError("LFM3 ASR was down a moment ago")  # skip the slow refusal
             async with self.client(20) as c:
                 r = await c.post(self.cfg.llamacpp_url.rstrip("/") + "/v1/chat/completions", json=body)
             r.raise_for_status()
             return (r.json()["choices"][0]["message"]["content"] or "").strip()
+        except httpx.ConnectError as error:
+            if time.monotonic() >= _asr_down_until:
+                log.warning("live: ASR failed: %r", error)
+                _asr_down_until = time.monotonic() + ASR_RETRY_S
         except (httpx.HTTPError, KeyError, IndexError, ValueError) as error:
             log.warning("live: ASR failed: %r", error)
         if self.stt is None:
@@ -259,7 +268,8 @@ class LiveBrain:
         if (re.search(r"\b(?:what|which)\b.{0,25}\b(?:model|brain|llm)s?\b", low)
                 and re.search(r"\b(?:you|your|you're|this|it|using|running)\b", low)):
             cur = await self.current()
-            return f"I'm using {cur['label']}, which is {cur['model']}." if "/" in cur["model"] else f"I'm using {cur['label']}."
+            label = cur["label"].split("/")[-1].split(":")[0]  # spoken: never read out a raw model id
+            return f"I'm using {label}, a free cloud model." if cur["model"].endswith(":free") else f"I'm using {label}."
         if (fact := parse_remember(text)) is not None:
             if is_sensitive(fact):
                 return NO_SECRETS

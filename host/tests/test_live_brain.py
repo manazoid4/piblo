@@ -10,7 +10,7 @@ import httpx
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
-from mazhost import live_voice
+from mazhost import live_brain, live_voice
 from mazhost.config import Settings
 from mazhost.live_brain import LiveBrain, is_noise, split_sentences
 from test_live_voice import REPLY_SAMPLES_24K, TOKEN, FakeRealtime, make_client, speak, text
@@ -257,6 +257,29 @@ def test_asr_server_down_falls_back_to_local_stt(tmp_path):
     text = asyncio.run(brain.transcribe(b"\x00\x01" * 1600))
     assert text == "remind me to call mum"
     assert len(stt.paths) == 1 and not stt.paths[0].exists()  # temp wav cleaned up
+
+
+def test_dead_asr_server_is_skipped_on_the_next_turns(tmp_path, monkeypatch):
+    monkeypatch.setattr(live_brain, "_asr_down_until", 0.0)
+    tries, stt = [], _FakeStt()
+
+    def handler(request):
+        tries.append(request)
+        return _asr_down(request)
+
+    brain = LiveBrain(Settings(data_dir=str(tmp_path)), transport=httpx.MockTransport(handler), stt=stt)
+    for _ in range(3):  # Windows takes ~2.4 s to refuse a dead localhost port: pay it once, not every turn
+        assert asyncio.run(brain.transcribe(b"\x00\x01" * 1600)) == "remind me to call mum"
+    assert len(tries) == 1 and len(stt.paths) == 3
+    monkeypatch.setattr(live_brain, "_asr_down_until", 0.0)  # once the pause is over, LFM3 is tried again
+    asyncio.run(brain.transcribe(b"\x00\x01" * 1600))
+    assert len(tries) == 2
+
+
+def test_what_model_reply_is_short_to_speak(tmp_path):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    reply = asyncio.run(brain.command("what model are you using"))
+    assert reply.startswith("I'm using ") and "/" not in reply and ":free" not in reply
 
 
 def test_asr_server_down_without_local_stt_drops_turn(tmp_path):
