@@ -1,11 +1,12 @@
 import { realUsageDeps, scanUsage } from './usage';
-import { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
+import { app, BrowserWindow, Menu, Notification, Tray, clipboard, ipcMain, nativeImage, nativeTheme, shell } from 'electron';
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import type { AppSettings, EnvKey, PairRequest, ThemeMode } from '../shared/types';
 import { CARD, PAIR } from '../shared/types';
 import { createApiClient } from './api-client';
+import { extractClipboardShare } from './share-link';
 import { discoverPort, discoverToken, locateCore, type FsLike } from './core-locator';
 import { applyEnvEdit, validateEnvEdit, viewEnv } from './env-file';
 import { isSafeTaskName, planInstall } from './install-plan';
@@ -168,6 +169,27 @@ function showWindow() {
   win.focus();
 }
 
+/** Save only when the owner explicitly clicks the tray item; never monitor clipboard. */
+async function saveClipboardLink() {
+  const share = extractClipboardShare(clipboard.readText());
+  if (!share) {
+    new Notification({ title: 'Piblo', body: 'Copy a web link, then choose Save Clipboard Link.' }).show();
+    return;
+  }
+  const response = await api.request<{ unified_memory?: { state?: string } }>('POST', '/share', share);
+  if (!response.ok) {
+    new Notification({ title: 'Not saved to Piblo', body: response.message }).show();
+    return;
+  }
+  const localMemory = response.data.unified_memory?.state === 'local_checkout';
+  new Notification({
+    title: 'Saved to Piblo',
+    body: localMemory
+      ? 'Saved to Core and your local Unified Memory checkout. Git push still pending.'
+      : 'Saved to Core on this PC. Unified Memory sync not configured.',
+  }).show();
+}
+
 function createTray() {
   const img = nativeImage.createFromPath(path.join(__dirname, '..', '..', 'build', 'tray.png'));
   tray = new Tray(img);
@@ -175,6 +197,7 @@ function createTray() {
   tray.setContextMenu(
     Menu.buildFromTemplate([
       { label: 'Open Piblo', click: showWindow },
+      { label: 'Save Clipboard Link to Piblo', click: () => { void saveClipboardLink(); } },
       { type: 'separator' },
       {
         label: 'Theme',
