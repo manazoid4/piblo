@@ -156,6 +156,25 @@ def test_voice_command_switches_model_and_persists(tmp_path):
     assert "my dog is called Biscuit" in (tmp_path / "piblo-memory.md").read_text()
 
 
+@pytest.mark.parametrize("said", ["Switch to local model.", "Hey Piblo, switch to the local model.",
+                                  "Can you switch to the local model please?", "Use the local model."])
+def test_switch_command_survives_natural_phrasing(tmp_path, said):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    assert asyncio.run(brain.command(said)) == "Okay, I'm using the local model now."
+
+
+@pytest.mark.parametrize("said", ["What model are you?", "What's your model?", "What AI model are you?",
+                                  "Hey Piblo, what model is this?"])
+def test_what_model_question_survives_natural_phrasing(tmp_path, said):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    assert asyncio.run(brain.command(said)).startswith("I'm using ")
+
+
+def test_general_model_talk_still_reaches_the_brain(tmp_path):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    assert asyncio.run(brain.command("What's the best model for photos")) is None
+
+
 def sse(*pieces: str) -> httpx.Response:
     body = "".join(f"data: {json.dumps({'choices': [{'delta': {'content': p}}]})}\n\n" for p in pieces)
     return httpx.Response(200, content=(body + "data: [DONE]\n\n").encode(),

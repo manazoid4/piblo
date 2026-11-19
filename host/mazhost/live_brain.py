@@ -248,12 +248,16 @@ class LiveBrain:
     # ---- voice commands ------------------------------------------------------
     async def command(self, text: str) -> str | None:
         t = text.strip().rstrip(".!?").strip()
-        low = t.lower()
-        if m := re.match(r"(?:please )?(?:use|switch(?: over)? to|change(?: over)? to)(?: the)?(?: model)? (.{2,30})$", low):
+        low = re.sub(r"^(?:(?:hey|hi|ok|okay)\W+)?(?:piblo|peeblo)\W+", "", t.lower().replace("’", "'"))
+        low = re.sub(r"^(?:(?:can|could|would|will) you |please |i want you to |i'd like you to )+", "", low)
+        low = re.sub(r"(?:,? (?:please|now|right now|for me|instead))+$", "", low)
+        if m := re.match(r"(?:use|switch(?: over| back)? to|change(?: over)? to)(?: the| a)?(?: model)? "
+                         r"(.{2,30}?)(?: model| mode| brain)?$", low):
             if got := await self.switch(m[1]):
                 return f"Okay, I'm using {got['label']} now."
             return None if low.startswith("use") else f"Sorry, I don't know a model called {m[1]}."
-        if re.search(r"what (?:model|brain)s?\b.*\b(?:using|running)|which (?:model|brain)", low):
+        if (re.search(r"\b(?:what|which)\b.{0,25}\b(?:model|brain|llm)s?\b", low)
+                and re.search(r"\b(?:you|your|you're|this|it|using|running)\b", low)):
             cur = await self.current()
             return f"I'm using {cur['label']}, which is {cur['model']}." if "/" in cur["model"] else f"I'm using {cur['label']}."
         if (fact := parse_remember(text)) is not None:
