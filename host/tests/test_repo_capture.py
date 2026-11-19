@@ -91,3 +91,27 @@ def test_instagram_caption_discovers_github_but_does_not_auto_build(tmp_path):
     assert r["evidence"] == "captions_provided"
     assert r["github_candidates"] == ["https://github.com/ExampleOrg/Tool"]
     assert r["unified_memory"]["state"] == "not_a_github_repo"
+
+
+def test_feed_vault_recent_endpoint_shows_source_and_repos(tmp_path):
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+    from mazhost.config import Settings
+    from mazhost.library_routes import build_library_router
+    from mazhost.dump_routes import inbox_dir
+
+    cfg = Settings(dumps_dir=str(tmp_path), _env_file=None)
+    root = inbox_dir(cfg) / "library"
+    library.save_item(root, url="https://www.instagram.com/reel/XYZ789/",
+                      text="Try https://github.com/Example/UsefulTools",
+                      tags=["feed-vault", "link-only"])
+    library.save_item(root, url="https://example.com/not-ig", text="other content")
+    api = FastAPI()
+    api.include_router(build_library_router(cfg, model_router=None))
+    resp = TestClient(api).get("/library/recent", params={"kind": "instagram", "limit": 20})
+    assert resp.status_code == 200
+    items = resp.json()["items"]
+    assert len(items) == 1 and items[0]["kind"] == "instagram"
+    assert items[0]["github_candidates"] == ["https://github.com/Example/UsefulTools"]
+    assert "path" not in items[0]
+    assert items[0]["url"] == "https://www.instagram.com/reel/XYZ789/"
