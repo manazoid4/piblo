@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from . import library
+from .repo_capture import find_references
 from .config import Settings
 from .dump_routes import inbox_dir
 
@@ -90,7 +91,8 @@ def build_library_router(cfg: Settings, model_router) -> APIRouter:
         rows = await run_in_threadpool(lambda: library.recent(root, limit=limit, kind=kind))
         # Return the visible source, not local filesystem paths, private export data or raw credentials.
         return {"items": [
-            {key: row.get(key) for key in ("id", "kind", "url", "title", "author", "project", "tags", "when")}
+            {**{key: row.get(key) for key in ("id", "kind", "url", "title", "author", "project", "tags", "when")},
+             "github_candidates": [item["url"] for item in find_references(row.get("text", "") + " " + row.get("notes", ""))]}
             for row in rows
         ]}
 
