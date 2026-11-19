@@ -18,14 +18,14 @@ object ScreenshotRepoFinder {
     data class Lookup(val repos: List<Repo>, val message: String, val query: String)
 
     private val github = Regex(
-        """(?:https?://)?(?:www\.)?github\.com/([A-Za-z0-9][A-Za-z0-9-]{0,38})/([A-Za-z0-9_.-]{1,100})(?:\b|/|$)""",
+        """(?<![A-Za-z0-9.-])(?:https?://)?(?:www\.)?github\.com/([A-Za-z0-9][A-Za-z0-9-]{0,38})/([A-Za-z0-9_.-]{1,100})(?:\b|/|$)""",
         RegexOption.IGNORE_CASE,
     )
     private val ownerRepo = Regex("""\b([A-Za-z0-9][A-Za-z0-9-]{0,38})/([A-Za-z0-9_.-]{2,100})\b""")
     private val word = Regex("""[A-Za-z][A-Za-z0-9_.-]{2,29}""")
     private val noise = setOf(
         "instagram","reels","reel","follow","following","followers","likes","liked",
-        "comments","comment","share","views","watch","audio","music","original","profile",
+        "comments","comment","like","share","views","watch","audio","music","original","profile",
         "home","sponsored","and","with","about","from","this","that","your","the",
         "for","new","check","out","link","bio","more","source","code","github",
         "project","repository","open","built","build","made","using","best","tools",
@@ -36,8 +36,8 @@ object ScreenshotRepoFinder {
     )
 
     fun clue(ocr: String): Clue? {
-        val lines = ocr.take(16_000).lineSequence().map(String::trim)
-            .filter(String::isNotEmpty).take(120).toList()
+        val lines = ocr.take(16_000).lineSequence().map { it.trim() }
+            .filter { it.isNotEmpty() }.take(120).toList()
         github.find(ocr.take(16_000))?.let {
             val key = it.groupValues[1] + "/" + it.groupValues[2].trimEnd('.', ',')
             return Clue(key, key)
