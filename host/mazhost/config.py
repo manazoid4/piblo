@@ -28,7 +28,8 @@ class Settings(BaseSettings):
     remote_detect: bool = True  # MAZ_REMOTE_DETECT=0 disables the background tailscale probe
     flow_cleanup_llm: bool = False  # MAZ_FLOW_CLEANUP_LLM=1: opt in to LLM cleanup of dictation (network/route)
     flow_cloud: bool = False  # MAZ_FLOW_CLOUD=1: opt in to sending dictation audio/text to Groq
-    stt_provider: str = "parakeet"  # MAZ_STT_PROVIDER: parakeet (onnx-asr, local) | whisper (faster-whisper)
+    stt_provider: str = "parakeet"  # MAZ_STT_PROVIDER: parakeet (onnx-asr) | vosk (small, fast CPU) | whisper
+    vosk_model_dir: str = ""  # empty = %LOCALAPPDATA%\Piblo\vosk-model (scripts/setup-vosk.py)
     stt_local_model: str = "nemo-parakeet-tdt-0.6b-v3"  # any onnx-asr model name, e.g. moonshine-base-en
     stt_quantization: str = "int8"
     whisper_model: str = "base.en"
@@ -104,6 +105,9 @@ class Settings(BaseSettings):
     live_memory_file: str = ""  # "remember ..." notes; empty = <data_dir>/piblo-memory.md
     wakeword: bool = True  # MAZ_WAKEWORD=0: live voice listens without "Hey Piblo"; on but ungated if sherpa-onnx/model missing
     wakeword_model_dir: str = ""  # empty = %LOCALAPPDATA%\Piblo\wakeword-model (scripts/setup-wakeword.py)
+    wakeword_engine: Literal["openwakeword", "sherpa"] = "openwakeword"  # MAZ_WAKEWORD_ENGINE
+    wakeword_model: str = ""  # openWakeWord name or .onnx path; empty = <model dir>/hey_piblo.onnx, else hey_jarvis
+    wakeword_threshold: float = Field(default=0.5, ge=0.05, le=0.99)
     vault_dir: str = ""  # explicitly selected document folder; disabled by default
     vault_remote_url: str = ""  # home PC's Tailscale Core, for a travelling client
     vault_remote_token: str = ""  # stays on this PC, never in a URL or device reply

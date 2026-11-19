@@ -19,7 +19,7 @@ import tempfile
 import time
 import wave
 from collections.abc import AsyncIterator, Callable
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 
 import httpx
@@ -299,7 +299,8 @@ class LiveBrain:
         return text
 
     async def system_prompt(self, query: str = "") -> str:
-        parts = [SYSTEM, f"Today is {date.today().strftime('%A %d %B %Y')}."]
+        parts = [SYSTEM, f"Today is {date.today().strftime('%A %d %B %Y')}; "
+                       f"the time is {datetime.now().strftime('%H:%M')} UK time."]  # Talk said it couldn't know the time
         mem = await self._github_memory()
         try:
             local = "\n".join(self.memory_path.read_text("utf-8").splitlines()[-40:])

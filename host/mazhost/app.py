@@ -46,7 +46,7 @@ from .device import DeviceMonitor
 from .dev_centre import build_dev_router
 from .features import build_features_router
 from .discovery import DiscoveryResponder
-from . import fw
+from . import fw, kokoro_pcm
 from . import private_mode
 from .errors import ErrorCode, RouteError
 from .bodydouble import BodyDouble, build_bodydouble_router
@@ -289,6 +289,19 @@ def create_app(
     @api.on_event("startup")
     def warm_tts() -> None:
         threading.Thread(target=speech_out.warm, name="tts-warm", daemon=True).start()
+
+    kokoro_srv = {}
+
+    @api.on_event("startup")
+    def start_kokoro_pcm() -> None:
+        # Live (Talk) streams Kokoro replies from this endpoint; without it every spoken reply failed.
+        if (cfg.tts_enabled and cfg.tts_provider == "kokoro") or cfg.kokoro_pcm_port:
+            kokoro_srv["srv"] = kokoro_pcm.serve_in_thread(cfg, synth=lambda text: speech_out.kokoro_audio(text)[0])
+
+    @api.on_event("shutdown")
+    def stop_kokoro_pcm() -> None:
+        if kokoro_srv.get("srv"):
+            kokoro_srv["srv"].shutdown()
 
     @api.on_event("startup")
     def warm_brain() -> None:

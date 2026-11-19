@@ -23,8 +23,12 @@ def load(cfg):
         return None
     model_dir = getattr(cfg, "wakeword_model_dir", "") or default_model_dir()
     try:
+        if getattr(cfg, "wakeword_engine", "openwakeword") == "openwakeword":
+            custom = Path(model_dir) / "hey_piblo.onnx"
+            model = getattr(cfg, "wakeword_model", "") or (str(custom) if custom.is_file() else "hey_jarvis")
+            return OpenWakeWord(model, getattr(cfg, "wakeword_threshold", 0.5))
         return Wakeword(model_dir)
-    except Exception as error:  # sherpa-onnx or model missing: live voice runs ungated, as before
+    except Exception as error:  # engine or model missing: live voice runs ungated, as before
         if not _warned:
             _warned = True
             log.warning("live: Hey Piblo wake word unavailable, listening without it: %s", error)
@@ -67,4 +71,40 @@ class Wakeword:
             if self.spotter.get_result(self.stream):
                 detected = True
                 self.spotter.reset_stream(self.stream)
+        return detected
+
+
+class OpenWakeWord:
+    """openWakeWord (Apache-2.0, github.com/dscripka/openWakeWord) on onnxruntime; 80 ms frames.
+
+    model: a pretrained name (hey_jarvis, alexa, hey_mycroft, ...) or a path to a custom .onnx such as
+    hey_piblo.onnx trained with openWakeWord's training notebook.
+    """
+    FRAME = 1280  # 80 ms at 16 kHz, the model's native step
+
+    def __init__(self, model: str, threshold: float = 0.5):
+        from openwakeword import utils
+        from openwakeword.model import Model
+
+        if not Path(model).suffix:  # pretrained name: fetch it (and the shared feature models) once
+            utils.download_models([model])
+        self.model = Model(wakeword_models=[model], inference_framework="onnx")
+        self.threshold = threshold
+        self._buf = np.empty(0, dtype=np.int16)
+
+    def reset(self):
+        self.model.reset()
+        self._buf = np.empty(0, dtype=np.int16)
+
+    def feed(self, pcm: bytes, sample_rate: int = RATE) -> bool:
+        if sample_rate != RATE or len(pcm) % 2:
+            raise ValueError("wakeword audio must be 16 kHz mono PCM16")
+        self._buf = np.concatenate([self._buf, np.frombuffer(pcm, dtype="<i2")])
+        detected = False
+        while len(self._buf) >= self.FRAME:
+            frame, self._buf = self._buf[:self.FRAME], self._buf[self.FRAME:]
+            if max(self.model.predict(frame).values()) >= self.threshold:
+                detected = True
+        if detected:
+            self.reset()  # one detection per utterance, not one per frame above threshold
         return detected

@@ -30,6 +30,7 @@ log = logging.getLogger("uvicorn.error")
 MAX_CHARS = 1000
 RATE = 24000
 MAX_CONCURRENT = 2
+DEFAULT_PORT = 8880
 
 
 def pcm16(audio) -> bytes:
@@ -129,21 +130,28 @@ def _token(settings: Settings) -> str | None:
     return settings.token if settings.token_configured else ""  # "" rejects everything
 
 
-def serve_in_thread(settings: Settings) -> ThreadingHTTPServer | None:
-    """Start the endpoint beside Core. A bind failure (port taken) is logged, never fatal to Core."""
+def port(settings: Settings) -> int:
+    """Live talks to this port; 8880 when kokoro_pcm_port is unset."""
+    return settings.kokoro_pcm_port or DEFAULT_PORT
+
+
+def serve_in_thread(settings: Settings, synth=None) -> ThreadingHTTPServer | None:
+    """Start the endpoint beside Core. A bind failure (port taken) is logged, never fatal to Core.
+    synth: share Core's already-loaded Kokoro (SpeechOut) instead of loading a second model."""
     try:
-        srv = make_server(KokoroSynth(settings), settings.kokoro_pcm_bind, settings.kokoro_pcm_port, _token(settings))
+        srv = make_server(synth or KokoroSynth(settings), settings.kokoro_pcm_bind, port(settings), _token(settings))
     except OSError:
         log.warning("kokoro_pcm: cannot bind %s:%s, endpoint disabled", settings.kokoro_pcm_bind,
-                    settings.kokoro_pcm_port, exc_info=True)
+                    port(settings), exc_info=True)
         return None
+    log.info("kokoro_pcm: serving on %s:%s", settings.kokoro_pcm_bind, port(settings))
     threading.Thread(target=srv.serve_forever, daemon=True, name="kokoro-pcm").start()
     return srv
 
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--port", type=int, default=8880)
+    ap.add_argument("--port", type=int, default=DEFAULT_PORT)
     ap.add_argument("--host", default=None)
     a = ap.parse_args()
     cfg = Settings()
