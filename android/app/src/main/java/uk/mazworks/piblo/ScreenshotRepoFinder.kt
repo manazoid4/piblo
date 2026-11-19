@@ -132,7 +132,17 @@ object ScreenshotRepoFinder {
         try {
             val status = c.responseCode
             if (status !in 200..299) return status to ""
-            val response = c.inputStream.use { it.readNBytes(192_000) }
+            // Bounded, Android-26-compatible stream reading (readNBytes needs newer Android).
+            val response = c.inputStream.use { stream ->
+                val out = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(4096)
+                while (out.size() < 192_000) {
+                    val n = stream.read(buffer, 0, minOf(buffer.size, 192_000 - out.size()))
+                    if (n < 0) break
+                    out.write(buffer, 0, n)
+                }
+                out.toByteArray()
+            }
             return status to response.toString(Charsets.UTF_8)
         } finally { c.disconnect() }
     }
