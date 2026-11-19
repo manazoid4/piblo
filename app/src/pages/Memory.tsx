@@ -205,8 +205,6 @@ function Library() {
       </div>
       <input className="input" placeholder="Why save this? (optional)" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} aria-label="What could Piblo use this for?" />
       {receipt && <p role="status" className="meta">{receipt}</p>}
-      <div className="row" style={{ display: 'none' }}>
-      </div>
     </section>
   );
 }
