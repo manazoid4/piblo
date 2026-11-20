@@ -25,8 +25,8 @@ def rig(tmp_path, monkeypatch):
     sent = []
     cfg = Settings(token="bridge-test-token-not-default", _env_file=None, data_dir=str(tmp_path / "data"),
                    piblocraft_bridge_url="http://receiver.invalid/job", buddy_db=str(tmp_path / "b.sqlite3"))
+    monkeypatch.setattr(piblocraft_bridge.JobBridge, "_post", staticmethod(lambda u, j: sent.append((u, j)) or Reply()))
     app = create_app(cfg)
-    monkeypatch.setattr(piblocraft_bridge.httpx, "post", lambda u, json=None, timeout=0: sent.append((u, json)) or Reply())
     return TestClient(app, headers=H), sent, tmp_path / "data" / "bridge.log"
 
 

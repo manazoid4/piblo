@@ -15,9 +15,10 @@ import time
 import uuid
 from pathlib import Path
 
-import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
+
+from . import private_mode
 
 REQUESTER = "piblo-device"
 WAIT_S = 70  # a little longer than the approval's own 60 s expiry
@@ -31,10 +32,15 @@ class JobIn(BaseModel):
 class JobBridge:
     def __init__(self, buddy, data_dir: Path, url: str, post=None, wait_s: float = WAIT_S) -> None:
         self.buddy, self.url, self.wait_s = buddy, url, wait_s
-        self.post = post or (lambda u, j: httpx.post(u, json=j, timeout=10))
+        self.post = post or self._post
         self.log_path = Path(data_dir) / "bridge.log"
         self.jobs: dict[str, dict] = {}
         self._lock = threading.Lock()
+
+    @staticmethod
+    def _post(url: str, payload: dict):
+        with private_mode.client(timeout=10) as c:  # guarded: private mode allows only loopback/LAN
+            return c.post(url, json=payload)
 
     def _log(self, job: dict, event: str, **extra) -> None:
         line = {"t": time.strftime("%Y-%m-%dT%H:%M:%S"), "id": job["id"], "event": event,
