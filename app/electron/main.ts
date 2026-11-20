@@ -5,6 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { registerCraftTerminal } from './craft-terminal';
+import { craftVoice } from './craft-voice';
 import type { AppSettings, EnvKey, PairRequest, ThemeMode } from '../shared/types';
 import { CARD, PAIR } from '../shared/types';
 import { createApiClient } from './api-client';
@@ -133,7 +134,7 @@ function createWindow(): BrowserWindow {
       additionalArguments: [`--piblo-version=${app.getVersion()}`, ...(craftPilot ? ['--craft-terminal-pilot'] : [])],
     },
   });
-  if (craftPilot) registerCraftTerminal(w, pathToFileURL(rendererFile).href);
+  if (craftPilot) registerCraftTerminal(w, pathToFileURL(rendererFile).href, craftVoice(() => `http://127.0.0.1:${port()}`, token));
   w.setMenuBarVisibility(false);
   // First paint is not guaranteed: if the renderer never becomes ready the window would stay
   // invisible, so the gate also reveals on did-finish-load and after a failsafe timeout.

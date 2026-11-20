@@ -81,6 +81,7 @@ from .skill_vault import SkillVault
 from starlette.concurrency import run_in_threadpool
 from .flow import Flow, foreground as flow_foreground, safe_paste as flow_safe_paste
 from .flow_routes import build_flow_router, insert_text, read_settings
+from .craft_voice import build_craft_voice_router
 from .stt import SpeechToText
 from .subtitle_routes import install_subtitle_routes
 from .subtitles import SubtitleJobs, WhisperTranscriber
@@ -261,7 +262,7 @@ def create_app(
         allow_origins=cfg.web_origin_list,
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-MAZ-Token", "X-MAZ-Context"],
+        allow_headers=["Authorization", "Content-Type", "X-MAZ-Token", "X-MAZ-Context", "X-Craft-Capture"],
         expose_headers=["X-MAZ-Width", "X-MAZ-Height", "X-MAZ-Format"],
     )
     install_validation_exception_handler(api)
@@ -1302,6 +1303,7 @@ def create_app(
     api.include_router(build_dev_router(resolve_data_dir(cfg), Path(cfg.repo_dir) if cfg.repo_dir else Path(__file__).resolve().parents[2]))
     api.include_router(build_features_router(resolve_data_dir(cfg)))
     api.include_router(build_flow_router(flow_service))
+    api.include_router(build_craft_voice_router(security, lambda path: turn_stt(path, "local")))
     body_double = BodyDouble(buddy, resolve_data_dir(cfg) / "body_double.json")
     api.include_router(build_bodydouble_router(body_double))
     api.on_event("startup")(body_double.start)

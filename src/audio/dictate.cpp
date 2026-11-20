@@ -27,12 +27,13 @@ constexpr uint32_t UPLOAD_STACK = 9216;
 nod::UploadGate gGate;
 bool            gSent = false;   // upload task launched for the current Working state
 std::string     gJobPath;        // worker-owned copy: the task deletes the file when done
-bool            gJobToPc = false;
+Target          gJobTarget = Target::Field;
 host::Reply     gJobReply;       // written by the task before gGate.finish()
 
 void uploadTask(void*) {
-    const auto reply = gJobToPc ? host::boardFlowPaste(gJobPath, HTTP_MS)
-                                : host::boardTranscribe(gJobPath, HTTP_MS);
+    const auto reply = gJobTarget == Target::Craft ? host::craftVoice(gJobPath, HTTP_MS)
+                     : gJobTarget == Target::Pc ? host::boardFlowPaste(gJobPath, HTTP_MS)
+                     : host::boardTranscribe(gJobPath, HTTP_MS);
     store::remove(gJobPath);
     gJobReply = reply;
     gGate.finish();
@@ -46,7 +47,7 @@ std::string         gPath;
 std::string         gText;
 std::string         gError;
 std::string         gPcOutcome;
-bool                gToPc   = false;
+Target              gTarget = Target::Field;
 bool                gReady  = false;
 uint32_t            gWorkAt = 0;
 
@@ -68,7 +69,7 @@ void fail(const char* why) {
 
 }  // namespace
 
-bool start(const void* owner, bool toPc) {
+bool start(const void* owner, bool toPc, bool craft) {
     if (gState == State::Listening || gState == State::Working) return false;
     if (gGate.busy()) {  // an abandoned upload is still on the wire
         fail("still sending the last one - wait");
@@ -81,7 +82,7 @@ bool start(const void* owner, bool toPc) {
     gText.clear();
     gError.clear();
     gPcOutcome.clear();
-    gToPc  = toPc;
+    gTarget = toPc ? targetForPc(craft) : Target::Field;
     gReady = false;
     discard();
 
@@ -155,7 +156,7 @@ void update() {
         }
         // Only touch the job slot once we own the gate: an abandoned task may still use it.
         gJobPath = gPath;
-        gJobToPc = gToPc;
+        gJobTarget = gTarget;
         gJobReply = host::Reply{};
         if (xTaskCreatePinnedToCore(uploadTask, "pibloDict", UPLOAD_STACK, nullptr, 1,
                                     nullptr, 0) != pdPASS) {
@@ -169,7 +170,7 @@ void update() {
     if (!gGate.take()) {
         if (gGate.timedOut(millis(), UI_MS) && gGate.abandon()) {  // else it just finished: next tick
             gPath.clear();  // the task deletes the file
-            fail(gToPc ? "PC too slow - it may still type" : "PC did not answer in time");
+            fail(gTarget == Target::Pc ? "PC too slow - it may still type" : "PC did not answer in time");
         }
         return;
     }
@@ -180,12 +181,12 @@ void update() {
                                  : reply.error.c_str());
         return;
     }
-    if (reply.transcript.empty()) {
+    if (reply.transcript.empty() && gTarget != Target::Craft) {
         fail("nothing was recognised");
         return;
     }
     gText  = reply.transcript;
-    gPcOutcome = gToPc ? reply.text : "";
+    gPcOutcome = gTarget == Target::Craft ? "craft" : (gTarget == Target::Pc ? reply.text : "");
     gReady = true;
     gState = State::Idle;
     sfx::confirm();

@@ -97,8 +97,15 @@ export interface CraftTaskBridge {
   cancel(): Promise<void>;
 }
 
+export interface CraftVoiceBridge {
+  arm(): Promise<void>;
+  read(): Promise<{ status: 'waiting' | 'expired' } | { status: 'ready'; text: string }>;
+  cancel(): Promise<void>;
+}
+
 export interface PibloBridge {
   craftTask?: CraftTaskBridge;
+  craftVoice?: CraftVoiceBridge;
   craftTerminal?: {
     open(cols: number, rows: number): Promise<{ id: number; data: string; end: number }>;
     read(id: number, offset: number): Promise<{ data: string; end: number; exited: boolean; truncated: boolean }>;

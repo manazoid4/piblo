@@ -187,6 +187,7 @@ Reply talkTextContext(const std::string& session, const std::string& text,
                       const std::string& context);
 Reply talkAudio(const std::string& session, const std::string& wavPath);
 Reply transcribe(const std::string& wavPath, uint32_t timeoutMs = 60000);
+Reply craftVoice(const std::string& wavPath, uint32_t timeoutMs = 60000);
 Reply flowPaste(const std::string& wavPath, uint32_t timeoutMs = 60000);  // /dictate?target=pc-paste
 
 // Board offload path (ESP-NOW to Piblo board). Falls back to HTTP when board is not healthy

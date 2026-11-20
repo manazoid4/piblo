@@ -15,6 +15,7 @@
 #include <stdint.h>
 
 #include <string>
+#include "dictate_target.h"
 
 namespace maz {
 namespace dictate {
@@ -31,7 +32,7 @@ enum class State : uint8_t {
 // collect the result.
 // toPc: send to the PC's /dictate?target=pc-paste instead, so the cleaned text
 // is typed into whatever window is focused on the computer (Piblo Flow).
-bool  start(const void* owner, bool toPc = false);
+bool  start(const void* owner, bool toPc = false, bool craft = false);
 // After a toPc take(): "pasted", "clipboard" (focus moved / PC locked) or "".
 const char* pcOutcome();
 void  stop();    // finish recording and begin transcribing

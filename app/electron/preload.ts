@@ -10,6 +10,10 @@ const bridge: PibloBridge = {
     models: () => invoke<string[]>('craft-task:models'),
     run: (draft: CraftDraft) => invoke<CraftTaskRecord>('craft-task:run', draft),
     cancel: () => invoke<void>('craft-task:cancel'),
+  }, craftVoice: {
+    arm: () => invoke('craft-voice:arm'),
+    read: () => invoke('craft-voice:read'),
+    cancel: () => invoke('craft-voice:cancel'),
   }, craftTerminal: {
     open: (cols: number, rows: number) => invoke<{ id: number; data: string; end: number }>('craft:open', cols, rows),
     read: (id: number, offset: number) => invoke<{ data: string; end: number; exited: boolean; truncated: boolean }>('craft:read', id, offset),

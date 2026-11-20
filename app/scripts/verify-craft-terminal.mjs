@@ -10,7 +10,9 @@ import { startMock } from './mock-core.mjs';
 const root = path.resolve(fileURLToPath(new URL('..', import.meta.url)));
 const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'piblo-craft-'));
 fs.writeFileSync(path.join(profile, 'settings.json'), JSON.stringify({ onboardingDone: true }));
-const mock = await startMock({ port: 0, pairing: false });
+const voiceText = 'Check the blue notebook.';
+const exerciseVoice = process.env.PIBLO_CRAFT_TEST_VOICE === '1';
+const mock = await startMock({ port: 0, pairing: false, craftTranscript: exerciseVoice ? voiceText : '' });
 // Opt in on an isolated runner. The application uses Ollama's fixed loopback endpoint.
 const exerciseTask = process.env.PIBLO_CRAFT_TEST_TASK === '1';
 const taskPrompt = 'Give the blue notebook a short title.';
@@ -98,6 +100,15 @@ try {
     assert.equal(await reopened.getByLabel('Task draft').inputValue(), taskPrompt);
     assert.equal(generations, 1);
     console.log('PASS: local task, encrypted result, restart and Continue without replay (fixture model)');
+  }
+  if (exerciseVoice) {
+    const current = await app.firstWindow();
+    const draft = current.getByLabel('Task draft');
+    await draft.fill('Already typed.');
+    await current.getByRole('button', { name: 'Dictate with Piblo' }).click();
+    await current.waitForFunction(expected => document.querySelector('#craft-prompt')?.value === expected, 'Already typed.\n' + voiceText);
+    assert.equal(generations, exerciseTask ? 1 : 0);
+    console.log('PASS: Craft voice appends a fixture transcript without submitting the draft');
   }
 } finally {
   await app?.close();

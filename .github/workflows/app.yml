@@ -66,6 +66,7 @@ jobs:
           if ($process.ExitCode -ne 0) { throw "Installer exited with $($process.ExitCode)" }
           $env:PIBLO_CRAFT_TEST_EXE = Join-Path $testInstall 'Piblo.exe'
           $env:PIBLO_CRAFT_TEST_TASK = '1'
+          $env:PIBLO_CRAFT_TEST_VOICE = '1'
           if (!(Test-Path -LiteralPath $env:PIBLO_CRAFT_TEST_EXE)) { throw 'Installed Piblo executable missing' }
           npm run verify:craft-terminal
 

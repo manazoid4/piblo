@@ -66,13 +66,13 @@ void markOnline(bool remote) {
     Sys.hostOnline = true;
 }
 
-Reply decodeReply(HTTPClient& http, int status) {
+Reply decodeReply(HTTPClient& http, int status, bool craft = false) {
     Reply out;
     out.status = status;
     const String body = http.getString();
     JsonDocument doc;
     const auto error = deserializeJson(doc, body);
-    if (status >= 200 && status < 300 && !error) {
+    if (status >= 200 && status < 300 && !error && (!craft || std::string(doc["status"] | "") == "ready")) {
         out.ok = true;
         out.text = doc["reply"] | "";
         if (out.text.empty() && doc["result"].is<const char*>())
@@ -99,7 +99,7 @@ Reply decodeReply(HTTPClient& http, int status) {
 
 Reply upload(const char* path, const std::string& wavPath,
              const std::vector<std::pair<std::string, std::string>>& headers,
-             bool idempotent = true, uint32_t timeoutMs = 60000) {
+             bool idempotent = true, uint32_t timeoutMs = 60000, bool localOnly = false) {
     Reply out;
     if (!configured() || WiFi.status() != WL_CONNECTED || !store::ready()) {
         out.error = "host offline";
@@ -113,6 +113,7 @@ Reply upload(const char* path, const std::string& wavPath,
     }
 
     for (const auto& base : bases()) {
+        if (localOnly && base.second) continue;
         file.seek(0);
         NodHttp http;
         if (!beginRequest(http, base.first, path, base.second, timeoutMs)) continue;
@@ -137,7 +138,7 @@ Reply upload(const char* path, const std::string& wavPath,
         }
         file.close();
         markOnline(base.second);
-        return decodeReply(http, status);
+        return decodeReply(http, status, localOnly);
     }
     file.close();
     Sys.hostOnline = false;
@@ -292,6 +293,37 @@ Reply talkAudio(const std::string& session, const std::string& wavPath) {
 
 Reply transcribe(const std::string& wavPath, uint32_t timeoutMs) {
     return upload("/transcribe/raw", wavPath, {{"X-MAZ-Route", route()}}, true, timeoutMs);
+}
+
+Reply craftVoice(const std::string& wavPath, uint32_t timeoutMs) {
+    Reply out;
+    if (!configured() || Cfg.hostAddr.empty() || WiFi.status() != WL_CONNECTED) {
+        out.error = "Connect to local PC first";
+        return out;
+    }
+    const std::string base = "http://" + Cfg.hostAddr + ":" + std::to_string(Cfg.hostPort);
+    NodHttp http;
+    if (!beginRequest(http, base, "/craft/voice/claim", false, 5000)) {
+        out.error = "PC unreachable";
+        return out;
+    }
+    const int status = http.POST("");
+    const String body = http.getString();
+    http.end();
+    if (status != 200) {
+        out.error = status == 404 ? "Open Craft voice capture first" :
+                    status == 409 ? "Multiple Craft captures open" : "Craft capture unavailable";
+        return out;
+    }
+    JsonDocument doc;
+    if (deserializeJson(doc, body) || !doc["capture_id"].is<const char*>()) {
+        out.error = "Invalid Craft capture response";
+        return out;
+    }
+    const std::string capture = doc["capture_id"].as<const char*>();
+    if (capture.empty()) { out.error = "Invalid Craft capture response"; return out; }
+    out = upload("/craft/voice/audio", wavPath, {{"X-Craft-Capture", capture}}, false, timeoutMs > 5000 ? timeoutMs - 5000 : timeoutMs, true);
+    return out;
 }
 
 Reply flowPaste(const std::string& wavPath, uint32_t timeoutMs) {
