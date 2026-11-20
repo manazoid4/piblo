@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 from fastapi import APIRouter, Header, HTTPException, Request, Response
+from fastapi.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 
@@ -88,11 +89,15 @@ def build_craft_voice_router(security, transcribe_local, *, clock=time.monotonic
                     tmp.write(chunk)
             security.validate_upload(path, size)
             text = await run_in_threadpool(transcribe_local, path)
+            if not text.strip():
+                text = ""
             with lock:
                 current = find(x_craft_capture)
                 if current is not item:
                     raise HTTPException(404, "capture_not_found")
                 item.update(state="ready", text=text)
+            if not text:
+                return JSONResponse(status_code=422, content={"detail": "No speech detected. Try again."})
             return {"status": "ready"}
         except Exception:
             with lock:

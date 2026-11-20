@@ -121,3 +121,13 @@ def test_core_claim_requires_auth(tmp_path):
     from test_app import client
     c = client(work_dir=tmp_path)
     assert c.post('/craft/voice/claim').status_code == 401
+
+
+def test_silence_reports_error_but_result_remains_consumable():
+    c = setup(lambda path: '')
+    h = arm(c)
+    response = c.post('/craft/voice/audio', headers=h, content=wav())
+    assert response.status_code == 422
+    assert response.json()['detail'] == 'No speech detected. Try again.'
+    assert c.get('/craft/voice', headers=h).json() == {'status': 'ready', 'text': ''}
+    assert c.get('/craft/voice', headers=h).status_code == 404
