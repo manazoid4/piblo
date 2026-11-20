@@ -208,7 +208,7 @@ private:
             credits_ = sum > RX_SLOTS ? (uint8_t)RX_SLOTS : (uint8_t)sum;  // never above the peer's slots
         } else if (f.type == HEARTBEAT && f.len >= 1) {
             // lost-DATA credit resync: only when nothing can still be in flight
-            if (credits_ == 0 && (uint32_t)(now - lastDataTx_) >= 2 * HEARTBEAT_MS && f.payload[0] <= RX_SLOTS) {
+            if (credits_ == 0 && f.payload[0] > 0 && f.payload[0] <= RX_SLOTS && (uint32_t)(now - lastDataTx_) >= 2 * HEARTBEAT_MS) {
                 credits_ = f.payload[0]; creditResyncs++;
             }
         } else if (f.type >= DATA_MIN) {
