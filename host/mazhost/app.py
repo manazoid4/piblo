@@ -27,6 +27,7 @@ from .dump_routes import build_dump_router, inbox_dir, save_safely
 from .catchup import Catchup, build_catchup_router
 from .promises import Promises, build_promises_router
 from .share_in import build_share_router
+from .home_pulse import build_home_pulse_app, install_home_pulse_routes
 from .buddy_forms import build_buddy_forms_router
 from .onboarding import Onboarding, build_onboarding_router
 from .library_routes import build_library_router
@@ -1241,6 +1242,8 @@ def create_app(
     promises_engine = Promises(buddy, model_router=model_router, settings=cfg)
     promises_engine.start()
     buddy.on_ack = promises_engine.on_alert_acked
+    api.mount("/home/pulse", build_home_pulse_app(cfg, buddy, resolve_data_dir(cfg)))
+    install_home_pulse_routes(api, cfg, resolve_data_dir(cfg))
     if cfg.vault_dir and cfg.vault_remote_url:
         raise ValueError('Choose a local vault folder or a remote home vault, not both')
     vault = (RemoteFileVault(cfg.vault_remote_url, cfg.vault_remote_token)
