@@ -28,9 +28,10 @@
 
 ## For Maz: on-device benchmark (do not run unattended; flashing needs your yes)
 ```
-pio device list                                   # note the Cardputer COM port, call it COMx
-pio run -e cardputer-adv-bench -t upload --upload-port COMx
-pio device monitor -p COMx -b 115200 --filter log2file   # use it ~5 min incl. one voice question, then Ctrl+C
-python scripts/bench_parse.py platformio-device-monitor-*.log
+pio device list                                   # confirm the Cardputer port (COM3 last time)
+pio run -e cardputer-adv-bench -t upload --upload-port COM3
+python -m serial.tools.miniterm --dtr 0 --rts 0 COM3 115200 | tee bench.log   # ~5 min incl. 5 Flow dictations, then Ctrl+]
+python scripts/bench_parse.py bench.log
 ```
+(DTR/RTS held low so opening the port does not reset the board.)
 To compare a change: capture a second log the same way and run `python scripts/bench_parse.py base.log cand.log`.
