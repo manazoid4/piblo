@@ -63,6 +63,20 @@ See [ALERTS.md](ALERTS.md). `kind: approval` routes into the approval queue. Add
 
 `/buddy/request` and `/buddy/alert` gained optional `agent`, `idempotency_key`, `sensitive` fields.
 
+## Hermes agent routes (feat: Hermes gadget port, additive)
+
+Core can hand ordinary questions to the owner's Hermes Agent over the Hermes Gadget protocol
+(docs/plans/2026-11-20-hermes-gadget-port.md). Firmware needs no change: answers still come back
+from `/turn` / `/turn/raw` / `/turn/text` (`provider: "hermes"`, optional `cards`, `degraded`), and
+Hermes questions arrive as ordinary approvals (`agent: "Hermes"`) decided with `/buddy/decide`.
+
+| Route | Method | Purpose |
+|---|---|---|
+| `/hermes/status` | GET | Enabled, selected agent, connected, paired, pairing code, last error, dashboard. Never the key or token. |
+| `/hermes/agent` | POST | `{"agent": "piblo"\|"hermes"}`: who answers ordinary questions. |
+| `/hermes/ask` | POST | `{"text"}`: one Hermes turn (app/testing). |
+| `/hermes/cancel`, `/hermes/new` | POST | Stop the Hermes turn; start a fresh Hermes conversation. |
+
 ## Persistence rules
 
 - Alerts, approvals, notifications, tasks, agents, connections, prefs and activity are written through
