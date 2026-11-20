@@ -330,3 +330,52 @@ def test_cli_search_import_stats(tmp_path, capsys):
     assert capsys.readouterr().out == ""
     assert nodinbox.main(base + ["stats"]) == 0
     assert "4 items" in capsys.readouterr().out
+
+
+def test_get_delete_export_roundtrip(tmp_path, root):
+    web = library.save_item(root, url="https://example.com/recipe?utm_source=x", text="sourdough starter",
+                            notes="feed 1:1:1", source="drop", author="synthetic")
+    ig = library.save_item(root, url="https://www.instagram.com/p/AAA111/", author="alpha_user", source="ig-export")
+    txt = library.save_item(root, text="fix the fence gate", notes="measure twice", source="drop")
+    got = library.get_item(root, web["id"])
+    assert got["url"] == "https://example.com/recipe" and got["Notes"] == "feed 1:1:1" and got["source"] == "drop"
+    assert library.get_item(root, "web-nope") is None
+    assert library.delete_item(root, ig["id"]) is True
+    assert not (root / "ig" / f"{ig['id']}.md").exists()
+    assert library.stats(root)["total"] == 2 and library.search(root, "alpha_user") == []
+    assert library.delete_item(root, ig["id"]) is False          # revoking twice is safe
+    items = library.export_items(root)
+    assert {i["id"] for i in items} == {web["id"], txt["id"]}
+    root2 = tmp_path / "other" / "library"                        # export re-imports elsewhere, notes intact
+    again = library.save_items(root2, [
+        dict(url=i.get("url", ""), text=i.get("Caption", ""), author=i.get("author", ""),
+             collection=i.get("collection", ""), notes=i.get("Notes", ""), tags=i.get("tags"),
+             project=i.get("project"), source=i.get("source", ""), saved=i.get("saved", ""))
+        for i in items])
+    assert {r["id"] for r in again} == {web["id"], txt["id"]}
+    assert library.get_item(root2, txt["id"])["Notes"] == "measure twice"
+
+
+@pytest.mark.parametrize("bad", ["../../evil", "web-../../evil", "ig-A/../../x", "nope-1", "", "web-"])
+def test_delete_and_get_reject_hostile_ids(root, bad):
+    library.save_item(root, url="https://example.com/keep", text="keep me")
+    assert library.get_item(root, bad) is None
+    assert library.delete_item(root, bad) is False
+    assert library.search(root, "keep")                           # nothing touched
+
+
+def test_item_delete_export_routes(tmp_path):
+    client = make(tmp_path)
+    assert client.get("/library/item/web-x").status_code == 401
+    assert client.delete("/library/item/web-x").status_code == 401
+    assert client.get("/library/export").status_code == 401
+    saved = client.post("/ingest", headers=AUTH, json={"kind": "url", "url": "https://example.com/one", "text": "otter"})
+    iid = saved.json()["id"]
+    got = client.get(f"/library/item/{iid}", headers=AUTH)
+    assert got.status_code == 200 and got.json()["url"] == "https://example.com/one"
+    assert client.get("/library/item/web-missing", headers=AUTH).status_code == 404
+    assert [i["id"] for i in client.get("/library/export", headers=AUTH).json()["items"]] == [iid]
+    assert client.delete(f"/library/item/{iid}", headers=AUTH).json() == {"ok": True, "id": iid}
+    assert client.delete(f"/library/item/{iid}", headers=AUTH).status_code == 404
+    assert client.get("/library/search", headers=AUTH, params={"q": "otter"}).json() == {"results": []}
+    assert client.get("/library/export", headers=AUTH).json() == {"items": []}

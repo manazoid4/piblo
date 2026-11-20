@@ -482,3 +482,58 @@ def recent(root, limit: int = 10) -> list[dict]:
             except (OSError, UnicodeError):
                 continue
     return sorted(rows, key=lambda row: row["when"], reverse=True)[:limit]
+
+
+# ---- single item, delete, export -------------------------------------------
+
+_ID = re.compile(r"^(ig|web|text)-[A-Za-z0-9_-]+$")
+
+
+def _item_path(root: Path, item_id: str) -> Path | None:
+    """Only ids we could have written ourselves; anything else is refused, never path-joined."""
+    if not _ID.match(item_id or ""):
+        return None
+    for sub in _DIRS.values():
+        path = root / sub / f"{item_id}.md"
+        if path.is_file():
+            return path
+    return None
+
+
+def get_item(root, item_id: str) -> dict | None:
+    """One saved item: frontmatter provenance plus Caption/Description/Notes. None when absent."""
+    path = _item_path(Path(root), item_id)
+    if path is None:
+        return None
+    meta, body = dumps._parse(path.read_text(encoding="utf-8"))
+    if meta.get("id") != item_id:
+        return None
+    return {**meta, **_split(body), "path": str(path)}
+
+
+def delete_item(root, item_id: str) -> bool:
+    """Remove one saved item (file + derived index). False when absent, so revoking twice is safe."""
+    root = Path(root)
+    path = _item_path(root, item_id)
+    if path is None:
+        return False
+    with dumps._lock(root):
+        path.unlink(missing_ok=True)
+        _prepare(root)
+        _rebuild(root)
+    return True
+
+
+def export_items(root) -> list[dict]:
+    """Every item as plain frontmatter + sections: portable backup, re-importable via save_items."""
+    root = Path(root)
+    out = []
+    for sub in _DIRS.values():
+        for path in sorted((root / sub).glob("*.md")):
+            try:
+                meta, body = dumps._parse(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError):
+                continue
+            if meta.get("id") == path.stem:
+                out.append({**meta, **_split(body)})
+    return out
