@@ -3,10 +3,20 @@
   "use strict";
   var stage = document.getElementById("pf-stage");
   var buttons = document.querySelectorAll(".pf-sw");
-  if (!stage) return;
+  var image = stage && stage.querySelector("img");
+  if (!image) return;
+  var finishes = {
+    cream: { src: image.getAttribute("src"), alt: image.alt },
+    smoke: {
+      src: "/media/concept/piblo-concept-smoke.jpg",
+      alt: "Piblo concept in a smoked clear finish, standing on its kickstand."
+    }
+  };
   buttons.forEach(function (b) {
     b.addEventListener("click", function () {
-      stage.dataset.concept = b.dataset.concept;
+      var finish = finishes[b.dataset.concept];
+      image.src = finish.src;
+      image.alt = finish.alt;
       buttons.forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
     });
   });
