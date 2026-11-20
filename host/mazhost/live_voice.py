@@ -188,6 +188,7 @@ class LiveBridge:
         self.kokoro = self.cloud and cfg.tts_provider == "kokoro"
         self.brain = LiveBrain(cfg, stt=self.stt) if self.cloud else None
         self._turn: list[bytes] = []
+        self._utt = None  # streaming STT utterance for the turn being heard (MAZ_LIVE_STREAM_STT=1)
         self._cloud: asyncio.Task | None = None
         self._tts_done = asyncio.Event()
 
@@ -257,6 +258,10 @@ class LiveBridge:
         blocks, ended = self.vad.feed(pcm)
         if blocks and self.cloud:
             self._turn.extend(blocks)  # buffered on Core; transcribed once the turn ends
+            if self.cfg.live_stream_stt and (stream := stream_stt()):
+                self._utt = self._utt or stream.stream()
+                for b in blocks:
+                    self._utt.feed(b)  # decoded while the user is still talking
         elif blocks:
             await self._up_send({"type": "input_audio_buffer.append",
                                  "audio": base64.b64encode(b"".join(blocks)).decode()})
@@ -273,7 +278,8 @@ class LiveBridge:
         self._played.clear()
         if self.cloud:
             pcm, self._turn = b"".join(self._turn), []
-            self._cloud = asyncio.create_task(self._cloud_turn(pcm))
+            utt, self._utt = self._utt, None
+            self._cloud = asyncio.create_task(self._cloud_turn(pcm, utt))
             return
         await self._set_state("thinking")
         await self._up_send({"type": "response.create"})
@@ -303,17 +309,17 @@ class LiveBridge:
         if self._cloud and self._cloud is not asyncio.current_task():
             self._cloud.cancel()
             self._cloud = None
-        self._turn = []
+        self._turn, self._utt = [], None
 
     # ---- cloud brain turn ----------------------------------------------------
-    async def _cloud_turn(self, pcm: bytes) -> None:
+    async def _cloud_turn(self, pcm: bytes, utt=None) -> None:
         """ASR -> (drop noise | voice command | cloud brain) -> sentence-by-sentence LFM3 TTS."""
         t, sentences = self._t, asyncio.Queue()
         self.brain.meta = {}
         producer = None
         try:
             t0 = time.monotonic()
-            text = await self.brain.transcribe(pcm)
+            text = (utt.finish().lower() if utt else "") or await self.brain.transcribe(pcm)  # streamed: nearly done at end of speech
             t["asr_ms"] = round((time.monotonic() - t0) * 1000)
             if is_noise(text):
                 log.info("live: dropped noise turn %r", text)
@@ -546,6 +552,22 @@ class LiveBridge:
         log.info("live_turn %s", row)
         if self.timings is not None:
             self.timings.add(row)
+
+
+_STREAM = None
+
+
+def stream_stt():
+    """The loaded streaming recognizer, or None (model missing: Talk keeps the batch path). Loaded once."""
+    global _STREAM
+    if _STREAM is None:
+        try:
+            from . import stt_stream
+            _STREAM = stt_stream.StreamingSTT() if stt_stream.available() else False
+        except Exception as error:  # noqa: BLE001
+            log.warning("live: streaming STT unavailable: %s", error)
+            _STREAM = False
+    return _STREAM or None
 
 
 def install_live_voice(api, cfg: Settings, security, timings=None, command_handler=None, stt=None,
