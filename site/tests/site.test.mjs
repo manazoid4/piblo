@@ -240,10 +240,10 @@ test("homepage images have alt attributes and existing files; Buddy images are u
   }
 });
 
-test("reservation summary and FAQ use the same refund cutoff", () => {
+test("reservation summary and FAQ explain the refund on shipping", () => {
   const html = contents["/"];
-  const hero = html.match(/<p class="note">(&pound;5[\s\S]*?)<\/p>/)[1];
+  const hero = html.match(/<p class="note">(We&rsquo;ll refund[\s\S]*?)<\/p>/)[1];
   const batch = html.match(/<div class="reserve-box">([\s\S]*?)<\/div>/)[1];
   const faq = html.match(/<summary>How does the &pound;5 reservation work\?<\/summary><p>([\s\S]*?)<\/p>/)[1];
-  for (const text of [hero, batch, faq]) assert.match(text, /refundable any time before shipping/i);
+  for (const text of [hero, batch, faq]) assert.match(text, /refund.{0,35}when.{0,20}ships/i);
 });
