@@ -84,6 +84,10 @@ try {
     await dialog.waitFor();
     for (let i = 0; i < 6; i++) await page.keyboard.press('Tab');
     check(`${wname}: Tab stays inside the dialog`, await page.evaluate(() => !!document.activeElement?.closest('[role=dialog]')));
+    // While the tour is open, page shortcuts and the palette stay shut (it is a modal).
+    await page.keyboard.press('Control+3');
+    await page.keyboard.press('Control+k');
+    check(`${wname}: modal blocks Ctrl+number and Ctrl+K`, (await dialog.count()) === 1 && (await page.getByPlaceholder('Jump anywhere in Piblo...').count()) === 0);
     await page.keyboard.press('Escape');
     // Reopen from Ctrl+K.
     await page.keyboard.press('Control+k');
