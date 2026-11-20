@@ -2,6 +2,7 @@ import { useEffect, useState, createContext, useContext, ReactNode } from 'react
 import iconUrl from './assets/piblo-icon.svg';
 import { PairingList } from './components/PairingCard';
 import { CommandPalette } from './components/CommandPalette';
+import { PageTour } from './components/PageTour';
 import { CoreGate } from './components/CoreGate';
 import { Icon } from './components/ui';
 import type { PaletteCommand } from './lib/dev';
@@ -17,6 +18,7 @@ import { Settings } from './pages/Settings';
 import { Usage } from './pages/Usage';
 import { Teach } from './pages/Teach';
 import { StoreProvider, usePoll, useStore } from './lib/store';
+import { isTourPage, markTourSeen, tourSeen, type TourPage } from './lib/tours';
 import { useUpdate } from './lib/useUpdate';
 
 type ThemeMode = 'light' | 'dark' | 'system';
@@ -102,11 +104,12 @@ function DevicePillView() {
 }
 
 function Shell() {
-  const { core, toastNow } = useStore();
+  const { core, toast, toastNow } = useStore();
   const [section, setSection] = useState<Section>('home');
   const [devTab, setDevTab] = useState<DevTab>('today');
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [welcome, setWelcome] = useState<boolean | null>(null);
+  const [tour, setTour] = useState<TourPage | null>(null);
   const needs = usePoll<{ items: { tier: string }[] }>('/needs', 15000);
   const badge = (needs.data?.items ?? []).filter((n) => n.tier !== 'approvals').length;
   const running = core?.phase === 'running';
@@ -133,6 +136,7 @@ function Shell() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (document.querySelector('.tour-card')) return; // a tour is a modal: page shortcuts wait for it
       if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setPaletteOpen((v) => !v);
@@ -150,9 +154,17 @@ function Shell() {
     return () => window.removeEventListener('keydown', onKey);
   }, []);
 
+  const closeTour = () => {
+    if (tour) markTourSeen(tour);
+    setTour(null);
+  };
+
   const runPaletteCommand = (cmd: PaletteCommand) => {
       setWelcome(false);
-      if (cmd.id.startsWith('nav:')) {
+      if (cmd.id === 'help:tour') {
+        if (isTourPage(section)) setTour(section);
+        else toast('This page has no tour');
+      } else if (cmd.id.startsWith('nav:')) {
         const target = cmd.id.slice(4) as Section;
         setSection(target);
       } else if (cmd.id.startsWith('dev:') && isDev) {
@@ -173,6 +185,12 @@ function Shell() {
   };
 
   const needsCore = section !== 'settings' && section !== 'usage' && !running;
+  const pageShown = welcome === false && !needsCore;
+
+  // First visit to a page opens its tour; moving to another page closes any open one.
+  useEffect(() => {
+    setTour(pageShown && isTourPage(section) && !tourSeen(section) ? section : null);
+  }, [section, pageShown]);
   const Page = { home: Home, live: LiveView, ask: Ask, memory: Memory, actions: Actions, settings: Settings, usage: Usage, teach: Teach }[section === 'dev' ? 'home' : section];
 
   return (
@@ -235,6 +253,7 @@ function Shell() {
           </>
         )}
       </main>
+      {tour && <PageTour key={tour} page={tour} onClose={closeTour} />}
       <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} onSelect={runPaletteCommand} />
       {toastNow && <div className={`toast ${toastNow.bad ? 'bad' : ''}`} role="status">{toastNow.text}</div>}
     </div>

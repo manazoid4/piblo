@@ -169,7 +169,7 @@ export function prCheckSummary(pr: DevPr): { state: 'ok' | 'bad' | 'pending' | '
 export interface PaletteCommand {
   id: string;
   label: string;
-  group: 'Sections' | 'Piblo Dev' | 'Actions';
+  group: 'Sections' | 'Help' | 'Piblo Dev' | 'Actions';
   keywords: string;
   shortcut?: string;
 }
@@ -182,6 +182,7 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   { id: 'nav:actions', label: 'Go to Actions', group: 'Sections', keywords: 'actions approvals needs focus quiet', shortcut: 'Ctrl+5' },
   { id: 'nav:usage', label: 'Go to Usage', group: 'Sections', keywords: 'usage tokens claude codex openrouter credits' },
   { id: 'nav:settings', label: 'Go to Settings', group: 'Sections', keywords: 'settings pairing privacy keys theme', shortcut: 'Ctrl+6' },
+  { id: 'help:tour', label: 'Tour of this page', group: 'Help', keywords: 'help tour guide walkthrough show me how' },
   { id: 'dev:today', label: 'Piblo Dev: Today', group: 'Piblo Dev', keywords: 'dev today overview founder needs now', shortcut: 'Ctrl+7' },
   { id: 'dev:checklists', label: 'Piblo Dev: Checklists', group: 'Piblo Dev', keywords: 'dev checklists founder today feature tests kickstarter gates tick' },
   { id: 'dev:content', label: 'Piblo Dev: Content Studio', group: 'Piblo Dev', keywords: 'dev content studio drafts reddit x twitter linkedin instagram share approve' },

@@ -4,6 +4,7 @@ import { BuddySection } from '../components/BuddySection';
 import type { AppSettings, CoreEnvView, EnvKey } from '../../shared/types';
 import { PageHead, Setting, Switch } from '../components/ui';
 import { useAct, usePoll, useStore } from '../lib/store';
+import { resetTours } from '../lib/tours';
 import { describeUpdate, useUpdate } from '../lib/useUpdate';
 import { useTheme } from '../App';
 
@@ -133,6 +134,9 @@ export function Settings() {
         </Setting>
         <Setting title="Welcome tour" sub="Walk through connecting your Piblo again.">
           <button className="btn" onClick={() => { void patch({ onboardingDone: false }); location.hash = '#/welcome'; }}>Show again</button>
+        </Setting>
+        <Setting title="Page tours" sub="Each page shows a short tour the first time. Skip any time; Ctrl+K reopens one.">
+          <button className="btn" onClick={() => { resetTours(); toast('Tours will show again'); }}>Show page tours again</button>
         </Setting>
         <Setting title="Keyboard" sub="Ctrl+1 to Ctrl+6 jump between sections. Tab moves through everything.">
           <span className="tag">Ctrl+1..6</span>
