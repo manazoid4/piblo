@@ -164,3 +164,31 @@ def test_focus_and_promise_run_without_approval():
     out = r.start("x", parse_compound("start a 25 minute focus session and remind me tonight to rest"))
     assert not r.buddy.requests
     assert rec.calls == [("focus", 25), ("confirm", "rest tonight")] and out["run"]["state"] == "done"
+
+
+def test_ambiguous_voice_date_is_never_silently_saved(monkeypatch):
+    # The runner must fail closed if a proposal ever has two readings (e.g. "next Friday"),
+    # even though today's WHEN grammar only produces single-reading dates.
+    from mazhost import compound_run
+    real_propose = compound_run.propose
+    monkeypatch.setattr(compound_run, "propose", lambda note: {
+        **real_propose(note, NOW), "ambiguous": True,
+        "candidates": [{"due": "2027-01-08T17:00", "label": "Fri 8 Jan, 5pm"},
+                       {"due": "2027-01-15T17:00", "label": "Fri 15 Jan, 5pm"}]})
+    r, rec = runner()
+    out = r.start("x", parse_compound("save the spreadsheet and remind me tonight to rest"))
+    r.buddy.answer.set()
+    settle(out["run"])
+    assert rec.calls == [("save", 7)]                     # stopped before the promise
+    assert out["run"]["state"] == "failed"
+    assert r.buddy.alerts and r.buddy.alerts[0].title.startswith("Stopped:")
+    assert "two readings" in r.buddy.alerts[0].body
+
+
+def test_voice_approval_expiry_runs_nothing():
+    r, rec = runner()
+    r.buddy.state = lambda rid, wait=0: {}                # the 90 s wait ran out with no YES
+    out = r.start("x", parse_compound("save it and remind me tonight to rest"))
+    settle(out["run"])
+    assert rec.calls == [] and out["run"]["state"] == "expired"
+    assert not r.buddy.alerts

@@ -105,7 +105,11 @@ class CompoundRunner:
             if step.get("needs_subject") and subject:
                 task = re.sub(r"\bit\b", lambda _m: _stem(subject), task, flags=re.I)
             note = f"{task} {step['when']}"
-            due = propose(note)["candidates"][0]
+            proposal = propose(note)
+            if proposal["ambiguous"]:
+                # Fail closed: a voice YES must never confirm a date the user did not pick.
+                raise PromiseError("ambiguous_date", "that date has two readings; say the exact day")
+            due = proposal["candidates"][0]
             saved = self.promises.confirm(note, due["due"])
             return f"Reminder {due['label']}: {task}"[:80] if saved["ok"] else "Reminder not saved"
         if kind == "focus.start":
