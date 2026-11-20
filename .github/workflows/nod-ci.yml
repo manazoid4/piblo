@@ -38,6 +38,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install platformio pytest pytest-xdist playwright -r host/requirements.txt
           pip install "click>=8.0.4,<8.4"
+          pip install -r host/requirements-test.txt
           python -m playwright install --with-deps chromium
 
       - name: Core tests

@@ -20,3 +20,12 @@ Local speech-to-text uses the NVIDIA Parakeet TDT 0.6B v3 model, ONNX conversion
 (https://huggingface.co/istupakov/parakeet-tdt-0.6b-v3-onnx, pinned to commit 8f23f0c),
 licensed CC-BY-4.0 (https://creativecommons.org/licenses/by/4.0/). Original model (c) NVIDIA.
 It is downloaded at first start, not redistributed in this repository; runtime is onnx-asr (MIT).
+
+Piblo Core's Hermes link (host/mazhost/hermes_gadget.py) implements Hermes Gadget Protocol v1 and
+adapts its identity, HMAC and binary-frame helpers from hermes-gadget-sdk plugin/protocol.py:
+  https://github.com/Adolanium/hermes-gadget-sdk (commit 35dbae7)
+  Copyright (c) 2026 Hermes Gadget SDK contributors
+  Licensed under the MIT License (third_party/hermes-gadget-sdk/LICENSE).
+The SDK itself is a test-only dependency (host/requirements-test.txt) and is not redistributed.
+Hermes Gadget is a community project, not affiliated with Nous Research; "Hermes" is used only to
+describe compatibility with Hermes Agent.
