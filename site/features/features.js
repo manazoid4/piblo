@@ -10,4 +10,11 @@
       buttons.forEach(function (x) { x.setAttribute("aria-pressed", String(x === b)); });
     });
   });
+  var reel = document.getElementById("pf-reel");
+  document.querySelectorAll(".pf-arrow").forEach(function (b) {
+    b.addEventListener("click", function () {
+      var card = reel && reel.querySelector(".reel");
+      if (card) reel.scrollBy({ left: Number(b.dataset.dir) * (card.offsetWidth + 16), behavior: "smooth" });
+    });
+  });
 })();
