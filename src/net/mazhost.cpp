@@ -13,6 +13,7 @@
 #include "../core/settings.h"
 #include "../core/sys.h"
 #include "../storage/store.h"
+#include "../net/board_link.h"
 
 namespace maz {
 namespace host {
@@ -299,6 +300,26 @@ Reply transcribe(const std::string& wavPath, uint32_t timeoutMs) {
 Reply flowPaste(const std::string& wavPath, uint32_t timeoutMs) {
     // Piblo Flow: Core cleans the text and types it into the focused PC window.
     return upload("/dictate?target=pc-paste", wavPath, {}, /*idempotent=*/false, timeoutMs);
+}
+
+Reply boardTranscribe(const std::string& wavPath, uint32_t timeoutMs) {
+    // Try board offload first (kind 1 = /transcribe/raw)
+    if (board::canUpload()) {
+        std::string result = board::upload(1, wavPath, timeoutMs);
+        if (!result.empty()) return host::Reply{true, 200, result, result, "", "", "", 0, "", 0};
+    }
+    // Fall back to HTTP
+    return transcribe(wavPath, timeoutMs);
+}
+
+Reply boardFlowPaste(const std::string& wavPath, uint32_t timeoutMs) {
+    // Try board offload first (kind 0 = /dictate?target=pc-paste)
+    if (board::canUpload()) {
+        std::string result = board::upload(0, wavPath, timeoutMs);
+        if (!result.empty()) return host::Reply{true, 200, result, result, "", "", "", 0, "", 0};
+    }
+    // Fall back to HTTP
+    return flowPaste(wavPath, timeoutMs);
 }
 
 Reply brainDump(const std::string& wavPath,

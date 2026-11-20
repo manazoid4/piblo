@@ -3,6 +3,7 @@ package uk.mazworks.piblo.hub
 import uk.mazworks.piblo.proto.CoreClient
 import uk.mazworks.piblo.proto.CoreHttpException
 import uk.mazworks.piblo.proto.EventsPage
+import uk.mazworks.piblo.proto.HaltState
 import uk.mazworks.piblo.proto.Summary
 import java.io.IOException
 import kotlin.math.min
@@ -22,6 +23,15 @@ interface Transport {
     fun share(json: String)
     fun screenPng(): ByteArray
     fun pressKeys(keys: String)
+    fun deviceAction(action: String): String
+    fun haltState(): HaltState
+    fun setHalt(on: Boolean, minutes: Int? = null)
+    /** Authenticated JSON GET/POST for the app's own screens. */
+    fun get(path: String): String
+    fun post(path: String, body: String? = null): String
+    fun postSlow(path: String, body: String? = null): String
+    fun patch(path: String, body: String? = null): String
+    fun delete(path: String): String
 }
 
 class CoreTransport(private val c: CoreClient) : Transport {
@@ -35,6 +45,14 @@ class CoreTransport(private val c: CoreClient) : Transport {
     override fun share(json: String) = c.share(json)
     override fun screenPng() = c.screenPng()
     override fun pressKeys(keys: String) = c.pressKeys(keys)
+    override fun deviceAction(action: String) = c.deviceAction(action)
+    override fun haltState() = c.haltState()
+    override fun setHalt(on: Boolean, minutes: Int?) = c.setHalt(on, minutes)
+    override fun get(path: String) = c.get(path)
+    override fun post(path: String, body: String?) = c.post(path, body)
+    override fun postSlow(path: String, body: String?) = c.postSlow(path, body)
+    override fun patch(path: String, body: String?) = c.patch(path, body)
+    override fun delete(path: String) = c.delete(path)
 }
 
 /** Clearly a stub: the current firmware has no BLE GATT service. See android/README.md for the proposed framing. */
@@ -50,6 +68,14 @@ object BleTransportStub : Transport {
     override fun screenPng(): ByteArray = na()
     override fun share(json: String) = na()
     override fun pressKeys(keys: String) = na()
+    override fun deviceAction(action: String): String = na()
+    override fun haltState(): HaltState = na()
+    override fun setHalt(on: Boolean, minutes: Int?) = na()
+    override fun get(path: String): String = na()
+    override fun post(path: String, body: String?): String = na()
+    override fun postSlow(path: String, body: String?): String = na()
+    override fun patch(path: String, body: String?): String = na()
+    override fun delete(path: String): String = na()
 }
 
 /**
@@ -142,3 +168,6 @@ class CoreLink(
         return backoff.next()
     }
 }
+/** Drain the share queue when the link has just come online, or right after something was enqueued while online. */
+fun shouldDrainShares(now: LinkState, prev: LinkState?, requested: Boolean): Boolean =
+    now == LinkState.ONLINE && (prev != LinkState.ONLINE || requested)

@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 from . import private_mode
+from .nowindow import no_window
 
 TIERS = ("approvals", "prs", "actions")
 PR_CACHE_S = 60
@@ -63,7 +64,7 @@ class Needs:
         out = subprocess.run(
             ["gh", "pr", "list", "--repo", repo, "--state", "open", "--limit", "100",
              "--json", "number,title,createdAt,url"],
-            capture_output=True, text=True, timeout=20, check=True).stdout
+            capture_output=True, text=True, timeout=20, check=True, **no_window()).stdout
         prs = json.loads(out)
         self._pr_cache[repo] = (time.monotonic(), prs)  # failures are never cached
         return prs

@@ -21,4 +21,4 @@ jobs:
         with:
           node-version: '22'
       - name: Run no-network fixture tests
-        run: node --test skills/free-model-scout/tests/scout.test.mjs
+        run: node --test skills/free-model-scout/tests/*.test.mjs

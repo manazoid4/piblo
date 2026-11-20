@@ -18,6 +18,7 @@ import httpx
 from .config import Settings
 from .core import CoreError, MazCore
 from . import private_mode
+from .nowindow import no_window
 
 
 class BridgeWorker:
@@ -61,7 +62,7 @@ class BridgeWorker:
             private_mode.guard_subprocess("GitHub CLI")
             result = subprocess.run(
                 [gh, "auth", "token"], capture_output=True, text=True, timeout=5,
-                shell=False, encoding="utf-8", errors="replace"
+                shell=False, encoding="utf-8", errors="replace", **no_window()
             )
             if result.returncode == 0:
                 return result.stdout.strip()

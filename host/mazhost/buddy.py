@@ -175,10 +175,12 @@ class HaltBody(BaseModel):
 
 class Buddy:
     def __init__(self, today: Callable[[], str] | None = None, store: BuddyStore | None = None,
-                 focus=None, device_keys: dict[str, str] | None = None) -> None:
+                 focus=None, device_keys: dict[str, str] | None = None,
+                 on_ack: Callable[[str], None] | None = None) -> None:
         self.store = store
         self.focus = focus
         self.device_keys = device_keys if device_keys is not None else {}
+        self.on_ack = on_ack
         self._today = today or _local_today
         self._idem: dict[str, str] = {}     # idempotency key -> approval id (this process)
         self._clients: dict[str, dict] = {}
@@ -216,12 +218,13 @@ class Buddy:
         for row in sorted(rows.values(), key=lambda r: r["created"]):
             data = row["data"]
             # A reminder that never fired before the restart stays pending (late, not lost); legacy rows have no _due.
-            pending = "_due" in data and not data.get("_fired") and row["outcome"] is None
+            fired = bool(data.get("_fired")) or "_due" not in data
+            pending = not fired and row["outcome"] is None
             snoozed = row["outcome"] == "snoozed" and data.get("_snooze") is not None
             rec = {**{k: v for k, v in data.items() if k not in ("_due", "_fired", "_snooze")},
-                   "due": data["_due"] if pending else row["created"], "fired": not pending,
+                   "due": data.get("_due", row["created"]), "fired": fired,
                    "snooze_until": data["_snooze"] if snoozed else 0.0,
-                   "_exp": (row["expires"] or float("inf")) if pending else 0.0,
+                   "_exp": (row["expires"] or float("inf")) if not fired else 0.0,
                    "outcome": "acked" if row["outcome"] == "acked" else "snoozed" if snoozed else None}
             if snoozed:
                 rec["_exp"] = row["expires"] or float("inf")
@@ -378,6 +381,18 @@ class Buddy:
                 rec["snooze_until"] = rec["outcome_at"] + minutes * 60
             self._db("set_alert_outcome", aid, rec["outcome"], rec["snooze_until"] if action == "snooze" else None)
             return {"ok": True, "id": aid, "outcome": rec["outcome"]}
+
+    def alert_undo(self, aid: str) -> dict:
+        """Take back an ack: the alert is open again, and never re-fires on its own."""
+        with self._cv:
+            rec = self._alerts.get(aid)
+            if rec is None:
+                raise KeyError(aid)
+            if rec["outcome"] != "acked":
+                raise ValueError("nothing_to_undo")
+            rec["outcome"], rec["outcome_at"] = None, None
+            self._db("set_alert_outcome", aid, None)
+            return {"ok": True, "id": aid, "outcome": None}
 
     def alerts(self) -> dict:
         with self._cv:
@@ -818,7 +833,10 @@ def install_buddy_routes(api: FastAPI, buddy: Buddy | None = None) -> Buddy:
     @api.post("/buddy/alert/{aid}/{action}")
     def buddy_alert_action(aid: str, action: Literal["ack", "snooze"], body: SnoozeBody | None = None):
         try:
-            return buddy.alert_outcome(aid, action, (body or SnoozeBody()).minutes)
+            result = buddy.alert_outcome(aid, action, (body or SnoozeBody()).minutes)
+            if action == "ack" and getattr(buddy, "on_ack", None):
+                buddy.on_ack(aid)
+            return result
         except KeyError:
             raise HTTPException(404, "alert_not_found")
         except ValueError as error:

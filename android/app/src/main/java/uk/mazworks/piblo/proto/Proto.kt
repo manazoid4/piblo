@@ -9,6 +9,9 @@ const val TITLE_MAX = 60      // docs/ALERTS.md
 const val BODY_MAX = 200      // docs/ALERTS.md
 const val SOURCE_MAX = 40     // AlertIn.source
 const val TEXT_MAX = 500      // phone keyboard text (easy-mode-task.md, POST /buddy/text)
+const val SHARE_TEXT_MAX = 50_000 // Share.text in host/mazhost/share_in.py
+const val SHARE_TITLE_MAX = 200
+const val SHARE_URL_MAX = 2000
 const val KEY_MAX = 400       // cardputer key names (POST /core/cardputer/key)
 const val KIND_FIND_PHONE = "find_phone"
 
@@ -33,6 +36,8 @@ data class AlertMsg(
 data class CoreEvent(val id: Int, val kind: String, val text: String, val source: String, val alert: AlertMsg?)
 data class Summary(val agent: String, val count: Int, val items: List<PendingApproval>)
 data class EventsPage(val events: List<CoreEvent>, val last: Int)
+
+data class HaltState(val halted: Boolean, val until: String?)
 
 class ProtoException(message: String) : Exception(message)
 
@@ -110,9 +115,9 @@ object Proto {
     /** POST /share body. text contains the shared content, title is optional, url is optional, idempotencyKey allows Core to dedupe. */
     fun shareJson(text: String, title: String, url: String, idempotencyId: String): String =
         JSONObject()
-            .put("text", truncate(text, TEXT_MAX))
-            .put("title", title)
-            .put("url", url)
+            .put("text", truncate(text, SHARE_TEXT_MAX))
+            .put("title", truncate(title, SHARE_TITLE_MAX))
+            .put("url", truncate(url, SHARE_URL_MAX))
             .put("idempotency_id", idempotencyId)
             .toString()
 
@@ -121,5 +126,13 @@ object Proto {
     /** GET /buddy/text/{id} status: pending / inserted / no_field / too_long (device acks). */
     fun parseTextStatus(json: String): String = guard { JSONObject(json).optString("status", "pending") }
 
-    private inline fun <T> guard(block: () -> T): T = try { block() } catch (e: ProtoException) { throw e } catch (e: Exception) { throw ProtoException("unexpected response: ${e.message}") }
+        fun parseHaltState(json: String): HaltState = guard {
+            val o = JSONObject(json)
+            HaltState(o.optBoolean("halted"), if (o.isNull("until")) null else o.optString("until").takeIf { it.isNotBlank() })
+        }
+
+        fun haltJson(on: Boolean, minutes: Int? = null): String =
+            JSONObject().put("on", on).apply { if (minutes != null) put("minutes", minutes) }.toString()
+
+        private inline fun <T> guard(block: () -> T): T = try { block() } catch (e: ProtoException) { throw e } catch (e: Exception) { throw ProtoException("unexpected response: ${e.message}") }
 }

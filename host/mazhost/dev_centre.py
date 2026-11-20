@@ -19,6 +19,7 @@ from pydantic import BaseModel, Field
 from typing import Literal
 
 from . import private_mode
+from .nowindow import no_window
 
 TASK = re.compile(r'^(\s*- \[)([ xX])(\] )(.*?)(\r?\n)?$')
 SUBS = ['esp32', 'M5Stack', '3Dprinting', 'arduino', 'functionalprint', 'ClaudeAI', 'LocalLLaMA', 'ChatGPTCoding']
@@ -92,7 +93,7 @@ class MemorySettings(BaseModel):
 
 def run_cli(args, *, local=False, cwd=None):
     private_mode.guard_subprocess(args[0], local=local)
-    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=10, check=True).stdout
+    return subprocess.run(args, cwd=cwd, capture_output=True, text=True, timeout=10, check=True, **no_window()).stdout
 
 
 def usage():

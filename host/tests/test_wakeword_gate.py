@@ -24,7 +24,7 @@ class FakeWakeword:
 
 def test_wake_gate_and_rearm(monkeypatch):
     monkeypatch.setattr('mazhost.wakeword.Wakeword', FakeWakeword)
-    cfg = SimpleNamespace(wakeword_model_dir='model', llamacpp_url='http://localhost',
+    cfg = SimpleNamespace(wakeword_engine='sherpa', wakeword_model_dir='model', llamacpp_url='http://localhost',
                           live_end_silence_ms=200, live_mic_gain=2,
                           live_listen_holdoff_ms=0, live_brain='lfm')
     bridge = LiveBridge(None, cfg)
@@ -51,7 +51,7 @@ def test_wake_gate_and_rearm(monkeypatch):
 
 
 def test_cloud_handler_precedes_brain_command():
-    cfg = SimpleNamespace(wakeword_model_dir='', llamacpp_url='http://localhost',
+    cfg = SimpleNamespace(wakeword_engine='sherpa', wakeword_model_dir='', llamacpp_url='http://localhost',
                           live_end_silence_ms=200, live_mic_gain=1,
                           live_listen_holdoff_ms=0, live_brain='lfm')
     handler = AsyncMock(return_value='Done')
@@ -72,7 +72,7 @@ def test_missing_model_falls_back_to_ungated(tmp_path, monkeypatch):
     monkeypatch.setattr(wakeword, '_warned', False)
     warnings = []
     monkeypatch.setattr(wakeword.log, 'warning', lambda *a: warnings.append(a))
-    cfg = SimpleNamespace(wakeword_model_dir=str(tmp_path), llamacpp_url='http://localhost',
+    cfg = SimpleNamespace(wakeword_engine='sherpa', wakeword_model_dir=str(tmp_path), llamacpp_url='http://localhost',
                           live_end_silence_ms=200, live_mic_gain=1,
                           live_listen_holdoff_ms=0, live_brain='lfm')
     first, second = LiveBridge(None, cfg), LiveBridge(None, cfg)

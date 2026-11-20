@@ -13,8 +13,8 @@ android {
         applicationId = "uk.mazworks.piblo"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.1-beta"
+        versionCode = 3
+        versionName = "0.2.0-beta"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -32,6 +32,8 @@ android {
     buildTypes {
         debug { signingConfigs.findByName("piblo")?.let { signingConfig = it } }
         release {
+            // Same key as debug (beta key in CI, default debug key locally) so a release APK installs over the beta, never an unsigned one.
+            signingConfig = signingConfigs.findByName("piblo") ?: signingConfigs.getByName("debug")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

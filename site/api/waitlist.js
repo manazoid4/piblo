@@ -124,7 +124,7 @@ export async function alreadyInSegment(email, fetchImpl = fetch) {
  * Best effort: a failed alert must never turn a real signup into an error for
  * the visitor, because the contact is already saved in Resend.
  */
-export async function notifyOwner(email, firstName, fetchImpl = fetch) {
+export async function notifyOwner(email, firstName, fetchImpl = fetch, source = "") {
   const apiKey = process.env.RESEND_API_KEY || '';
   const to = process.env.SIGNUP_NOTIFY_EMAIL || '';
   if (!apiKey || !to) return false;
@@ -139,7 +139,7 @@ export async function notifyOwner(email, firstName, fetchImpl = fetch) {
         to: [to],
         reply_to: email,
         subject: `New Piblo waitlist signup: ${email}`,
-        text: `${firstName ? `${firstName} <${email}>` : email} just joined the Piblo waitlist.\n\nThey are saved in Resend under the Piblo segment.`,
+        text: `${firstName ? `${firstName} <${email}>` : email} just joined the Piblo waitlist.\n\nThey are saved in Resend under the Piblo segment.${source ? `\nSource: ${source}` : ""}`,
       }),
       signal: controller.signal,
     });
@@ -187,6 +187,7 @@ export default async function handler(req, res, fetchImpl = fetch) {
   const result = await addContact(email, firstName, fetchImpl, referral);
   if (result.ok) result.ref = ref;
   // Awaited, not fired-and-forgotten: the function can be frozen once it replies.
-  if (result.ok && !repeat) await notifyOwner(email, firstName, fetchImpl);
+  const source = typeof body.source === 'string' && ['reddit', 'x', 'discord'].includes(body.source) ? body.source : '';
+  if (result.ok && !repeat) await notifyOwner(email, firstName, fetchImpl, source);
   return reply(req, res, result.ok ? 200 : 502, result);
 }

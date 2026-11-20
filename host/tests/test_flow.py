@@ -91,7 +91,7 @@ def test_dictate_pc_paste_keeps_focus_guard_and_settings(tmp_path, monkeypatch, 
     (tmp_path / "settings.json").write_text(json.dumps({
         "input_mode": mode, "press_enter": press_enter, "cleanup": "auto", "stt": "auto",
     }), encoding="utf-8")
-    monkeypatch.setattr(Flow, "dictate", lambda self, path: {"intent": intent, "text": "Hello."})
+    monkeypatch.setattr(Flow, "dictate", lambda self, path, **kw: {"intent": intent, "text": "Hello.", "ms": {"stt": 5, "clean": 1, "total": 6}})
     monkeypatch.setattr(app_module, "flow_foreground", lambda: 42)
     seen = {}
 
@@ -477,3 +477,38 @@ def test_paste_restore_failure_returns_restore_failed(monkeypatch):
     result = paste("new text")
     assert calls == ["new text"], f"expected only the new-text copy, got {calls}"
     assert result == "restore_failed", f"expected 'restore_failed', got {result!r}"
+
+
+def test_pc_dictation_logs_every_stage_and_total_includes_typing(tmp_path, monkeypatch):
+    """record end -> typed: upload + stt + clean + insert, in the response and in /flow/status."""
+    import time as _time
+    from mazhost import app as app_module
+
+    monkeypatch.setattr(app_module, "flow_foreground", lambda: 42)
+    monkeypatch.setattr(app_module, "flow_safe_paste", lambda text, enter, armed, fn: (_time.sleep(0.05), "pasted")[1])
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path), groq_api_key="",
+                   flow_cleanup_llm=False, stt_provider="whisper", flow_cloud=False)
+    client = TestClient(create_app(cfg, stt=Stt(), models=Models()))
+    h = {"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"}
+    j = client.post("/dictate?target=pc-paste", content=_wav(), headers=h).json()
+    ms = j["ms"]
+    assert j["pc"] == "pasted" and ms["insert"] >= 45
+    assert ms["total"] == ms["upload"] + ms["stt"] + ms["clean"] + ms["insert"]
+    log = (tmp_path / "latency.log").read_text()
+    assert f"insert={ms['insert']}" in log and "pc=pasted" in log
+    assert log.count("dictate") == 1  # one line per dictation, written after typing
+    status = client.get("/flow/status", headers=h).json()
+    assert status["last"]["insert_ms"] == ms["insert"] and status["last"]["total_ms"] == ms["total"]
+    assert status["target_ms"] == 1500
+
+
+def test_timeout_does_not_silence_later_dictations(tmp_path, monkeypatch):
+    """A timed-out run used to leave _cancel set forever: later notes and timing lines were dropped."""
+    from mazhost.flow import Flow
+
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path), groq_api_key="",
+                   flow_cleanup_llm=False, stt_provider="whisper", flow_cloud=False)
+    app = create_app(cfg, stt=Stt(), models=Models())
+    app.state._flow._cancel.set()  # what the 504 path does
+    out = app.state._flow.dictate(__import__("pathlib").Path("x.wav"))
+    assert out["text"] and "dictate" in (tmp_path / "latency.log").read_text()

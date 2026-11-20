@@ -158,3 +158,46 @@ def test_interrupt_during_kokoro_stream_cancels_turn_and_closes_stream(monkeypat
         assert {"type": "stop"} in socket.events
 
     asyncio.run(run())
+
+
+def test_core_starts_kokoro_endpoint_when_kokoro_is_the_voice(monkeypatch):
+    """Talk replies were silent: Live streamed from :8880 but nothing in Core ever started that server."""
+    from fastapi.testclient import TestClient
+    from mazhost import app as app_module
+    from test_app import client
+
+    started = []
+    monkeypatch.setattr(app_module.kokoro_pcm, "serve_in_thread", lambda cfg, synth=None: started.append(synth))
+    monkeypatch.setenv("MAZ_TTS_PROVIDER", "kokoro")
+    monkeypatch.setenv("MAZ_TTS_ENABLED", "true")
+    with client():
+        pass
+    assert len(started) == 1 and callable(started[0])
+
+
+def test_live_reaches_core_kokoro_endpoint_on_configured_port():
+    import threading
+    import numpy as np
+    from mazhost import kokoro_pcm
+
+    srv = kokoro_pcm.make_server(lambda text: np.zeros(240, dtype=np.float32), "127.0.0.1", 0)
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    try:
+        cfg = Settings(_env_file=None, tts_provider="kokoro", kokoro_pcm_port=srv.server_address[1])
+
+        async def run():
+            bridge = live_voice.LiveBridge(Socket(), cfg)
+            bridge._t = {"create": time.monotonic()}
+
+            async def play():
+                await asyncio.Event().wait()
+
+            bridge._play = play
+            await bridge._tts("Hello there.")
+            audio = await asyncio.wait_for(bridge._q.get(), 1)
+            assert len(audio) == 320  # 240 samples at 24 kHz, resampled to 16 kHz PCM16
+            bridge._end_turn_tasks()
+
+        asyncio.run(run())
+    finally:
+        srv.shutdown()

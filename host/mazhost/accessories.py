@@ -9,6 +9,7 @@ import uuid
 from pathlib import Path
 
 from . import private_mode
+from .nowindow import no_window
 
 HARDWARE = Path(__file__).resolve().parents[2] / "hardware"
 LIBRARY = {"stand": "Desk stand", "mount": "Wall or fridge mount", "loop": "Lanyard or keyring loop"}
@@ -59,7 +60,7 @@ class Accessories:
             try:
                 private_mode.guard_subprocess("OpenSCAD render", local=True)
                 process = subprocess.run([executable, "-o", str(stl), str(scad)], capture_output=True,
-                                         stdin=subprocess.DEVNULL, timeout=90, check=False)
+                                         stdin=subprocess.DEVNULL, timeout=90, check=False, **no_window())
                 if process.returncode == 0 and stl.is_file() and stl.stat().st_size > 0:
                     result.update(format="stl", path=str(stl), text="STL rendered on your paired computer. Check fit and strength before use.")
             except (OSError, subprocess.SubprocessError):

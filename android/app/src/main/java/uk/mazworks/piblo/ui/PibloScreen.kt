@@ -45,11 +45,8 @@ import uk.mazworks.piblo.hub.ItemKind
 import uk.mazworks.piblo.hub.LinkState
 import uk.mazworks.piblo.proto.Priority
 
-private val Navy = Color(0xFF0B1B3A)
-private val Yellow = Color(0xFFFFD23F)
 private val Mint = Color(0xFF4CE0B3)
 private val Coral = Color(0xFFFF6B4A)
-private val Cream = Color(0xFFFFF6E9)
 
 /** A 240x135 Piblo screen, scaled to the phone width. Everything is sized in "device pixels" (u = width / 240). */
 @Composable

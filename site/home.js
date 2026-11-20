@@ -19,3 +19,30 @@ addEventListener("DOMContentLoaded", () => {
   const sync = () => document.querySelectorAll("[data-open-wide] details").forEach(d => { d.open = wide.matches; });
   sync(); wide.addEventListener("change", sync);
 });
+
+// Life tabs: without JS every panel is visible and the tablist stays hidden (see bright.css).
+addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("[data-tabs]").forEach(root => {
+    const tabs = [...root.querySelectorAll('[role="tab"]')];
+    const panels = tabs.map(t => document.getElementById(t.getAttribute("aria-controls")));
+    const select = (i, focus) => {
+      tabs.forEach((t, j) => {
+        const on = i === j;
+        t.setAttribute("aria-selected", on);
+        t.tabIndex = on ? 0 : -1;
+        if (panels[j]) panels[j].hidden = !on;
+      });
+      if (focus) tabs[i].focus();
+    };
+    tabs.forEach((t, i) => {
+      t.addEventListener("click", () => select(i));
+      t.addEventListener("keydown", e => {
+        const to = { ArrowRight: (i + 1) % tabs.length, ArrowLeft: (i + tabs.length - 1) % tabs.length, Home: 0, End: tabs.length - 1 }[e.key];
+        if (to === undefined) return;
+        e.preventDefault();
+        select(to, true);
+      });
+    });
+    select(Math.max(0, tabs.findIndex(t => t.getAttribute("aria-selected") === "true")));
+  });
+});

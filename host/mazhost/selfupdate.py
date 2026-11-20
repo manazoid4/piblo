@@ -22,6 +22,9 @@ import httpx
 
 from . import fw
 from . import private_mode
+from .nowindow import no_window
+from .nowindow import no_window
+from .nowindow import no_window
 
 log = logging.getLogger("uvicorn.error.selfupdate")
 
@@ -255,7 +258,7 @@ class SelfUpdater:
         command = ["git", *args]
         if private_mode.enabled():
             command = ["git", "--no-pager", "-c", "core.fsmonitor=false", *args]
-        p = subprocess.run(command, cwd=self.repo, capture_output=True, text=True, timeout=timeout)
+        p = subprocess.run(command, cwd=self.repo, capture_output=True, text=True, timeout=timeout, **no_window())
         if check and p.returncode != 0:
             raise RuntimeError(f"git {args[0]} failed: {p.stderr.strip()[:200]}")
         return p.stdout.strip() if p.returncode == 0 else ""
@@ -294,7 +297,7 @@ class SelfUpdater:
             return "code_skipped_no_deploy_branch"
         self._git(["fetch", "origin", BRANCH], timeout=180)
         p = subprocess.run(["git", "merge-base", "--is-ancestor", target, f"origin/{BRANCH}"],
-                           cwd=self.repo, capture_output=True)
+                           cwd=self.repo, capture_output=True, **no_window())
         if p.returncode != 0:
             log.warning("selfupdate: %s not on origin/%s, skipping", target[:10], BRANCH)
             self.state["code"] = "skipped_not_on_branch"
@@ -321,7 +324,7 @@ class SelfUpdater:
         private_mode.guard_subprocess("self-update pip")
         log.info("selfupdate: pip install -r host/requirements.txt")
         p = subprocess.run([self._python(), "-m", "pip", "install", "-r", str(self.repo / "host" / "requirements.txt")],
-                           cwd=self.repo, capture_output=True, text=True, timeout=1500)
+                           cwd=self.repo, capture_output=True, text=True, timeout=1500, **no_window())
         if p.returncode != 0:
             tail = (p.stdout[-300:] + p.stderr[-300:]).replace("\n", " | ")
             log.error("selfupdate: pip failed: %s", tail)

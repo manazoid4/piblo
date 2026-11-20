@@ -1,4 +1,5 @@
 .pio/
+firmware/nod/build/
 .device-diagnostic/
 .vscode/
 .idea/
