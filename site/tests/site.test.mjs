@@ -239,3 +239,11 @@ test("homepage images have alt attributes and existing files; Buddy images are u
     assert.ok(statSync(file).size < 300 * 1024, f + " over 300 KB");
   }
 });
+
+test("reservation summary and FAQ use the same refund cutoff", () => {
+  const html = contents["/"];
+  const hero = html.match(/<p class="note">(&pound;5[\s\S]*?)<\/p>/)[1];
+  const batch = html.match(/<div class="reserve-box">([\s\S]*?)<\/div>/)[1];
+  const faq = html.match(/<summary>How does the &pound;5 reservation work\?<\/summary><p>([\s\S]*?)<\/p>/)[1];
+  for (const text of [hero, batch, faq]) assert.match(text, /refundable any time before shipping/i);
+});
