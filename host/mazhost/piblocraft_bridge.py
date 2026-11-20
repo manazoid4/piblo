@@ -25,7 +25,7 @@ WAIT_S = 70  # a little longer than the approval's own 60 s expiry
 
 
 class JobIn(BaseModel):
-    command: str = Field(min_length=1, max_length=500)
+    command: str = Field(min_length=1, max_length=200)  # the device approval shows 200 chars: never send more than was shown
     cwd: str = Field(default="", max_length=260)
 
 

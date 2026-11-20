@@ -67,3 +67,9 @@ def test_rejects_multiline_and_unknown(rig):
     c, _, _ = rig
     assert c.post("/bridge/job", json={"command": "a\nb"}).status_code == 422
     assert c.get("/bridge/job/nope").status_code == 404
+
+
+def test_command_longer_than_approval_text_is_rejected(rig):
+    c, sent, _ = rig
+    assert c.post("/bridge/job", json={"command": "echo " + "a" * 195 + "; rm -rf x"}).status_code == 422
+    assert c.post("/bridge/job", json={"command": "x" * 200}).status_code == 200
