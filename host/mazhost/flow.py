@@ -35,7 +35,8 @@ _INTENT = {"note": "note", "remind me": "remind", "claude": "claude"}
 # Always applied, so installs whose dictionary.txt predates this still benefit.
 BUILTIN_ALIASES = {
     "Piblo Flow": ["Pebloflow", "Peblo flow", "Pibloflow", "Peblo Flow", "Paper blue flow"],
-    "Piblo": ["Peblo", "Pibblo", "Pebblo", "Piblow", "Paper blue", "Peb low", "Peb Lowe"],
+    "Claude": ["Clawed", "Claud"],  # streaming zipformer hears these (synthetic bench, 19 Nov)
+    "Piblo": ["Pibo", "Peblo", "Pibblo", "Pebblo", "Piblow", "Paper blue", "Peb low", "Peb Lowe"],
     "Cardputer": ["card puter", "card pewter", "card computer", "Card putter"],
 }
 
@@ -245,7 +246,7 @@ def _copy(text: str) -> None:
     pyperclip.copy(text)
 
 
-def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> str:
+def paste(text: str, enter: bool = False, only_hwnd: int | None = None, on_typed=None) -> str:
     """Save clipboard, set text, Ctrl+V, restore clipboard (Windows).
     Returns "pasted" on success, "failed" if the clipboard was busy (nothing pasted),
     or "restore_failed" (text pasted but old clipboard not restored).
@@ -274,6 +275,8 @@ def paste(text: str, enter: bool = False, only_hwnd: int | None = None) -> str:
     # release Right Ctrl logically so the target app sees a clean Ctrl+V
     time.sleep(0.03)
     tap(0x11, 0x56)
+    if on_typed:
+        on_typed()  # the moment the text lands, before the slow clipboard restore below
     if enter:
         time.sleep(0.05)
         tap(0x0D)
