@@ -32,6 +32,7 @@ from .onboarding import Onboarding, build_onboarding_router
 from .library_routes import build_library_router
 from .bridge import BridgeWorker
 from .buddy import AlertIn, Buddy, install_buddy_routes
+from .piblocraft_bridge import JobBridge, build_router as build_bridge_router
 from .buddy_companion import install_companion_routes
 from .buddy_store import BuddyStore
 from .needs_routes import build_needs_router
@@ -1260,6 +1261,7 @@ def create_app(
     buddy_store = None if cfg.buddy_db == "off" else BuddyStore(
         cfg.buddy_db or resolve_data_dir(cfg) / "buddy.sqlite3")
     buddy = install_buddy_routes(api, Buddy(store=buddy_store, focus=focus, device_keys=device_keys))
+    api.include_router(build_bridge_router(JobBridge(buddy, resolve_data_dir(cfg), cfg.piblocraft_bridge_url)))
     promises_engine = Promises(buddy, model_router=model_router, settings=cfg)
     promises_engine.start()
     buddy.on_ack = promises_engine.on_alert_acked
