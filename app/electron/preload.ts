@@ -1,9 +1,22 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { CoreState, PairRequest, PibloBridge, ThemeMode, UpdateStatus } from '../shared/types';
+import type { CoreState, CraftDraft, CraftTaskRecord, PairRequest, PibloBridge, ThemeMode, UpdateStatus } from '../shared/types';
 
 const invoke = <T>(channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args) as Promise<T>;
 
 const bridge: PibloBridge = {
+  ...(process.isMainFrame && process.argv.includes('--craft-terminal-pilot') ? { craftTask: {
+    load: () => invoke<CraftTaskRecord>('craft-task:load'),
+    save: (draft: CraftDraft) => invoke<void>('craft-task:save', draft),
+    models: () => invoke<string[]>('craft-task:models'),
+    run: (draft: CraftDraft) => invoke<CraftTaskRecord>('craft-task:run', draft),
+    cancel: () => invoke<void>('craft-task:cancel'),
+  }, craftTerminal: {
+    open: (cols: number, rows: number) => invoke<{ id: number; data: string; end: number }>('craft:open', cols, rows),
+    read: (id: number, offset: number) => invoke<{ data: string; end: number; exited: boolean; truncated: boolean }>('craft:read', id, offset),
+    write: (id: number, data: string) => invoke<void>('craft:write', id, data),
+    resize: (id: number, cols: number, rows: number) => invoke<void>('craft:resize', id, cols, rows),
+    close: (id: number) => invoke<void>('craft:close', id),
+  } } : {}),
   platform: process.platform,
   version: process.argv.find((a) => a.startsWith('--piblo-version='))?.slice('--piblo-version='.length) ?? '',
   core: {

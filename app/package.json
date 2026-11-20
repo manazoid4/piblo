@@ -18,7 +18,9 @@
     "test": "vitest run",
     "screenshots": "node scripts/screenshots.mjs",
     "verify:ui": "node scripts/verify-ui.mjs",
-    "verify:flow": "node scripts/verify-flow.mjs"
+    "verify:flow": "node scripts/verify-flow.mjs",
+    "verify:craft-terminal": "node scripts/verify-craft-terminal.mjs",
+    "pack:craft-pilot": "node scripts/pack-craft-pilot.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
@@ -34,13 +36,17 @@
     "vitest": "^2.1.8"
   },
   "dependencies": {
+    "@xterm/addon-fit": "0.11.0",
+    "@xterm/xterm": "6.0.0",
+    "electron-updater": "6.3.9",
+    "node-pty": "1.1.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "electron-updater": "6.3.9"
+    "react-dom": "^18.3.1"
   },
   "build": {
     "appId": "uk.piblo.app",
     "productName": "Piblo",
+    "npmRebuild": false,
     "directories": {
       "output": "release",
       "buildResources": "build"

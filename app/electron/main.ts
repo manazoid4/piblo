@@ -3,6 +3,8 @@ import { app, BrowserWindow, Menu, Notification, Tray, ipcMain, nativeImage, nat
 import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { registerCraftTerminal } from './craft-terminal';
 import type { AppSettings, EnvKey, PairRequest, ThemeMode } from '../shared/types';
 import { CARD, PAIR } from '../shared/types';
 import { createApiClient } from './api-client';
@@ -26,6 +28,7 @@ const realFs: FsLike = {
 };
 
 const isDev = !app.isPackaged;
+const craftPilot = process.platform === 'win32' && process.argv.includes('--craft-terminal-pilot') && !process.env.NOD_DEV_URL;
 const startHidden = process.argv.includes('--hidden');
 const colors = {
   light: { bg: '#fff4e0', fg: '#2a1a12' },
@@ -110,6 +113,7 @@ nativeTheme.on('updated', () => {
 
 function createWindow(): BrowserWindow {
   const t = theme();
+  const rendererFile = path.join(__dirname, '..', 'renderer', 'index.html');
   const w = new BrowserWindow({
     width: 1180,
     height: 760,
@@ -126,9 +130,10 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      additionalArguments: [`--piblo-version=${app.getVersion()}`],
+      additionalArguments: [`--piblo-version=${app.getVersion()}`, ...(craftPilot ? ['--craft-terminal-pilot'] : [])],
     },
   });
+  if (craftPilot) registerCraftTerminal(w, pathToFileURL(rendererFile).href);
   w.setMenuBarVisibility(false);
   // First paint is not guaranteed: if the renderer never becomes ready the window would stay
   // invisible, so the gate also reveals on did-finish-load and after a failsafe timeout.
@@ -153,11 +158,11 @@ function createWindow(): BrowserWindow {
     return { action: 'deny' };
   });
   w.webContents.on('will-navigate', (e, url) => {
-    if (!url.startsWith('http://localhost:5173') && !url.startsWith('file://')) e.preventDefault();
+    if (craftPilot ? url.split('#')[0] !== pathToFileURL(rendererFile).href : !url.startsWith('http://localhost:5173') && !url.startsWith('file://')) e.preventDefault();
   });
   const dev = process.env.NOD_DEV_URL;
   if (dev) void w.loadURL(dev);
-  else void w.loadFile(path.join(__dirname, '..', 'renderer', 'index.html'));
+  else void w.loadFile(rendererFile);
   return w;
 }
 
@@ -268,7 +273,7 @@ function setupIpc() {
         settings = next;
         fs.mkdirSync(path.dirname(settingsFile()), { recursive: true });
         fs.writeFileSync(settingsFile(), JSON.stringify(settings));
-        applyLoginItem();
+        if (!craftPilot) applyLoginItem();
         applyTheme(settings.theme);
         return settings;
       });
@@ -405,7 +410,7 @@ if (!app.requestSingleInstanceLock()) {
     showWindow();
     void (sidecar.state.phase === 'running' ? sidecar.recheck() : sidecar.ensure());
   });
-  app.setAppUserModelId('uk.piblo.app');
+  app.setAppUserModelId(craftPilot ? 'uk.piblo.app.craft-pilot' : 'uk.piblo.app');
   void app.whenReady().then(() => {
       settings = loadSettings();
       Menu.setApplicationMenu(null);
@@ -414,13 +419,13 @@ if (!app.requestSingleInstanceLock()) {
       applyTheme(settings.theme);
       win = createWindow();
       createTray();
-      applyLoginItem();
+      if (!craftPilot) applyLoginItem();
       void sidecar.ensure();
       setInterval(() => {
         void sidecar.recheck();
         void pollPairing();
       }, 5000);
-      appUpdater.start();
+      if (!craftPilot) appUpdater.start();
     });
   app.on('before-quit', () => {
     quitting = true;

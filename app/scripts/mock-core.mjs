@@ -461,7 +461,7 @@ export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline
 
     json(res, 404, { detail: 'not_found' });
   });
-  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ dir, port, token, close: () => server.close() })));
+  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ dir, port: server.address().port, token, close: () => server.close() })));
 }
 
 if (process.argv[1] && process.argv[1].endsWith('mock-core.mjs')) {

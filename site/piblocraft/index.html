@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#fbfaf7">
-  <meta name="description" content="PibloCraft is mission control for your AI agents. Every agent, every task, one calm screen. Claude, Codex, Hermes and 20 more providers. Early access.">
+  <meta name="description" content="See which AI task needs a decision. Try a simulated approval and follow the work into a handoff.">
   <meta property="og:title" content="PibloCraft. Mission control for your AI.">
-  <meta property="og:description" content="Give your agents a job and see what needs you. Claude, Codex, Hermes and 20 more providers in split panes, with a job queue, overnight runs and a morning report.">
+  <meta property="og:description" content="Follow a task from request to review, then see what the next person needs to pick it up.">
   <meta property="og:type" content="website">
   <link rel="canonical" href="https://piblo.co.uk/piblocraft/">
   <meta property="og:url" content="https://piblo.co.uk/piblocraft/">
@@ -42,9 +42,9 @@
   <section class="pc-hero">
     <div class="container pc-hero-inner">
       <span class="eyebrow"><span class="road-pulse" aria-hidden="true"></span> PIBLOCRAFT &middot; EARLY ACCESS</span>
-      <h1>Mission control <em>for your AI.</em></h1>
-      <p class="pc-lead">Every agent. Every task. One calm screen.</p>
-      <div class="actions"><a class="btn btn-primary btn-big" href="#mission" data-va="cta_click">Try mission control</a><a class="btn btn-quiet btn-big" href="#access">Get early access</a></div>
+      <h1>See which task <em>needs you.</em></h1>
+      <p class="pc-lead">When several AI assistants are working, one may be waiting for an answer. PibloCraft brings that decision back to you.</p>
+      <div class="actions"><a class="btn btn-primary btn-big" href="#mission" data-va="cta_click">Try a task</a><a class="btn btn-quiet btn-big" href="#access">Get early access</a></div>
     </div>
   </section>
 
@@ -90,14 +90,14 @@
       <label class="pc-sr" for="compare-range">Drag to compare before and after</label>
       <input class="pc-range" id="compare-range" type="range" min="0" max="100" value="50">
     </div>
-    <p class="pc-cap">Drag to compare. Illustration, not a captured session.</p>
+    <p class="pc-cap">Drag to compare the illustrated workspaces. On the right, Hermes is waiting for permission to push a change.</p>
   </section>
 
   <section class="section container" id="mission" aria-labelledby="mission-title">
     <div class="section-top">
       <span class="eyebrow">TRY IT</span>
-      <h2 id="mission-title">Tell your team. <span>Watch it work.</span></h2>
-      <p>Type a task or pick one. PibloCraft hands it to the best agent that is free, switches when one runs out, and asks you before anything risky.</p>
+      <h2 id="mission-title">Give it a task. <span>Decide what happens.</span></h2>
+      <p>Try &ldquo;Push the fix to main&rdquo; in this simulation. Watch the agent pause for review. Allow it to finish, or deny the push and see the result in Activity.</p>
     </div>
     <div class="mc" id="mc">
       <div class="mc-stats"><span><b id="mc-working">0</b> working</span><span><b id="mc-need">0</b> needs you</span><span><b id="mc-done">0</b> done</span></div>
@@ -114,28 +114,28 @@
       </div>
       <div class="mc-grid" id="mc-grid"></div>
       <div class="mc-feed"><h3>Activity</h3><ol id="mc-feed" aria-live="polite"></ol></div>
-      <p class="pc-cap">Interactive demo. Simulated agents: nothing runs and nothing is sent.</p>
+      <p class="pc-cap">This demo runs in your browser with simulated agents. Your task stays on this page.</p>
     </div>
   </section>
 
   <section class="section container" aria-labelledby="exp-title">
     <div class="section-top">
-      <span class="eyebrow">THE EXPERIENCE</span>
-      <h2 id="exp-title">Less juggling. <span>More done.</span></h2>
+      <span class="eyebrow">Example handoff</span>
+      <h2 id="exp-title">Pick it up <span>tomorrow.</span></h2>
+      <p>A task name tells you what you started. A handoff tells you where to resume. Here is what one could look like after reviewing a login fix.</p>
     </div>
-    <div class="pc-grid">
-      <article class="pc-card"><h3>See everything.</h3><p>Who is working, who is free, who needs you and how much each account has left. One look.</p></article>
-      <article class="pc-card"><h3>Never stall.</h3><p>When one account hits its limit, the task moves to the next one that is ready. You keep going.</p></article>
-      <article class="pc-card"><h3>Pass it on.</h3><p>When an agent finishes, you get a short report, and the next agent can pick the work straight up.</p></article>
-      <article class="pc-card"><h3>Nothing without your yes.</h3><p>Risky steps wait for you. Allow once or deny, from your screen or the Piblo on your desk.</p></article>
+    <div class="pc-grid pc-grid-3">
+      <article class="pc-card"><h3>The request</h3><p>&ldquo;When my session expires, take me back to sign in.&rdquo;</p></article>
+      <article class="pc-card"><h3>The decision</h3><p>The agent prepared a fix. You chose to review it before publishing.</p></article>
+      <article class="pc-card"><h3>The next step</h3><p>&ldquo;The redirect is ready to try. Open an expired session and check that signing in returns you to the same page.&rdquo;</p></article>
     </div>
-    <p class="fine pc-note">Works with Claude Code, Codex, Hermes and 20 more providers, including local models. You bring your own logins. Windows first; Linux and macOS are not yet verified. The Piblo device link is in testing, and Piblo is still a working prototype.</p>
+    <p class="fine pc-note">PibloCraft is in private testing on Windows. The device connection is also in testing.</p>
   </section>
 
   <section class="road-close container" id="access" aria-labelledby="access-title">
     <span class="eyebrow">EARLY ACCESS</span>
     <h2 id="access-title">PibloCraft is in <span>private testing.</span></h2>
-    <p>The code is not public yet. Join the Piblo list and we will email you when early access opens.</p>
+    <p>Join the Piblo list for news of the Windows beta. We will email you when early access opens.</p>
     <div class="actions"><a class="btn btn-primary" href="/#waitlist" data-va="cta_click">Get early access</a><a class="btn btn-quiet" href="/">Back to Piblo</a></div>
   </section>
 </main>
