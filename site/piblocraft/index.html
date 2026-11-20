@@ -5,117 +5,131 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#fbfaf7">
-  <meta name="description" content="PibloCraft runs your coding agents side by side in split terminal panes, gives them tracked jobs and shows what needs you. Claude, Codex, Hermes and 20 more providers. Early access.">
-  <meta property="og:title" content="PibloCraft. Run your coding agents side by side.">
+  <meta name="description" content="PibloCraft is mission control for your AI agents. Every agent, every task, one calm screen. Claude, Codex, Hermes and 20 more providers. Early access.">
+  <meta property="og:title" content="PibloCraft. Mission control for your AI.">
   <meta property="og:description" content="Give your agents a job and see what needs you. Claude, Codex, Hermes and 20 more providers in split panes, with a job queue, overnight runs and a morning report.">
   <meta property="og:type" content="website">
   <link rel="canonical" href="https://piblo.co.uk/piblocraft/">
   <meta property="og:url" content="https://piblo.co.uk/piblocraft/">
   <meta property="og:image" content="https://piblo.co.uk/piblocraft/og.svg">
-  <meta property="og:image:alt" content="PibloCraft. Run your coding agents side by side. See what needs you.">
+  <meta property="og:image:alt" content="PibloCraft. Mission control for your AI. See what needs you.">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:site_name" content="Piblo">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@Piblo_UK">
-  <meta name="twitter:title" content="PibloCraft. Run your coding agents side by side.">
+  <meta name="twitter:title" content="PibloCraft. Mission control for your AI.">
   <meta name="twitter:description" content="Give your agents a job and see what needs you. Early access.">
   <meta name="twitter:image" content="https://piblo.co.uk/piblocraft/og.svg">
-  <meta name="twitter:image:alt" content="PibloCraft. Run your coding agents side by side. See what needs you.">
-  <title>PibloCraft. Run your coding agents side by side.</title>
+  <meta name="twitter:image:alt" content="PibloCraft. Mission control for your AI. See what needs you.">
+  <title>PibloCraft. Mission control for your AI.</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/home-base.css"><link rel="stylesheet" href="/home.css"><link rel="stylesheet" href="/pages.css">
   <link rel="stylesheet" href="/piblocraft/piblocraft.css">
   <script defer src="/_vercel/insights/script.js"></script>
+  <script defer src="/piblocraft/mission.js"></script>
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="header">
   <div class="wrap header-inner">
     <a class="logo" href="/" aria-label="Piblo home"><img src="/media/brand/piblo-wordmark.svg" alt="Piblo" width="61" height="26"></a>
-    <nav class="nav" aria-label="Site sections"><a href="#features">What it does</a><a href="#how">With Piblo</a><a href="#control">Control</a><a href="#access">Early access</a></nav>
+    <nav class="nav" aria-label="Site sections"><a href="#compare">Before and after</a><a href="#mission">Try it</a><a href="#access">Early access</a></nav>
     <a class="btn btn-primary btn-small" href="#access" data-va="cta_click">Get early access</a>
   </div>
 </header>
 <main id="main">
   <section class="pc-hero">
     <div class="container pc-hero-inner">
-      <span class="eyebrow"><span class="road-pulse" aria-hidden="true"></span> FROM PIBLO &middot; EARLY ACCESS</span>
-      <h1>Run your coding agents <em>side by side.</em></h1>
-      <p class="pc-lead">PibloCraft opens Claude, Codex, Hermes and more in split terminal panes. Give them a job, and see what needs you.</p>
-      <div class="actions"><a class="btn btn-primary btn-big" href="#access" data-va="cta_click">Get early access</a><a class="btn btn-quiet btn-big" href="#features">See what it does</a></div>
-      <figure class="pc-shot">
-        <img src="/piblocraft/terminal-preview.svg" alt="Illustration: three terminal panes for Claude, Codex and Hermes. Hermes shows needs you, and a status line says Hermes needs you." width="960" height="540">
-        <figcaption>Illustration of the three-pane view. Colours and names are for show, not a captured session.</figcaption>
-      </figure>
+      <span class="eyebrow"><span class="road-pulse" aria-hidden="true"></span> PIBLOCRAFT &middot; EARLY ACCESS</span>
+      <h1>Mission control <em>for your AI.</em></h1>
+      <p class="pc-lead">Every agent. Every task. One calm screen.</p>
+      <div class="actions"><a class="btn btn-primary btn-big" href="#mission" data-va="cta_click">Try mission control</a><a class="btn btn-quiet btn-big" href="#access">Get early access</a></div>
     </div>
   </section>
 
-  <section class="section container" id="features" aria-labelledby="features-title">
+  <section class="container pc-compare-wrap" id="compare" aria-labelledby="compare-title">
+    <h2 id="compare-title" class="pc-sr">Before and after PibloCraft</h2>
+    <div class="pc-compare" id="pc-compare">
+      <div class="pc-scene pc-before" aria-hidden="true">
+        <div class="pc-desk">
+          <div class="pc-win w1"><b>claude &mdash; tab 1</b><i>&gt; refactor auth&hellip;</i><i>&gt; still thinking</i></div>
+          <div class="pc-win w2"><b>codex</b><i>Waiting for your input&hellip;</i></div>
+          <div class="pc-win w3"><b>claude &mdash; tab 2</b><i class="pc-err">Usage limit reached</i></div>
+          <div class="pc-win w4"><b>hermes</b><i>&gt; researching&hellip;</i></div>
+          <div class="pc-win w5"><b>terminal (3)</b><i>which one was fixing the login?</i></div>
+          <div class="pc-win w6"><b>claude &mdash; tab 7</b><i>Allow this command? (y/n)</i></div>
+          <div class="pc-win w7"><b>notes.txt</b><i>todo: check codex??</i></div>
+          <div class="pc-win w8"><b>claude &mdash; tab 4</b><i>&gt; npm test</i><i class="pc-err">3 failing</i></div>
+          <div class="pc-win w9"><b>chrome &mdash; 23 tabs</b><i>usage dashboard</i></div>
+          <div class="pc-win w10"><b>codex &mdash; 2</b><i>Session expired. Sign in again.</i></div>
+          <span class="pc-toast t4">Claude needs you</span>
+          <span class="pc-toast t5">Rate limited</span>
+          <span class="pc-toast t1">5h limit hit</span>
+          <span class="pc-toast t2">Needs approval</span>
+          <span class="pc-toast t3">3 agents idle</span>
+          <span class="pc-tabs">+14 tabs</span>
+        </div>
+        <span class="pc-tag">Before</span>
+      </div>
+      <div class="pc-scene pc-after" aria-hidden="true">
+        <div class="pc-mc">
+          <div class="pc-mc-top"><b>PibloCraft</b><span>4 working &middot; 1 needs you &middot; 12 done today</span></div>
+          <div class="pc-mc-grid">
+            <div class="pc-tile is-work"><b>Claude 1</b><em>Working</em><i>Refactor auth</i><u class="u62"></u></div>
+            <div class="pc-tile is-done"><b>Claude 2</b><em>Done</em><i>Release notes</i><u class="u100"></u></div>
+            <div class="pc-tile is-work"><b>Codex</b><em>Working</em><i>Fix the login bug</i><u class="u38"></u></div>
+            <div class="pc-tile is-need"><b>Hermes</b><em>Needs you</em><i>Push to main?</i><span class="pc-mini">Allow &middot; Deny</span></div>
+            <div class="pc-tile is-work"><b>Research &times;3</b><em>Working</em><i>Competitor scan</i><u class="u80"></u></div>
+            <div class="pc-tile"><b>Ollama</b><em>Ready</em><i>Free, on this PC</i></div>
+          </div>
+        </div>
+        <span class="pc-tag">After</span>
+      </div>
+      <div class="pc-handle" aria-hidden="true"><span></span></div>
+      <label class="pc-sr" for="compare-range">Drag to compare before and after</label>
+      <input class="pc-range" id="compare-range" type="range" min="0" max="100" value="50">
+    </div>
+    <p class="pc-cap">Drag to compare. Illustration, not a captured session.</p>
+  </section>
+
+  <section class="section container" id="mission" aria-labelledby="mission-title">
     <div class="section-top">
-      <span class="eyebrow">WHAT IT DOES</span>
-      <h2 id="features-title">Your agents, <span>one workspace.</span></h2>
-      <p>Claude Code, Codex and other command-line agents keep their own tools and chats. PibloCraft adds named panes, a shared job queue and results you can review.</p>
+      <span class="eyebrow">TRY IT</span>
+      <h2 id="mission-title">Tell your team. <span>Watch it work.</span></h2>
+      <p>Type a task or pick one. PibloCraft hands it to the best agent that is free, switches when one runs out, and asks you before anything risky.</p>
+    </div>
+    <div class="mc" id="mc">
+      <div class="mc-stats"><span><b id="mc-working">0</b> working</span><span><b id="mc-need">0</b> needs you</span><span><b id="mc-done">0</b> done</span></div>
+      <form class="mc-cmd" id="mc-form">
+        <label class="pc-sr" for="mc-input">Task for your agents</label>
+        <input id="mc-input" type="text" autocomplete="off" maxlength="80" placeholder="Tell your team what to do&hellip;">
+        <button class="btn btn-primary" type="submit">Go</button>
+      </form>
+      <div class="mc-chips" id="mc-chips">
+        <button type="button" data-task="Fix the login bug">Fix the login bug</button>
+        <button type="button" data-task="Research three competitors">Research three competitors</button>
+        <button type="button" data-task="Write the release notes">Write the release notes</button>
+        <button type="button" data-task="Push the fix to main" data-risky="1">Push the fix to main</button>
+      </div>
+      <div class="mc-grid" id="mc-grid"></div>
+      <div class="mc-feed"><h3>Activity</h3><ol id="mc-feed" aria-live="polite"></ol></div>
+      <p class="pc-cap">Interactive demo. Simulated agents: nothing runs and nothing is sent.</p>
+    </div>
+  </section>
+
+  <section class="section container" aria-labelledby="exp-title">
+    <div class="section-top">
+      <span class="eyebrow">THE EXPERIENCE</span>
+      <h2 id="exp-title">Less juggling. <span>More done.</span></h2>
     </div>
     <div class="pc-grid">
-      <article class="pc-card">
-        <span class="road-meta">01 &middot; PANES</span>
-        <h3>Pick an agent for each pane</h3>
-        <p>Open three panes and choose Claude (two accounts), Codex, Hermes or any of 20 other providers, from DeepSeek and Kimi to OpenRouter and local Ollama. Each pane shows how much usage is left and stars the best one.</p>
-      </article>
-      <article class="pc-card">
-        <span class="road-meta">02 &middot; JOBS</span>
-        <h3>Give it a job, or a whole night</h3>
-        <p>Type <code>pc "Improve the README"</code> and a free agent picks it up. For a bounded shift, add a time: <code>for 2 hours</code>. Work runs in separate git worktrees, and <code>pc morning</code> reads back what happened.</p>
-      </article>
-      <article class="pc-card">
-        <span class="road-meta">03 &middot; STATUS</span>
-        <h3>See what needs you</h3>
-        <p>A status view shows each agent as working, waiting for you or idle, with its latest result. <code>pc ?</code> gives the short version, and <code>pc answer</code> walks through the decisions waiting on you, one at a time.</p>
-      </article>
-      <article class="pc-card">
-        <span class="road-meta">04 &middot; REVIEW</span>
-        <h3>Results you can check</h3>
-        <p>Tasks carry completion checks, and another agent reviews the work. <code>pc diff</code> shows what changed in a task and <code>pc ship</code> commits and pushes its branch. You still review before anything merges.</p>
-      </article>
+      <article class="pc-card"><h3>See everything.</h3><p>Who is working, who is free, who needs you and how much each account has left. One look.</p></article>
+      <article class="pc-card"><h3>Never stall.</h3><p>When one account hits its limit, the task moves to the next one that is ready. You keep going.</p></article>
+      <article class="pc-card"><h3>Pass it on.</h3><p>When an agent finishes, you get a short report, and the next agent can pick the work straight up.</p></article>
+      <article class="pc-card"><h3>Nothing without your yes.</h3><p>Risky steps wait for you. Allow once or deny, from your screen or the Piblo on your desk.</p></article>
     </div>
-  </section>
-
-  <section class="section container" id="how" aria-labelledby="how-title">
-    <div class="pc-band">
-      <div class="section-top">
-        <span class="eyebrow">WITH PIBLO</span>
-        <h2 id="how-title">When it needs you, <span>it tells your desk.</span></h2>
-      </div>
-      <ol class="pc-steps">
-        <li><span class="pc-num">1</span><div><h3>Start the work</h3><p>Run <code>pc</code>, pick your agents and hand out a job.</p></div></li>
-        <li><span class="pc-num">2</span><div><h3>Agents ask on the board</h3><p>When one needs a decision, it lands on a shared board and in <code>pc ?</code>.</p></div></li>
-        <li><span class="pc-num">3</span><div><h3>See it on your Piblo</h3><p>An optional bridge sends messages and the morning brief to your Piblo, so you can look up from the screen.</p></div></li>
-      </ol>
-      <p class="fine pc-note">The bridge is off until you set it up. Today it goes one way, from PibloCraft to Piblo. Sending jobs from your Piblo back to PibloCraft is planned, not built. Piblo is still a working prototype.</p>
-    </div>
-  </section>
-
-  <section class="section container" id="control" aria-labelledby="control-title">
-    <div class="section-top">
-      <span class="eyebrow">STAYS IN YOUR HANDS</span>
-      <h2 id="control-title">Quiet by default. <span>You stay in charge.</span></h2>
-    </div>
-    <div class="pc-grid pc-grid-3">
-      <article class="pc-card">
-        <h3>Nothing starts on its own</h3>
-        <p>Agents open idle and messages wait in an inbox. Autonomous behaviour is a switch you turn on.</p>
-      </article>
-      <article class="pc-card">
-        <h3>A guard on risky commands</h3>
-        <p>It blocks pushes to main, force pushes and mass deletes for Claude. It is a safety net, not a sandbox, so keep each agent's own approvals on.</p>
-      </article>
-      <article class="pc-card">
-        <h3>Your keys stay with you</h3>
-        <p>Provider keys are saved once in a private folder on your PC, never in a repo, and only provider panes can read them.</p>
-      </article>
-    </div>
-    <p class="fine pc-note">Works on Windows with Yaw or Windows Terminal. The tmux backend for Linux, macOS and WSL has dry-run tests but no verified live session yet. You bring your own agent logins; none are included.</p>
+    <p class="fine pc-note">Works with Claude Code, Codex, Hermes and 20 more providers, including local models. You bring your own logins. Windows first; Linux and macOS are not yet verified. The Piblo device link is in testing, and Piblo is still a working prototype.</p>
   </section>
 
   <section class="road-close container" id="access" aria-labelledby="access-title">
