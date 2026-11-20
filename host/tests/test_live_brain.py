@@ -399,3 +399,33 @@ def test_bare_wake_phrase_makes_the_next_utterance_the_dictation(monkeypatch, tm
         until_listening(ws)  # "Sent."
         ws.send_text(json.dumps({"type": "bye"}))
     assert pasted == [("fix the failing test.", True, 7)]  # "Claude ..." pastes and presses Enter
+
+
+def test_streamed_stt_hears_the_turn_before_it_ends(monkeypatch):
+    """MAZ_LIVE_STREAM_STT=1: audio is decoded while the user talks; the batch transcribe() is not called."""
+    fed = []
+
+    class Utt:
+        def feed(self, pcm): fed.append(len(pcm))
+        def finish(self): return "TELL ME A JOKE"
+
+    monkeypatch.setattr(live_voice, "stream_stt", lambda: type("S", (), {"stream": lambda self: Utt()})())
+    fake = FakeRealtime()
+    brain = type("B", (FakeBrain,), {"text": "BATCH SHOULD NOT RUN", "chunks": ["Sure."], "hang": False,
+                                     "stream_closed": False, "asked": threading.Event()})
+    monkeypatch.setattr(live_voice, "LiveBrain", brain)
+    client = make_client(fake, live_brain="cloud", live_stream_stt=True)
+    with client.websocket_connect(f"/voice/live?token={TOKEN}") as ws:
+        assert text(ws)["state"] == "listening"
+        speak(ws)
+        assert until_thinking(ws)
+        ws.send_text(json.dumps({"type": "bye"}))
+    assert fed and sum(fed) > 0 and not brain.asked.is_set()
+
+
+def until_thinking(ws):
+    for _ in range(60):
+        m = text(ws)
+        if not isinstance(m, bytes) and m.get("state") == "thinking":
+            return True
+    return False

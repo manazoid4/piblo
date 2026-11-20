@@ -102,3 +102,9 @@ python -m pytest host/tests -q
 ```
 
 The GitHub Actions firmware workflow also runs the Core suite before compiling the Cardputer image and building the three required ZIP packages.
+
+## Fast push-to-talk dictation (streaming)
+`python ..\scripts\setup-stream-stt.py` downloads a 72 MB Apache-2.0 streaming model. With it installed, `nodflow.py` (hold Right Ctrl) decodes while you speak and pastes about 70 ms after release; without it, or with `PIBLO_PTT_ENGINE=batch`, the accurate Parakeet batch path is used (~450 ms). `python nodflow.py --stats [--json]` prints p50/p95 per mode from `latency.log` (PibloCraft can call this). Talk can use the same model: `MAZ_LIVE_STREAM_STT=1`. Accuracy trade-off and numbers: `docs/evidence/FLOW-STREAMING-AND-BRIDGE-2026-11-19.md`.
+
+## Piblo -> PibloCraft jobs
+`POST /bridge/job {command, cwd}` asks for approval on the device, then sends the job to `MAZ_PIBLOCRAFT_BRIDGE_URL`. Nothing is sent without a yes; every command is logged to `bridge.log` in the data folder.
