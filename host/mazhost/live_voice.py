@@ -157,8 +157,9 @@ class Resampler24to16:
 class LiveBridge:
     """One device session: owns the upstream realtime socket and the per-turn state machine."""
 
-    def __init__(self, ws: WebSocket, cfg: Settings, timings=None, command_handler=None, stt=None) -> None:
+    def __init__(self, ws: WebSocket, cfg: Settings, timings=None, command_handler=None, stt=None, hermes=None) -> None:
         self.ws, self.cfg, self.timings, self.stt = ws, cfg, timings, stt
+        self.hermes = hermes  # HermesAgent: answers Talk turns when the owner chose Hermes
         self.command_handler = command_handler
         from .wakeword import load
         self.wakeword = load(cfg)
@@ -283,11 +284,21 @@ class LiveBridge:
 
     async def _interrupt(self) -> None:
         self._end_turn_tasks()
+        link = getattr(self.hermes, "link", None) if self.hermes is not None and self.hermes.selected() else None
+        if link is not None and link.status().get("busy"):  # stop Hermes too, not just Piblo's playback
+            asyncio.get_running_loop().run_in_executor(None, self._cancel_hermes, link)
         if not self.kokoro:
             await self._up_send({"type": "response.cancel"})
         await self._send({"type": "stop"})
         await self._set_state("listening")
         self.vad.reset()
+
+    @staticmethod
+    def _cancel_hermes(link) -> None:
+        try:
+            link.cancel()
+        except Exception:  # link gone: nothing is running there to stop
+            pass
 
     def _end_turn_tasks(self) -> None:
         if self._guard:
@@ -320,9 +331,23 @@ class LiveBridge:
             self.brain.on_slow = lambda: sentences.put_nowait("One sec.")
             reply = await self.command_handler(text) if self.command_handler else None
             handled = reply is not None
+            hermes = self.hermes if self.hermes is not None and self.hermes.selected() else None
+            if not handled and hermes:  # "switch to X" / "which model" go to Hermes's /model
+                got = await asyncio.to_thread(hermes.model_command, text)
+                reply, handled = (got["reply"], True) if got else (None, False)
             if not handled:
                 reply = await self.brain.command(text)
-            if handled or reply:
+            if not handled and not reply and hermes:
+                got = await asyncio.to_thread(hermes.answer, text)
+                t["brain"] = "hermes"
+                for s in split_sentences(got["reply"], final=True)[0]:  # spoken sentence by sentence
+                    await self._send({"type": "text", "role": "assistant", "text": s + " "})
+                    sentences.put_nowait(s)
+                sentences.put_nowait(None)
+                reply, handled = None, True
+            if t.get("brain") == "hermes":
+                pass  # sentences already queued
+            elif handled or reply:
                 sentences.put_nowait(reply)
                 sentences.put_nowait(None)
             else:
@@ -528,7 +553,7 @@ class LiveBridge:
             self.timings.add(row)
 
 
-def install_live_voice(api, cfg: Settings, security, timings=None, command_handler=None, stt=None) -> None:
+def install_live_voice(api, cfg: Settings, security, timings=None, command_handler=None, stt=None, hermes=None) -> None:
     """Register /voice/live. Plain Starlette route: the app-wide HTTP auth dependency can't take a WebSocket."""
 
     async def endpoint(ws: WebSocket) -> None:
@@ -539,7 +564,7 @@ def install_live_voice(api, cfg: Settings, security, timings=None, command_handl
             await ws.close(4401)
             return
         try:
-            bridge = LiveBridge(ws, cfg, timings, command_handler, stt)
+            bridge = LiveBridge(ws, cfg, timings, command_handler, stt, hermes)
         except Exception as error:
             log.error("live: session setup failed: %s", error)
             try:

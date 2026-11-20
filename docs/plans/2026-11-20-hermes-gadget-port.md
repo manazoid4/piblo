@@ -61,6 +61,12 @@ Display 240×135 ASCII (40 cols), mic 16 kHz PCM16, inputs talk/cancel/up/down (
 Switch brains any time: `POST /hermes/agent {"agent":"piblo"|"hermes"}` (kept in `hermes-agent.json`).
 Private mode never routes to Hermes.
 
+## Piblo Talk (always-listening voice)
+
+With Hermes chosen, Talk turns go to Hermes too. Order: Piblo feature commands, then "switch to / which
+model" (sent to Hermes `/model`), then Piblo's local voice commands (remember...), then Hermes. Replies are
+spoken sentence by sentence. Interrupting Talk also cancels the running Hermes turn.
+
 ## Switch model and provider by voice
 
 With Hermes as the agent, Piblo turns speech into Hermes's own `/model provider:model` command:
@@ -86,7 +92,6 @@ Only providers already set up in Hermes (`hermes model`) can be switched to. App
 
 - Hermes reply audio is received (`MAZ_HERMES_VOICE=hermes`, tested) but not yet played on the
   device; Piblo speaks the text with its own TTS.
-- Device cancel during a Hermes turn: use `POST /hermes/cancel`; firmware does not call it yet.
+- Push-to-talk cancel during a Hermes turn: use `POST /hermes/cancel` (Talk's interrupt already cancels Hermes).
 - Hermes dashboard is exposed in `/hermes/status` but not drawn on the device.
-- Piblo Talk (always-listening Live voice) still uses Piblo's own brain; only push-to-talk goes to Hermes.
 - PR #109 (closed) is app auto-update UI only; nothing Hermes-related to reuse.

@@ -1369,7 +1369,7 @@ def create_app(
         return await run_in_threadpool(feature_commands.handle, text)
 
     install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command,
-                      stt=speech if isinstance(speech, SpeechToText) else None)
+                      stt=speech if isinstance(speech, SpeechToText) else None, hermes=hermes_agent)
     # ------------------------------------------------------------ SUBTITLES
     install_subtitle_routes(api, subtitle_jobs)
 
