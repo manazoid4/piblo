@@ -12,12 +12,14 @@
   <link rel="canonical" href="https://piblo.co.uk/features/">
   <meta property="og:url" content="https://piblo.co.uk/features/">
   <meta property="og:site_name" content="Piblo">
-  <meta name="twitter:card" content="summary">
+  <meta property="og:image" content="https://piblo.co.uk/media/concept/piblo-concept-smoke.jpg">
+  <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@Piblo_UK">
   <title>Piblo. Less screen. More done.</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/home-base.css"><link rel="stylesheet" href="/home.css"><link rel="stylesheet" href="/pages.css">
   <link rel="stylesheet" href="/features/features.css">
+  <script defer src="/features/features.js"></script>
   <script defer src="/_vercel/insights/script.js"></script>
 </head>
 <body>
@@ -31,18 +33,30 @@
 </header>
 <main id="main">
   <section class="pf-hero">
-    <div class="container">
-      <span class="eyebrow">PIBLO</span>
-      <h1>Less screen. <em>More done.</em></h1>
-      <p class="pf-lead">A small friend for your desk. It listens, it waits for your yes, and it keeps your phone face down.</p>
-      <ol class="pf-index" aria-label="Five features">
-        <li><a href="#talk"><span>01</span>Just say it.</a></li>
-        <li><a href="#approve"><span>02</span>Yes, from your desk.</a></li>
-        <li><a href="#phone"><span>03</span>Put the phone down.</a></li>
-        <li><a href="#focus"><span>04</span>Never work alone.</a></li>
-        <li><a href="#dump"><span>05</span>Empty your head.</a></li>
-      </ol>
+    <div class="container pf-hero-grid">
+      <div class="pf-hero-copy">
+        <span class="eyebrow">PIBLO STANDARD</span>
+        <h1>Less screen. <em>More done.</em></h1>
+        <p class="pf-lead">A small friend for your desk. It listens, waits for your yes, and keeps your phone face down.</p>
+        <div class="pf-swatch" role="group" aria-label="Choose a finish">
+          <button type="button" class="pf-sw" data-concept="smoke" aria-pressed="true"><i class="smoke"></i>Smoke</button>
+          <button type="button" class="pf-sw" data-concept="cream" aria-pressed="false"><i class="cream"></i>Cream</button>
+        </div>
+        <div class="actions"><a class="btn btn-primary btn-big" href="/#waitlist" data-va="cta_click">Join the list</a><a class="btn btn-quiet btn-big" href="#talk">See what it does</a></div>
+      </div>
+      <figure class="pf-stage" id="pf-stage" data-concept="smoke">
+        <img class="is-smoke" src="/media/concept/piblo-concept-smoke.jpg" width="963" height="1600" alt="Piblo Standard concept in smoke: a clear case showing the board, with a steel kickstand." fetchpriority="high">
+        <img class="is-cream" src="/media/concept/piblo-concept-cream.jpg" width="963" height="1600" alt="Piblo Standard concept with a cream top over a clear case, with a steel kickstand." loading="lazy">
+        <figcaption>Concept render. The final design may change.</figcaption>
+      </figure>
     </div>
+    <ol class="pf-index container" aria-label="Five features">
+      <li><a href="#talk"><span>01</span>Just say it.</a></li>
+      <li><a href="#approve"><span>02</span>Yes, from your desk.</a></li>
+      <li><a href="#phone"><span>03</span>Put the phone down.</a></li>
+      <li><a href="#focus"><span>04</span>Never work alone.</a></li>
+      <li><a href="#dump"><span>05</span>Empty your head.</a></li>
+    </ol>
   </section>
 
   <section class="pf-feat" id="talk" aria-labelledby="talk-title">

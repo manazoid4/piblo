@@ -1,13 +1,39 @@
 /* Piblo features page. Builds on /home.css and /pages.css tokens. */
 .pf-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
-.pf-hero { padding: 56px 0 8px; text-align: center; }
+.pf-hero { padding: 40px 0 8px; }
+.pf-hero-grid { display: grid; gap: 32px; align-items: center; }
+.pf-hero-copy { text-align: center; }
 .pf-hero h1 { max-width: 10em; margin: 14px auto 0; }
 .pf-lead { max-width: 32em; margin: 16px auto 0; font-size: clamp(17px, 1.6vw, 21px); line-height: 1.5; color: var(--ink-2); text-wrap: pretty; }
-.pf-index { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 32px auto 0; padding: 0; list-style: none; }
+.pf-hero .actions { justify-content: center; margin-top: 26px; }
+.pf-swatch { display: inline-flex; gap: 6px; margin-top: 24px; padding: 5px; border-radius: 99px; background: var(--tint); }
+.pf-sw { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 16px 0 8px; border: 0; border-radius: 99px; background: transparent; color: var(--ink-2); font: 600 14px var(--font-sans); cursor: pointer; transition: background .2s, color .2s, box-shadow .2s; }
+.pf-sw[aria-pressed="true"] { background: var(--card); color: var(--ink); box-shadow: 0 1px 2px rgba(40,30,20,.12), 0 4px 12px -6px rgba(40,30,20,.25); }
+.pf-sw:focus-visible { outline: 3px solid var(--tomato); outline-offset: 2px; }
+.pf-sw i { width: 22px; height: 22px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.12); }
+.pf-sw i.smoke { background: linear-gradient(135deg, #5b5d63, #26272b); }
+.pf-sw i.cream { background: linear-gradient(180deg, #ece4d2 0 58%, #2f9e6e 58% 66%, #e9b949 66% 74%, #e4572e 74% 82%, #2a2b30 82%); }
+
+.pf-stage { position: relative; display: grid; margin: 0 auto; width: min(100%, 340px); }
+.pf-stage img { grid-area: 1 / 1; width: 100%; height: auto; aspect-ratio: 963 / 1600; object-fit: cover; border-radius: 32px; box-shadow: 0 40px 80px -40px rgba(40,28,16,.55), 0 0 0 1px var(--line); transition: opacity .45s ease; }
+.pf-stage .is-cream, .pf-stage[data-concept="cream"] .is-smoke { opacity: 0; }
+.pf-stage[data-concept="cream"] .is-cream { opacity: 1; }
+.pf-stage figcaption { margin-top: 12px; text-align: center; font-size: 13px; color: var(--ink-3); }
+
+.pf-index { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 40px; padding: 0; list-style: none; }
 .pf-index a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 16px 0 8px; border-radius: 99px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line); color: var(--ink); font-weight: 600; font-size: 15px; text-decoration: none; transition: box-shadow .2s; }
 .pf-index a:hover { box-shadow: inset 0 0 0 1px var(--ink-3); }
 .pf-index span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--tint); font: 600 11px var(--font-mono); color: var(--ink-2); }
+
+@media (min-width: 900px) {
+  .pf-hero { padding-top: 56px; }
+  .pf-hero-grid { grid-template-columns: 1fr 1fr; gap: 56px; }
+  .pf-hero-copy { text-align: left; }
+  .pf-hero h1, .pf-lead { margin-left: 0; }
+  .pf-hero .actions { justify-content: flex-start; }
+  .pf-stage { width: min(100%, 480px, calc((100svh - 170px) * .602)); }
+}
 
 .pf-feat { padding: clamp(72px, 10vw, 128px) 0 0; scroll-margin-top: 64px; }
 .pf-head { max-width: 40rem; margin: 0 auto; text-align: center; }
@@ -86,4 +112,4 @@
   .pf-ba { margin-top: 28px; }
   .pf-phone { width: 22%; top: 42%; border-radius: 16px; }
 }
-@media (prefers-reduced-motion: reduce) { .pf-wave i, .pf-glow { animation: none; } .pf-wave i { height: 60%; } }
+@media (prefers-reduced-motion: reduce) { .pf-wave i, .pf-glow { animation: none; } .pf-stage img { transition: none; } .pf-wave i { height: 60%; } }
