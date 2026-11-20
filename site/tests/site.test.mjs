@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import vm from "node:vm";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const pages = ["/", "/roadmap/", "/timeline/", "/readiness/", "/privacy/", "/piblocraft/"];
+const pages = ["/", "/roadmap/", "/timeline/", "/readiness/", "/privacy/", "/piblocraft/", "/features/"];
 const contents = Object.fromEntries(pages.map(path => [path, readFileSync(join(root, path, "index.html"), "utf8")]));
 const attrs = (html, name) => [...html.matchAll(new RegExp(name + '="([^"]+)"', "g"))].map(match => match[1]);
 const ids = html => new Set(attrs(html, "id"));
