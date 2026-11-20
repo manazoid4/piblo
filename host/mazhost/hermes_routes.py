@@ -12,6 +12,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import re
 import wave
 from pathlib import Path
 from typing import Literal
@@ -31,12 +32,32 @@ STOPPED = "Stopped."
 FAILED = "Hermes couldn't finish that."
 
 
+# "switch to deepseek", "use kimi on openrouter", "change to claude sonnet via anthropic"
+SWITCH = re.compile(r"^(?:hey piblo,? )?(?:please )?(?:use|switch(?: over)? to|change(?: over)? to)(?: the)?(?: model)? "
+                    r"(?P<model>.{2,48}?)(?: model)?(?: (?:on|from|via|with|through|using) (?P<provider>[a-z0-9 .-]{2,24}))?$")
+WHICH = re.compile(r"what (?:model|brain)s?\b.*\b(?:using|running|on)\b|which (?:model|brain)")
+# spoken provider -> Hermes provider id (`/model provider:model`); anything else is passed as said
+PROVIDERS = {"openrouter": "openrouter", "open router": "openrouter", "nous": "nous", "nous portal": "nous",
+             "anthropic": "anthropic", "openai": "openai", "open ai": "openai", "zai": "zai", "z ai": "zai",
+             "kimi": "kimi-coding", "moonshot": "kimi-coding", "local": "custom", "ollama": "custom", "custom": "custom"}
+
+
+def _say_line(text: str) -> str:
+    """First line of a Hermes command reply: what Piblo says out loud."""
+    return next((ln.strip(" -*") for ln in text.splitlines() if ln.strip(" -*")), text).strip()
+
+
 class AgentChoice(BaseModel):
     agent: Literal["piblo", "hermes"]
 
 
 class HermesAsk(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
+
+
+class ModelChoice(BaseModel):
+    model: str = Field(min_length=1, max_length=120)
+    provider: str = Field(default="", max_length=40)
 
 
 class HermesAgent:
@@ -99,6 +120,62 @@ class HermesAgent:
     def answer(self, text: str) -> dict:
         self.link.start()  # idempotent; normally already running from Core's startup
         return self._result(self.link.ask_text(text, self.cfg.hermes_timeout_s))
+
+    # ---- model and provider, by voice ------------------------------------------------------
+    def _catalogue(self) -> list[dict]:
+        """OpenRouter's model list, shared with Piblo Talk's cache (24 h, data dir)."""
+        from .live_brain import LiveBrain
+        return asyncio.run(LiveBrain(self.cfg)._models())
+
+    def resolve_model(self, spoken: str, provider: str = "") -> tuple[str, str] | None:
+        """(hermes provider id, model id) for a spoken name; OpenRouter picks free models first."""
+        from .live_brain import ALIASES, pick_model
+        name = spoken.strip().lower()
+        prov = PROVIDERS.get(provider.strip().lower(), provider.strip().lower().replace(" ", "-"))
+        prov = prov or self.cfg.hermes_default_provider
+        if name in ("local", "the local model", "ollama"):
+            return "custom", ""
+        if "/" in name or ":" in name or prov != "openrouter":
+            return prov, name.replace(" ", "-")
+        key = re.sub(r"[^a-z0-9]", "", name)
+        patterns = ALIASES.get(key) or [re.sub(r"\s+", "-", name), key]
+        try:
+            mid = pick_model(self._catalogue(), patterns)
+        except Exception:
+            log.warning("hermes: model list unavailable", exc_info=True)
+            mid = None
+        return (prov, mid) if mid else None
+
+    def model_command(self, text: str) -> dict | None:
+        """A spoken model/provider switch or question, sent to Hermes as its own /model command."""
+        low = text.strip().rstrip(".!?").strip().lower()
+        if WHICH.search(low):
+            return self._command("/model", "which model")
+        m = SWITCH.match(low)
+        if not m:
+            return None
+        got = self.resolve_model(m["model"], m["provider"] or "")
+        if got is None:
+            where = m["provider"] or self.cfg.hermes_default_provider
+            return {"reply": f"Sorry, I couldn't find a model called {m['model']} on {where}.", "provider": "hermes",
+                    "degraded": True, "timings": {"llm_ms": 0}}
+        prov, mid = got
+        return self._command(f"/model {prov}:{mid}" if mid else f"/model {prov}", f"switch to {prov}:{mid}")
+
+    def set_model(self, model: str, provider: str = "") -> dict:
+        got = self.resolve_model(model, provider)
+        if got is None:
+            raise HTTPException(404, "model_not_found")
+        return self._command(f"/model {got[0]}:{got[1]}" if got[1] else f"/model {got[0]}", "set model")
+
+    def _command(self, command: str, what: str) -> dict:
+        self.link.start()
+        out = self._result(self.link.ask_text(command, self.cfg.hermes_timeout_s))
+        if not out.get("degraded"):
+            out["reply"] = _say_line(out["reply"])
+        out["command"] = command
+        log.info("hermes: %s -> %s", what, command)
+        return out
 
     def answer_audio(self, pcm: bytes, rate: int = 16000) -> dict:
         self.link.start()
@@ -230,6 +307,12 @@ def build_hermes_router(agent: HermesAgent) -> APIRouter:
         if agent.link is None:
             raise HTTPException(503, "hermes_disabled")
         return agent.answer(body.text)
+
+    @router.post("/hermes/model")
+    def hermes_model(body: ModelChoice):
+        if agent.link is None:
+            raise HTTPException(503, "hermes_disabled")
+        return agent.set_model(body.model, body.provider)
 
     @router.post("/hermes/cancel")
     def hermes_cancel():

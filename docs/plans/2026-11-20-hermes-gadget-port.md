@@ -61,9 +61,26 @@ Display 240×135 ASCII (40 cols), mic 16 kHz PCM16, inputs talk/cancel/up/down (
 Switch brains any time: `POST /hermes/agent {"agent":"piblo"|"hermes"}` (kept in `hermes-agent.json`).
 Private mode never routes to Hermes.
 
+## Switch model and provider by voice
+
+With Hermes as the agent, Piblo turns speech into Hermes's own `/model provider:model` command:
+
+| Said | Sent to Hermes |
+|---|---|
+| "switch to deepseek" | `/model openrouter:<best DeepSeek id, free first>` (`MAZ_HERMES_DEFAULT_PROVIDER`, default openrouter) |
+| "use minimax m2 on openrouter" | `/model openrouter:minimax/minimax-m2:free` |
+| "change to claude sonnet 4.6 via anthropic" | `/model anthropic:claude-sonnet-4.6` |
+| "switch to local" | `/model custom` (Hermes auto-detects its local endpoint) |
+| "which model are you using" | `/model` |
+
+OpenRouter names resolve against the same catalogue cache Piblo Talk uses (free models first). Piblo
+speaks the first line of Hermes's answer. The switch is Hermes's session-only one: it survives a gateway
+restart, and `/new` clears it. Hermes asks before a costly switch, and that question arrives as a Piblo approval.
+Only providers already set up in Hermes (`hermes model`) can be switched to. App: `POST /hermes/model {"model", "provider"}`.
+
 ## Routes (additive, Core token required)
 
-`GET /hermes/status`, `POST /hermes/agent`, `POST /hermes/ask`, `POST /hermes/cancel`, `POST /hermes/new`.
+`GET /hermes/status`, `POST /hermes/agent`, `POST /hermes/ask`, `POST /hermes/model`, `POST /hermes/cancel`, `POST /hermes/new`.
 
 ## Not done / next
 
@@ -71,4 +88,5 @@ Private mode never routes to Hermes.
   device; Piblo speaks the text with its own TTS.
 - Device cancel during a Hermes turn: use `POST /hermes/cancel`; firmware does not call it yet.
 - Hermes dashboard is exposed in `/hermes/status` but not drawn on the device.
+- Piblo Talk (always-listening Live voice) still uses Piblo's own brain; only push-to-talk goes to Hermes.
 - PR #109 (closed) is app auto-update UI only; nothing Hermes-related to reuse.

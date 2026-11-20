@@ -75,6 +75,7 @@ Hermes questions arrive as ordinary approvals (`agent: "Hermes"`) decided with `
 | `/hermes/status` | GET | Enabled, selected agent, connected, paired, pairing code, last error, dashboard. Never the key or token. |
 | `/hermes/agent` | POST | `{"agent": "piblo"\|"hermes"}`: who answers ordinary questions. |
 | `/hermes/ask` | POST | `{"text"}`: one Hermes turn (app/testing). |
+| `/hermes/model` | POST | `{"model", "provider"?}`: sends Hermes `/model provider:model` (OpenRouter names resolve, free first). |
 | `/hermes/cancel`, `/hermes/new` | POST | Stop the Hermes turn; start a fresh Hermes conversation. |
 
 ## Persistence rules

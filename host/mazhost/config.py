@@ -116,6 +116,7 @@ class Settings(BaseSettings):
     hermes_token: str = ""  # MAZ_HERMES_TOKEN: the gateway's GADGET_ACCESS_TOKEN, if it sets one; never logged
     hermes_stt: Literal["core", "hermes"] = "core"  # who transcribes push-to-talk: Piblo's STT, or Hermes's own
     hermes_voice: Literal["piblo", "hermes"] = "piblo"  # "hermes" also asks Hermes for reply audio
+    hermes_default_provider: str = "openrouter"  # "switch to deepseek" with no provider named means this one
     hermes_timeout_s: float = Field(default=90.0, ge=5.0, le=600.0)
     vault_dir: str = ""  # explicitly selected document folder; disabled by default
     vault_remote_url: str = ""  # home PC's Tailscale Core, for a travelling client

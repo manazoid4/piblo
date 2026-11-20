@@ -555,7 +555,7 @@ def create_app(
             return {"text": refined.text, "reply": reminder_reply, "provider": "promises-local",
                     "actions": [], "timings": {"llm_ms": 0}}
         if hermes_agent.selected():  # the owner chose Hermes: Piblo's local commands above still run first
-            result = hermes_agent.answer(refined.text)
+            result = hermes_agent.model_command(refined.text) or hermes_agent.answer(refined.text)
             sessions.add_turn(session_id, refined.text, result["reply"])
             return {"text": refined.text, "actions": refined.actions, **result}
         started = time.perf_counter()

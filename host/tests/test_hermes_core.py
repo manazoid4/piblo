@@ -279,3 +279,42 @@ def test_hermes_timeout_withdraws_the_piblo_approval(core):
     assert late.status_code != 200 or late.json()["decision"] != "allow"
     time.sleep(0.3)
     assert brain.answers == []
+
+
+CATALOGUE = [
+    {"id": "deepseek/deepseek-v4.1-flash", "context_length": 128000, "pricing": {"prompt": "0.0000001", "completion": "0.0000002"}},
+    {"id": "deepseek/deepseek-v4:free", "context_length": 128000, "pricing": {"prompt": "0", "completion": "0"}},
+    {"id": "minimax/minimax-m2:free", "context_length": 200000, "pricing": {"prompt": "0", "completion": "0"}},
+]
+
+
+@pytest.fixture
+def catalogue(monkeypatch):
+    from mazhost.hermes_routes import HermesAgent
+    monkeypatch.setattr(HermesAgent, "_catalogue", lambda self: CATALOGUE)
+
+
+@pytest.mark.parametrize("said,command", [
+    ("Switch to DeepSeek.", "/model openrouter:deepseek/deepseek-v4:free"),       # free model first
+    ("use minimax m2 on openrouter", "/model openrouter:minimax/minimax-m2:free"),
+    ("change to claude sonnet 4.6 via anthropic", "/model anthropic:claude-sonnet-4.6"),
+    ("switch to local", "/model custom"),
+    ("which model are you using", "/model"),
+])
+def test_spoken_model_switch_becomes_hermes_model_command(core, catalogue, said, command):
+    client, auth, hub, brain, lt, calls = core()
+    body = text_turn(client, auth, session(client, auth), said)
+    assert brain.texts == [command] and body["provider"] == "hermes" and body["command"] == command
+
+
+def test_unknown_openrouter_model_is_said_not_sent(core, catalogue):
+    client, auth, hub, brain, lt, calls = core()
+    body = text_turn(client, auth, session(client, auth), "switch to banana nine")
+    assert "couldn't find a model called banana nine on openrouter" in body["reply"] and brain.texts == []
+
+
+def test_app_can_set_the_model(core, catalogue):
+    client, auth, hub, brain, lt, calls = core()
+    r = client.post("/hermes/model", headers=auth, json={"model": "deepseek", "provider": "openrouter"})
+    assert r.status_code == 200 and brain.texts == ["/model openrouter:deepseek/deepseek-v4:free"]
+    assert client.post("/hermes/model", headers=auth, json={"model": "banana nine"}).status_code == 404
