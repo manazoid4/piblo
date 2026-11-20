@@ -25,6 +25,7 @@ from typing import Any, Callable, Iterable, Protocol
 
 from .config import Settings
 from .stt import SpeechToText
+from .nowindow import no_window
 
 
 VIDEO_EXTENSIONS = frozenset({
@@ -360,7 +361,8 @@ class SubtitleJobs:
             "-i", str(video), "-vn", "-ac", "1", "-ar", "16000", "-f", "wav", str(target),
         ]
         proc = subprocess.Popen(
-            argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE
+            argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+            **no_window(),
         )
         try:
             while proc.poll() is None:

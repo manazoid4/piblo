@@ -10,6 +10,7 @@ from pathlib import Path
 import httpx
 
 from . import private_mode
+from .ledger import append_ledger
 
 log = logging.getLogger("mazhost.flow")
 
@@ -124,7 +125,10 @@ class Flow:
                 log.warning("flow cleanup chain failed: %s", type(e).__name__)
         return rule_cleanup(text), "rules"
 
-    def dictate(self, wav: Path) -> dict:
+    def dictate(self, wav: Path, log: bool = True) -> dict:
+        """wav -> {text, intent, raw, ms, via, stt_via}. With log=False the caller finishes
+        the timing line with log_result() once the text has really been typed."""
+        cancel = self._cancel = threading.Event()  # per call: a timed-out run cannot cancel its successor
         t0 = time.perf_counter()
         if self.s.stt_provider == "parakeet":
             raw, engine = self.speech.transcribe_local(wav)
@@ -135,21 +139,36 @@ class Flow:
             raw, engine = self.speech.transcribe(wav), "whisper"
         t1 = time.perf_counter()
         if not raw.strip():
-            return {"text": "", "intent": "paste", "raw": "", "ms": {"stt": 0, "clean": 0, "total": 0}}
+            stt = round((t1 - t0) * 1000)
+            return {"text": "", "intent": "paste", "raw": "", "ms": {"stt": stt, "clean": 0, "total": stt}}
         cleaned, provider = self._cleanup(raw)
         cleaned = apply_dictionary(cleaned, self.lines)
         intent, body = parse_prefix(cleaned)
         t2 = time.perf_counter()
         ms = {"stt": round((t1 - t0) * 1000), "clean": round((t2 - t1) * 1000),
               "total": round((t2 - t0) * 1000)}
-        if not self._cancel.is_set():
+        result = {"text": body, "intent": intent, "raw": raw, "ms": ms, "via": provider, "stt_via": engine}
+        if not cancel.is_set():
             if intent == "note":
                 self._append("inbox.md", f"- {time.strftime('%Y-%m-%d %H:%M')} {body}")
             elif intent == "remind":
                 self._append("reminders-pending.md", f"- {time.strftime('%Y-%m-%d %H:%M')} {body}")
-            self._append("latency.log", f"{time.strftime('%Y-%m-%dT%H:%M:%S')} dictate intent={intent} "
-                         f"stt={ms['stt']} clean={ms['clean']} total={ms['total']} via={provider} stt_via={engine} chars={len(body)}")
-        return {"text": body, "intent": intent, "raw": raw, "ms": ms}
+            if log:
+                self.log_result(result)
+            try:
+                append_ledger("dictation", body)
+            except (OSError, UnicodeError, ValueError):
+                pass
+        return result
+
+    def log_result(self, result: dict, upload_ms: int = 0, insert_ms: int = 0, pc: str = "") -> None:
+        """One latency.log line. total = upload + stt + clean + insert: first audio byte -> typed."""
+        ms = result.setdefault("ms", {"stt": 0, "clean": 0})
+        ms["upload"], ms["insert"] = upload_ms, insert_ms
+        ms["total"] = upload_ms + ms["stt"] + ms["clean"] + insert_ms
+        self._append("latency.log", f"{time.strftime('%Y-%m-%dT%H:%M:%S')} dictate intent={result['intent']} "
+                     f"upload={upload_ms} stt={ms['stt']} clean={ms['clean']} insert={insert_ms} total={ms['total']} "
+                     f"via={result.get('via', '-')} stt_via={result.get('stt_via', '-')} pc={pc or '-'} chars={len(result['text'])}")
 
     def _append(self, name: str, line: str) -> None:
         with (self.dir / name).open("a", encoding="utf-8") as f:

@@ -23,6 +23,7 @@
 #include "../storage/store.h"
 #include "apps.h"
 #include "common.h"
+#include "../net/board_link.h"
 
 namespace maz {
 namespace apps {
@@ -49,7 +50,7 @@ public:
         if (!e.down) return false;
         if (!_detail.empty()) {
             if ((e.code == KEY_ENTER || e.code == KEY_U) && host::updateReady() &&
-                _detail.rfind("nod v", 0) == 0) {
+                _detail.rfind("Piblo v", 0) == 0) {
                 shell::confirmFwUpdate();
                 invalidate();
                 return true;
@@ -181,18 +182,22 @@ private:
             case 7: {
                 const std::string cv = host::coreInfo().version;
                 const std::string upd = host::updateReady() ? "\nUPDATE READY v" + host::coreInfo().fwVersion : "";
+                const auto& bs = board::state();
+                const char* boardStatus = bs.linked ? (bs.healthy ? "linked, healthy" : "linked, not ready") : "not linked";
+                const std::string boardMac = bs.haveMac ? board::macString() : "unknown";
                 snprintf(buf, sizeof(buf),
-                         "nod v" NOD_FW_VERSION " (" NOD_FW_SHA ")\nCore %s%s\nChip     %s "
-                         "rev%d\nCores    %d\nKeyboard %s\nUptime   %s\nBuild    " PIBLO_LABEL,
+                         "Piblo v" NOD_FW_VERSION " (" NOD_FW_SHA ")\nCore %s%s\nChip     %s "
+                         "rev%d\nCores    %d\nKeyboard %s\nUptime   %s\nBoard    %s (%s)\nLink     %s\nBuild    " PIBLO_LABEL,
                          cv.empty() ? "offline" : ("v" + cv).c_str(), upd.c_str(), ESP.getChipModel(),
                          (int)ESP.getChipRevision(), (int)ESP.getChipCores(),
                          KB.ok() ? "TCA8418 ok" : "NOT DETECTED",
-                         ui::hhmmss(Sys.uptimeSeconds()).c_str());
+                         ui::hhmmss(Sys.uptimeSeconds()).c_str(),
+                         boardStatus, boardMac.c_str(), board::diag().c_str());
                 _detail = buf;
                 break;
             }
             case 8:
-                notify::post(Note::Info, "Rebooting", "back to M5Launcher");
+                notify::post(Note::Info, "Rebooting", "back to the launcher");
                 delay(600);
                 if (!launcher::reboot())
                     notify::post(Note::Error, "Launcher", "hand-back failed");
@@ -308,7 +313,7 @@ const char* SET_NAMES[] = {"Brightness",    "Volume",        "UI sounds",
                            "Screen timeout", "Mic gain",     "Storage",
                            "Time zone",      "Wi-Fi & host", "Keys & help",
                            "Voice",           "Quiet mode", "Quiet for",
-                           "Easy mode"};
+                           "Easy mode",      "Auto-update on charger"};
 constexpr int SET_COUNT = sizeof(SET_NAMES) / sizeof(SET_NAMES[0]);
 
 class SettingsApp : public App {
@@ -389,6 +394,9 @@ public:
             case 12:
                 if (e.code == KEY_ENTER) Cfg.easyMode = !Cfg.easyMode;
                 break;
+            case 13:
+                if (e.code == KEY_ENTER) Cfg.autoUpdate = !Cfg.autoUpdate;
+                break;
             default:
                 break;
         }
@@ -452,6 +460,8 @@ private:
                 return quiet::durLabel(Cfg.quietDur);
             case 12:
                 return Cfg.easyMode ? "on" : "off";
+            case 13:
+                return Cfg.autoUpdate ? "on" : "off";
             default:
                 return "";
         }
@@ -785,7 +795,7 @@ const char* HELP_LINES[] = {
     "            whole screen off.",
     "#GLOBAL",
     "Ctrl+K      command palette",
-    "Ctrl+L      back to M5Launcher",
+    "Ctrl+L      back to launcher",
     "Fn+SPACE    context ask (Talk)",
     "Fn+F        toggle field mode",
     "Fn+Q        quiet / silent / normal",
@@ -809,10 +819,10 @@ const char* HELP_LINES[] = {
     "up/down move   ENTER open",
     "D twice     delete",
     "#ABOUT",
-    "Piblo v" NOD_FW_VERSION " on Cardputer ADV",
+    "Piblo v" NOD_FW_VERSION " handheld",
     "by Maz Works  mazworks.uk",
     "Bruce and Nemo stay available",
-    "through M5Launcher.",
+    "through the launcher.",
 };
 constexpr int HELP_COUNT = sizeof(HELP_LINES) / sizeof(HELP_LINES[0]);
 

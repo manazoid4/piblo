@@ -1,0 +1,11 @@
+{
+  "data": {
+    "free_model_daily_requests": {
+      "limit": 1000,
+      "remaining": 863,
+      "used": 137
+    },
+    "limit_remaining": 7.52,
+    "is_free_tier": false
+  }
+}

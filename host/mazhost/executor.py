@@ -10,6 +10,7 @@ from typing import Literal
 from .authority import AuthorityBroker, AuthorityError, Grant
 from .config import Settings
 from . import private_mode
+from .nowindow import no_window
 
 
 Shell = Literal["powershell", "cmd"]
@@ -110,6 +111,7 @@ class ElevatedExecutor:
                 errors="replace",
                 timeout=timeout_seconds,
                 env=os.environ.copy(),
+                **no_window(),
             )
         except FileNotFoundError as error:
             raise ExecutionError(f"shell_not_found: {argv[0]}") from error

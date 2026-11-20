@@ -18,6 +18,7 @@ import psutil
 
 from .config import Settings
 from . import private_mode
+from .nowindow import no_window
 
 CACHE_SECONDS = 2.0
 
@@ -93,6 +94,7 @@ class SystemTelemetry:
                 text=True,
                 timeout=2,
                 check=False,
+                **no_window(),
             )
         except (OSError, subprocess.SubprocessError):
             return {"available": False}

@@ -9,6 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Test
 import uk.mazworks.piblo.proto.CoreClient
+import uk.mazworks.piblo.proto.HaltState
 import uk.mazworks.piblo.proto.Priority
 import uk.mazworks.piblo.proto.Proto
 import uk.mazworks.piblo.proto.ProtoException
@@ -132,6 +133,9 @@ class ProtoTest {
 
     @Test fun normalizeBase() {
         assertEquals("http://192.168.1.20:8787", CoreClient.normalizeBase("192.168.1.20"))
+        assertEquals("http://100.101.102.103:8787", CoreClient.normalizeBase("100.101.102.103"))
+        assertEquals("http://laptop.tail1234.ts.net:8787", CoreClient.normalizeBase("laptop.tail1234.ts.net"))
+        assertNull(CoreClient.normalizeBase("8.8.8.8"))
         assertEquals("http://pc:9000", CoreClient.normalizeBase(" pc:9000/ "))
         assertEquals("https://core.example.net", CoreClient.normalizeBase("https://core.example.net"))
         assertNull(CoreClient.normalizeBase("")); assertNull(CoreClient.normalizeBase("ftp://x")); assertNull(CoreClient.normalizeBase("a b"))
@@ -142,4 +146,60 @@ class ProtoTest {
         assertNull(CoreClient.normalizeBase("http://8.8.8.8:8787"))
         assertEquals("https://example.com", CoreClient.normalizeBase("https://example.com"))
     }
+
+    @Test fun shareKeepsTheWholeTextUpToCoreLimit() {
+        val long = "a".repeat(5_000)
+        assertEquals(5_000, JSONObject(Proto.shareJson(long, "t", "", "id1")).getString("text").length)
+        val huge = "b".repeat(60_000)
+        assertEquals(uk.mazworks.piblo.proto.SHARE_TEXT_MAX, JSONObject(Proto.shareJson(huge, "t", "", "id2")).getString("text").length)
+    }
+
+    @Test fun shareBoundsTitleAndUrlToCoreLimits() {
+        val o = JSONObject(Proto.shareJson("x", "t".repeat(300), "https://e.com/" + "u".repeat(3000), "id3"))
+        assertEquals(uk.mazworks.piblo.proto.SHARE_TITLE_MAX, o.getString("title").length)
+        assertEquals(uk.mazworks.piblo.proto.SHARE_URL_MAX, o.getString("url").length)
+    }
+
+    @Test fun shareDrainsOnReconnectOrRequestOnly() {
+        val on = uk.mazworks.piblo.hub.LinkState.ONLINE
+        val off = uk.mazworks.piblo.hub.LinkState.OFFLINE
+        assertTrue(uk.mazworks.piblo.hub.shouldDrainShares(on, off, false))   // just reconnected
+        assertTrue(uk.mazworks.piblo.hub.shouldDrainShares(on, null, false))  // first online cycle
+        assertTrue(uk.mazworks.piblo.hub.shouldDrainShares(on, on, true))     // new enqueue
+        assertFalse(uk.mazworks.piblo.hub.shouldDrainShares(on, on, false))   // steady state: no re-send of a slow /share
+        assertFalse(uk.mazworks.piblo.hub.shouldDrainShares(off, off, true))  // never while offline
+    }
+
+    @Test fun doubleTappedNoteIsNotQueuedTwice() {
+            val e = uk.mazworks.piblo.data.ShareEntry(text = "buy milk", title = "Note from phone", url = "", createdAt = 1)
+            assertTrue(uk.mazworks.piblo.data.hasQueuedShare(listOf(e), "buy milk", "Note from phone"))
+            assertFalse(uk.mazworks.piblo.data.hasQueuedShare(listOf(e), "buy eggs", "Note from phone"))
+            assertFalse(uk.mazworks.piblo.data.hasQueuedShare(emptyList(), "buy milk", "Note from phone"))
+    }
+
+        @Test fun parseHaltStateReadsHaltedAndUntil() {
+            val hs = Proto.parseHaltState("{\"halted\":true,\"until\":\"2025-01-01T12:00:00Z\"}")
+            assertTrue(hs.halted)
+            assertEquals("2025-01-01T12:00:00Z", hs.until)
+
+            val hs2 = Proto.parseHaltState("{\"halted\":false}")
+            assertFalse(hs2.halted)
+            assertNull(hs2.until)
+
+            val hs3 = Proto.parseHaltState("{\"halted\":true,\"until\":\"\"}")
+            assertTrue(hs3.halted)
+            assertNull(hs3.until)   // blank string -> null
+
+            assertNull(Proto.parseHaltState("{\"halted\":false,\"until\":null}").until)  // Core sends null when not halted
+        }
+
+        @Test fun haltJsonEncodesOnAndOptionalMinutes() {
+            val j = JSONObject(Proto.haltJson(true))
+            assertTrue(j.getBoolean("on"))
+            assertFalse(j.has("minutes"))
+
+            val j2 = JSONObject(Proto.haltJson(false, 30))
+            assertFalse(j2.getBoolean("on"))
+            assertEquals(30, j2.getInt("minutes"))
+        }
 }

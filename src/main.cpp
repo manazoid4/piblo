@@ -8,12 +8,14 @@
 #include "core/ambient.h"
 #include "core/field.h"
 #include "core/health.h"
+#include "core/bench.h"
 #include "core/notify.h"
 #include "core/settings.h"
 #include "core/launcher.h"
 #include "core/shell.h"
 #include "core/sys.h"
 #include "input/keyboard.h"
+#include "net/board_link.h"
 #include "net/control.h"
 #include "net/mazhost.h"
 #include "net/net.h"
@@ -74,6 +76,7 @@ void setup() {
     Serial.println("[boot] shell");
 
     health::begin();
+    PIBLO_BENCH_BOOT();
 
     Serial.printf("Piblo %s READY board=%d keyboard=%s storage=%s\n",
                   NOD_FW_VERSION, (int)M5.getBoard(),
@@ -89,6 +92,7 @@ void setup() {
         notify::post(Note::Warn, "SD card unreadable", "format it as FAT32 to keep data safely");
     if (Cfg.fieldMode)
         notify::post(Note::Info, "FIELD mode restored", "lower background + faster dim");
+    board::begin();    // ESP-NOW link to the Piblo board (offload); falls back to HTTP when not healthy
 }
 
 void loop() {
@@ -100,8 +104,11 @@ void loop() {
     ambient::update();
     sfx::update();     // non-blocking alert/approval/alarm chirps
     host::linkIdle();  // WiFi power saving back on 20 s after the last voice request, from any screen
+    board::update();   // non-blocking ESP-NOW discovery/ping
 
     health::observeLoop(millis() - loopStarted);
+    PIBLO_BENCH_LOOP(millis() - loopStarted);
     health::update();
+    PIBLO_BENCH_REPORT();
     delay(2);
 }

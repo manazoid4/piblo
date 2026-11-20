@@ -25,6 +25,7 @@ from .beam import BeamStore
 from .braindump import structure_braindump
 from .dump_routes import build_dump_router, inbox_dir, save_safely
 from .catchup import Catchup, build_catchup_router
+from .promises import Promises, build_promises_router
 from .share_in import build_share_router
 from .buddy_forms import build_buddy_forms_router
 from .onboarding import Onboarding, build_onboarding_router
@@ -35,6 +36,8 @@ from .buddy_companion import install_companion_routes
 from .buddy_store import BuddyStore
 from .needs_routes import build_needs_router
 from .commands import parse_command
+from .compound import parse_compound
+from .compound_run import CompoundRunner
 from .config import Settings
 from .control_routes import install_control_routes
 from .core import CoreError, MazCore
@@ -43,14 +46,16 @@ from .device import DeviceMonitor
 from .dev_centre import build_dev_router
 from .features import build_features_router
 from .discovery import DiscoveryResponder
-from . import fw
+from . import fw, kokoro_pcm
 from . import private_mode
 from .errors import ErrorCode, RouteError
+from .bodydouble import BodyDouble, build_bodydouble_router
 from .focus import Focus, install_focus_routes
 from .maker import install_maker_routes
 from .where import build_where_router
 from .memory_notes import (MAX_MEMORY_CHARS, NO_SECRETS, REDACTED, TOO_LONG, MemoryNotes, build_memory_router,
                            is_sensitive, parse_remember)
+from .ledger import build_ledger_router
 from .learning import Learning
 from .speaks_first import SpeaksFirst
 from .rescue import install_rescue_routes
@@ -148,7 +153,7 @@ def _strip_facts_tag(text: str) -> str:
     return text
 
 
-_DEVICE_ACTION = re.compile(r"update|reboot|key:\d{1,3},\d{1,3},\d{1,2}|open:[a-z_]{1,24}")
+_DEVICE_ACTION = re.compile(r"update|fwcheck|reboot|key:\d{1,3},\d{1,3},\d{1,2}|open:[a-z_]{1,24}")
 
 
 class ExtractRequest(BaseModel):
@@ -224,6 +229,7 @@ def create_app(
     sessions = SessionStore(cfg.max_turns, cfg.session_ttl_minutes)
     memory_notes = MemoryNotes(resolve_data_dir(cfg))
     catchup = None  # set once buddy exists; answer() reads it at call time
+    compound_runner = None  # same: set once buddy and promises exist
     authority = AuthorityBroker(cfg)
     elevated_executor = ElevatedExecutor(cfg, authority)
     debug_capsules = DebugCapsules(cfg)
@@ -231,6 +237,7 @@ def create_app(
     work_store.bootstrap()
     work_service = WorkService(work_store)
     inflight = {"n": 0}  # live turns/jobs: self-update never restarts Core under one
+    device_fw = {}
     updates = updater or SelfUpdater(
         enabled=cfg.autoupdate, interval_s=cfg.update_interval_s, repo_dir=cfg.repo_dir,
         github_token=cfg.github_token, port=cfg.port,
@@ -283,6 +290,19 @@ def create_app(
     def warm_tts() -> None:
         threading.Thread(target=speech_out.warm, name="tts-warm", daemon=True).start()
 
+    kokoro_srv = {}
+
+    @api.on_event("startup")
+    def start_kokoro_pcm() -> None:
+        # Live (Talk) streams Kokoro replies from this endpoint; without it every spoken reply failed.
+        if (cfg.tts_enabled and cfg.tts_provider == "kokoro") or cfg.kokoro_pcm_port:
+            kokoro_srv["srv"] = kokoro_pcm.serve_in_thread(cfg, synth=lambda text: speech_out.kokoro_audio(text)[0])
+
+    @api.on_event("shutdown")
+    def stop_kokoro_pcm() -> None:
+        if kokoro_srv.get("srv"):
+            kokoro_srv["srv"].shutdown()
+
     @api.on_event("startup")
     def warm_brain() -> None:
         def run() -> None:
@@ -292,6 +312,21 @@ def create_app(
             except Exception:
                 logging.getLogger("uvicorn.error").info("brain warmup skipped", exc_info=True)
         threading.Thread(target=run, name="brain-warm", daemon=True).start()
+
+    fw_push_stop = threading.Event()
+
+    @api.on_event("startup")
+    def start_fw_push() -> None:
+        pusher = fw.FwPusher(core_service.cardputer_action)
+
+        def run() -> None:
+            while not fw_push_stop.wait(30):
+                pusher.tick(getattr(core_service, "device_ip", None))
+        threading.Thread(target=run, name="fw-push", daemon=True).start()
+
+    @api.on_event("shutdown")
+    def stop_fw_push() -> None:
+        fw_push_stop.set()
 
     @api.on_event("startup")
     def warm_projects() -> None:
@@ -334,6 +369,7 @@ def create_app(
     @api.on_event("shutdown")
     def stop_bridge() -> None:
         bridge_worker.stop()
+        promises_engine.stop()
 
     def versioned_core_status() -> dict:
         status = dict(core_service.status())
@@ -363,6 +399,11 @@ def create_app(
                 "\"and after that\" or \"what did I just ask\".\n"
             )
         context += maths_line(text) + ("" if local_only else weather_line(text)) + priorities_line(text, cfg.now_path)
+        try:
+            if any(word in text.lower() for word in ("bin", "recycling", "reminder")):
+                context += "\nUpcoming home reminders: " + promises_engine.next_spoken() + "."
+        except Exception:
+            pass
         try:
             saved = memory_notes.context(text) if not pocket_context else ""
             if saved:
@@ -486,6 +527,12 @@ def create_app(
             }
         # Context Ask is informational: selected-screen context must never turn
         # an ordinary question into an executable PC/reminder command.
+        steps = None if pocket_context else parse_compound(refined.text)
+        if steps and compound_runner is not None:
+            started = compound_runner.start(refined.text, steps)
+            sessions.add_turn(session_id, refined.text, started["reply"])
+            return {"text": refined.text, "reply": started["reply"], "provider": "piblo-local",
+                    "actions": refined.actions, "compound": started["run"], "timings": {"llm_ms": 0}}
         command = None if pocket_context else parse_command(refined.text)
         if command:
             return deterministic_command(session_id, refined.text, command, refined.actions)
@@ -496,6 +543,16 @@ def create_app(
             sessions.add_turn(session_id, refined.text, feature_reply)
             return {'text': refined.text, 'reply': feature_reply, 'provider': 'piblo-local',
                     'actions': refined.actions, 'timings': {'llm_ms': 0}}
+        setup_reply = None if pocket_context else promises_engine.try_setup(refined.text)
+        if setup_reply is not None:
+            sessions.add_turn(session_id, refined.text, setup_reply)
+            return {"text": refined.text, "reply": setup_reply, "provider": "promises-local",
+                    "actions": [], "timings": {"llm_ms": 0}}
+        reminder_reply = None if pocket_context else promises_engine.answer_question(refined.text)
+        if reminder_reply is not None:
+            sessions.add_turn(session_id, refined.text, reminder_reply)
+            return {"text": refined.text, "reply": reminder_reply, "provider": "promises-local",
+                    "actions": [], "timings": {"llm_ms": 0}}
         started = time.perf_counter()
         try:
             token = _output_cap.set(max_tokens) if max_tokens else None  # spoken path only
@@ -567,6 +624,8 @@ def create_app(
             return {"ok": True, "name": "nod Core", "version": CORE_VERSION}
         if "ESP32" in request.headers.get("user-agent", "") and request.client:
             core_service.note_device(request.client.host)  # the device polls this; live view reuses its address
+            if fw_version:
+                device_fw["version"] = fw_version
         core_status = versioned_core_status() if cfg.core_enabled else {"ok": False, "disabled": True}
         return {
             "ok": True,
@@ -735,7 +794,9 @@ def create_app(
 
     @api.get("/core/cardputer/status")
     def core_cardputer_status():
-        return core_service.cardputer_status()
+        status = core_service.cardputer_status()
+        m = fw.manifest()
+        return {**status, "device_fw_version": device_fw.get("version") or None, "staged_fw_version": m["version"] if m else None}
 
     @api.get("/core/cardputer/screen")
     def core_cardputer_screen():
@@ -1000,6 +1061,7 @@ def create_app(
     @api.post("/dictate")
     async def dictate(request: Request, target: str = "text"):
         """wav in -> cleaned text out. target=pc-paste also pastes on the PC."""
+        t_in = time.perf_counter()
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as tmp:
             size = 0
             async for chunk in request.stream():
@@ -1009,16 +1071,19 @@ def create_app(
                     raise HTTPException(413, "audio_too_large")
                 tmp.write(chunk)
             path = Path(tmp.name)
+        upload_ms = round((time.perf_counter() - t_in) * 1000)
         try:
             security.validate_upload(path, size)
             armed = flow_foreground() if target == "pc-paste" else 0  # focus when the audio landed
             try:
                 result = await asyncio.wait_for(
-                    run_in_threadpool(flow_service.dictate, path), timeout=flow_service.dictate_timeout)
+                    run_in_threadpool(flow_service.dictate, path, log=False), timeout=flow_service.dictate_timeout)
             except asyncio.TimeoutError:
                 flow_service._cancel.set()
                 raise HTTPException(504, "stt_timeout")
+            insert_ms, pc = 0, ""
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
+                t_ins = time.perf_counter()
                 prefs = read_settings(flow_service)
                 enter = result["intent"] == "claude" or bool(prefs["press_enter"])
 
@@ -1032,6 +1097,11 @@ def create_app(
                 except Exception:  # noqa: BLE001 - clipboard busy/locked: still return the text
                     result["pc"] = "failed"
                 result["reply"] = result["pc"]  # firmware decodeReply reads `reply` as the outcome
+                insert_ms, pc = round((time.perf_counter() - t_ins) * 1000), result["pc"]
+            if result["text"]:
+                flow_service.log_result(result, upload_ms, insert_ms, pc)
+            else:
+                result["ms"]["upload"] = upload_ms
             return result
         finally:
             try:
@@ -1168,6 +1238,9 @@ def create_app(
     buddy_store = None if cfg.buddy_db == "off" else BuddyStore(
         cfg.buddy_db or resolve_data_dir(cfg) / "buddy.sqlite3")
     buddy = install_buddy_routes(api, Buddy(store=buddy_store, focus=focus, device_keys=device_keys))
+    promises_engine = Promises(buddy, model_router=model_router, settings=cfg)
+    promises_engine.start()
+    buddy.on_ack = promises_engine.on_alert_acked
     if cfg.vault_dir and cfg.vault_remote_url:
         raise ValueError('Choose a local vault folder or a remote home vault, not both')
     vault = (RemoteFileVault(cfg.vault_remote_url, cfg.vault_remote_token)
@@ -1229,6 +1302,10 @@ def create_app(
     api.include_router(build_dev_router(resolve_data_dir(cfg), Path(cfg.repo_dir) if cfg.repo_dir else Path(__file__).resolve().parents[2]))
     api.include_router(build_features_router(resolve_data_dir(cfg)))
     api.include_router(build_flow_router(flow_service))
+    body_double = BodyDouble(buddy, resolve_data_dir(cfg) / "body_double.json")
+    api.include_router(build_bodydouble_router(body_double))
+    api.on_event("startup")(body_double.start)
+    api.on_event("shutdown")(body_double.stop)
     api.include_router(build_dump_router(cfg, model_router))
     api.include_router(webui_router)
     api.include_router(build_library_router(cfg, model_router))
@@ -1237,19 +1314,28 @@ def create_app(
     install_focus_routes(api, focus, buddy.sync_focus)
     api.include_router(build_where_router(cfg, buddy, focus))
     api.include_router(build_memory_router(memory_notes))
+    api.include_router(build_ledger_router())
     install_rescue_routes(api, security.authorize, resolve_data_dir(cfg))
     api.include_router(build_agent_router(
         AgentBuilder(cfg, SkillVault(cfg, model_router), resolve_data_dir(cfg), llm=model_router, buddy=buddy)))
     onboarding = Onboarding(resolve_data_dir(cfg))
     catchup = Catchup(resolve_data_dir(cfg), buddy, inbox_dir(cfg) / "library")
     api.include_router(build_catchup_router(catchup))
+    api.include_router(build_promises_router(promises_engine))
+    compound_runner = CompoundRunner(buddy, promises_engine, focus, pc_controller)
+
+    @api.get("/compound/last")
+    def compound_last():
+        return compound_runner.last or {"state": "none"}
+
     api.include_router(build_share_router(cfg, model_router))
     api.include_router(build_onboarding_router(onboarding))
     api.include_router(build_buddy_forms_router(onboarding=onboarding))
     async def feature_voice_command(text):
         return await run_in_threadpool(feature_commands.handle, text)
 
-    install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command)
+    install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command,
+                      stt=speech if isinstance(speech, SpeechToText) else None)
     # ------------------------------------------------------------ SUBTITLES
     install_subtitle_routes(api, subtitle_jobs)
 

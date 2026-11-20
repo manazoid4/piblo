@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { FlowSection } from '../components/FlowSection';
+import { BuddySection } from '../components/BuddySection';
 import type { AppSettings, CoreEnvView, EnvKey } from '../../shared/types';
 import { PageHead, Setting, Switch } from '../components/ui';
 import { useAct, usePoll, useStore } from '../lib/store';
@@ -106,6 +107,8 @@ export function Settings() {
       </section>
 
       <FlowSection />
+
+      <BuddySection />
 
       <section className="card" aria-labelledby="app-h">
               <h2 id="app-h">This app</h2>

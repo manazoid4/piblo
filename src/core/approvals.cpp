@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 
+#include <approval_format.h>
 #include <nod_hold.h>
 #include <poll_backoff.h>
 
@@ -220,9 +221,9 @@ void render(M5Canvas& g) {
     const int32_t leftMs = static_cast<int32_t>(r.deadline - millis());
     const int left = leftMs > 0 ? (leftMs + 999) / 1000 : 0;
 
-    // The Nod: an approval with details gets amount/recipient lines; without them (older Core,
-    // plain agent asks) every line below renders exactly as before.
-    const bool details = r.summary.compare(0, 9, "THE NOD  ") == 0;
+    // Detailed approvals carry amount/recipient lines; without them (older Core, plain agent
+    // asks) every line below renders exactly as before. Accept both Core heads (see header).
+    const bool details = approvalHasDetails(r.summary);
     const std::string head = details ? nodLine(r.summary, 0) : "CLAUDE CODE NEEDS YOU";
     g.setFont(&fonts::Font0);
     g.setTextColor(ACCENT, PANEL);

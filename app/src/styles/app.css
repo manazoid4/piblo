@@ -74,7 +74,15 @@ p {
   gap: var(--s-2);
   font-weight: var(--weight-strong);
   font-size: var(--text-md);
-  -webkit-app-region: drag;
+  /* clickable (goes Home): a drag region would swallow the click */
+  -webkit-app-region: no-drag;
+  background: none;
+  border: 0;
+  padding: 0;
+  color: inherit;
+  font-family: inherit;
+  cursor: pointer;
+  border-radius: var(--r-sm);
 }
 .brand-mark {
   width: 22px;

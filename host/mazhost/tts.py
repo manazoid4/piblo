@@ -152,6 +152,12 @@ class SpeechOut:
 
     def _kokoro(self, text: str, path: Path) -> None:
         """Optional Kokoro-ONNX, entirely on the Windows Core machine."""
+        import soundfile as sf
+        audio, rate = self.kokoro_audio(text)
+        sf.write(str(path), audio, rate, subtype="PCM_16")
+
+    def kokoro_audio(self, text: str):
+        """(float32 samples, rate) from the one shared Kokoro model; Live's PCM endpoint uses it too."""
         model_path = Path(self.settings.kokoro_model_path).expanduser()
         voices_path = Path(self.settings.kokoro_voices_path).expanduser()
         if not self.settings.kokoro_model_path or not self.settings.kokoro_voices_path:
@@ -165,11 +171,9 @@ class SpeechOut:
                 from kokoro_onnx import Kokoro
                 self._kokoro_model = Kokoro(str(model_path), str(voices_path))
                 log.info("kokoro providers=%s", self._kokoro_model.sess.get_providers())
-            import soundfile as sf
-            audio, rate = self._kokoro_model.create(
+            return self._kokoro_model.create(
                 text, voice=self.settings.kokoro_voice,
                 speed=self.settings.kokoro_speed, lang="en-us")
-            sf.write(str(path), audio, rate, subtype="PCM_16")
 
     @staticmethod
     def _device_wav(path: Path) -> None:

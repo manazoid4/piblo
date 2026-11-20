@@ -65,7 +65,7 @@ def test_unreachable_device_raises_core_error():
 
 def test_action_whitelist():
     from mazhost.app import _DEVICE_ACTION
-    ok = ["update", "reboot", "key:4,97,0", "key:82,0,1", "open:inbox"]
+    ok = ["update", "fwcheck", "reboot", "key:4,97,0", "key:82,0,1", "open:inbox"]
     bad = ["launcher", "pc:lock", "key:4,97", "update;reboot", "open:../x", "key:4,97,0,1", "reconnect"]
     assert all(_DEVICE_ACTION.fullmatch(a) for a in ok)
     assert not any(_DEVICE_ACTION.fullmatch(a) for a in bad)

@@ -21,7 +21,7 @@ class FakeBrain:
     text, chunks, hang, stream_closed = "tell me a joke", [], False, False
     asked = threading.Event()
 
-    def __init__(self, cfg):
+    def __init__(self, cfg, stt=None):
         self.meta, self.on_slow = {"model": "fake/model:free", "fallback": None, "brain_first_token_ms": 5}, None
 
     async def transcribe(self, pcm):
@@ -183,6 +183,26 @@ def test_openrouter_429_falls_back_to_ollama(tmp_path):
     assert brain.history[-1] == {"role": "assistant", "content": "Local answer."}
 
 
+def test_local_ollama_brain_turns_thinking_off(tmp_path):
+    # qwen3.5 on Ollama otherwise spends the whole max_tokens budget reasoning and speaks nothing
+    bodies = []
+
+    def handler(req):
+        bodies.append((req.url.host, json.loads(req.content)))
+        return sse("Hello ", "Maz.")
+
+    brain = brain_for(tmp_path, handler, live_ollama_model="qwen3.5:4b")
+    assert asyncio.run(brain.command("switch to local")) == "Okay, I'm using the local model now."
+
+    async def run():
+        return "".join([p async for p in brain.stream("who are you")])
+
+    assert asyncio.run(run()) == "Hello Maz."
+    host, body = bodies[-1]
+    assert host == "127.0.0.1" and body["model"] == "qwen3.5:4b"
+    assert body["reasoning_effort"] == "none" and "reasoning" not in body
+
+
 def test_transcript_noise_filter_and_sentence_cutting():
     assert all(is_noise(t) for t in ("", ".", "you", "Thank you.", "um, yeah", "(silence)"))
     assert not any(is_noise(t) for t in ("hello", "what time is it", "switch to deepseek"))
@@ -196,3 +216,30 @@ def test_first_clause_starts_speech_early():
     assert first_clause("How about something snappy, like Bleep or Zip") == (["How about something snappy,"], "like Bleep or Zip")
     assert first_clause("Sure, like Bleep") == ([], "Sure, like Bleep")  # too short to be worth a TTS call
     assert first_clause("No comma yet here") == ([], "No comma yet here")
+
+
+class _FakeStt:
+    def __init__(self):
+        self.paths = []
+
+    def transcribe_local(self, path):
+        self.paths.append(path)
+        assert path.read_bytes()[:4] == b"RIFF"  # a real wav reaches the local model
+        return " remind me to call mum ", "parakeet"
+
+
+def _asr_down(request):
+    raise httpx.ConnectError("All connection attempts failed", request=request)
+
+
+def test_asr_server_down_falls_back_to_local_stt(tmp_path):
+    stt = _FakeStt()
+    brain = LiveBrain(Settings(data_dir=str(tmp_path)), transport=httpx.MockTransport(_asr_down), stt=stt)
+    text = asyncio.run(brain.transcribe(b"\x00\x01" * 1600))
+    assert text == "remind me to call mum"
+    assert len(stt.paths) == 1 and not stt.paths[0].exists()  # temp wav cleaned up
+
+
+def test_asr_server_down_without_local_stt_drops_turn(tmp_path):
+    brain = LiveBrain(Settings(data_dir=str(tmp_path)), transport=httpx.MockTransport(_asr_down))
+    assert asyncio.run(brain.transcribe(b"\x00\x01" * 1600)) == ""
