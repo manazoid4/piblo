@@ -144,6 +144,14 @@ int main() {
         a.send(0x12, d, 1); pump(false,false);
         CHECK(b.seqGaps == 1 && b.recv(r));
         run(200,false);
+        // the lost frame leaked one credit; it is only given back once the sender is stuck at 0
+        CHECK(a.credits() == RX_SLOTS - 1 && a.creditResyncs == 0);
+        run(1200,false);
+        CHECK(a.credits() == RX_SLOTS - 1 && a.creditResyncs == 0);
+        for (int i = 0; i < (int)RX_SLOTS; i++) a.send(0x12, d, 1);
+        pump(true, false);                                       // whole burst lost
+        run(1500,false);
+        CHECK(a.credits() == RX_SLOTS && a.creditResyncs == 1 && b.state() == Up && a.state() == Up);
 
         // overflow: a misbehaving peer ignores credit -> bounded RX queue drops, counts, no crash
         {

@@ -3,10 +3,12 @@
 //
 // Frame:  SOF(0xA5) | ver | type | seq | len_lo len_hi | payload[len] | crc16 (lo hi)
 //         crc16 = CRC-16/CCITT-FALSE over ver..payload. len <= MAX_PAYLOAD.
-// Types:  HELLO 1 (payload: rxSlots, isReply), HEARTBEAT 2, CREDIT 3 (payload: n),
+// Types:  HELLO 1 (payload: rxSlots, isReply), HEARTBEAT 2 (payload: free rx slots), CREDIT 3 (payload: n),
 //         0x10.. = application DATA (the link only carries them).
 // Flow control: credits. A side may send DATA only while it holds credit; the peer
-//         grants credit as its app drains the bounded RX queue.
+//         grants credit as its app drains the bounded RX queue. A DATA frame lost on the wire would
+//         leak its credit forever, so HEARTBEAT carries the peer's free RX slots; a sender stuck at
+//         zero credit with nothing in flight (>= 2 heartbeats since its last DATA) resyncs to it.
 // Reconnect: a silent peer (> TIMEOUT_MS) drops the link to Down; HELLO is sent every
 //         HELLO_MS until the peer answers. A HELLO from a rebooted peer resets seq/credit.
 // Fallback: the app calls useCoprocessor(); false (Down / Incompatible) means "use your own
@@ -105,7 +107,7 @@ private:
 class Link {
 public:
     // counters for the benchmark / health lines
-    uint32_t seqGaps = 0, rxOverflow = 0, txOverflow = 0, fallbacks = 0, reconnects = 0, noCredit = 0;
+    uint32_t seqGaps = 0, rxOverflow = 0, txOverflow = 0, fallbacks = 0, reconnects = 0, noCredit = 0, creditResyncs = 0;
     Parser   parser;
 
     State   state() const { return state_; }
@@ -127,7 +129,7 @@ public:
         if (type < DATA_MIN || state_ != Up) return false;
         if (credits_ == 0) { noCredit++; return false; }
         if (!queue(type, p, len)) return false;
-        credits_--;
+        credits_--; lastDataTx_ = lastTick_;
         return true;
     }
     // --- app in ----------------------------------------------------------------------
@@ -141,12 +143,14 @@ public:
 
     // --- timing + wire out -----------------------------------------------------------
     void tick(uint32_t now) {
+        lastTick_ = now;
         if (state_ == Up && (uint32_t)(now - lastRx_) > TIMEOUT_MS) {
             state_ = Down; credits_ = 0; fallbacks++;
         }
         if (state_ == Up) {
             if (owedCredit_) { const uint8_t n = owedCredit_; if (queue(CREDIT, &n, 1)) owedCredit_ = 0; }
-            if ((uint32_t)(now - lastTx_) >= HEARTBEAT_MS && queue(HEARTBEAT, nullptr, 0)) lastTx_ = now;
+            const uint8_t freeSlots = (uint8_t)(RX_SLOTS - rxCount_);
+            if ((uint32_t)(now - lastTx_) >= HEARTBEAT_MS && queue(HEARTBEAT, &freeSlots, 1)) lastTx_ = now;
         } else if (state_ == Down && (uint32_t)(now - lastTx_) >= HELLO_MS) {
             sendHello(false);
             lastTx_ = now;
@@ -163,7 +167,7 @@ private:
     State    state_ = Down;
     uint8_t  credits_ = 0, owedCredit_ = 0, txSeq_ = 0, expectSeq_ = 0;
     bool     haveSeq_ = false;
-    uint32_t lastRx_ = 0, lastTx_ = 0;
+    uint32_t lastRx_ = 0, lastTx_ = 0, lastTick_ = 0, lastDataTx_ = 0;
     Frame    rx_[RX_SLOTS];
     size_t   rxHead_ = 0, rxCount_ = 0;
     uint8_t  tx_[TX_BYTES] = {0};
@@ -202,6 +206,11 @@ private:
         if (f.type == CREDIT && f.len >= 1) {
             const unsigned sum = credits_ + f.payload[0];
             credits_ = sum > RX_SLOTS ? (uint8_t)RX_SLOTS : (uint8_t)sum;  // never above the peer's slots
+        } else if (f.type == HEARTBEAT && f.len >= 1) {
+            // lost-DATA credit resync: only when nothing can still be in flight
+            if (credits_ == 0 && (uint32_t)(now - lastDataTx_) >= 2 * HEARTBEAT_MS && f.payload[0] <= RX_SLOTS) {
+                credits_ = f.payload[0]; creditResyncs++;
+            }
         } else if (f.type >= DATA_MIN) {
             if (rxCount_ == RX_SLOTS) { rxOverflow++; return; }  // peer ignored its credit
             rx_[(rxHead_ + rxCount_) % RX_SLOTS] = f; rxCount_++;
