@@ -196,6 +196,18 @@ test("homepage structure: screen cards replace phone frames, every image has alt
   assert.doesNotMatch(html, /149|£280|counts towards/);
   assert.match(html, /Reserve your place/);
 });
+test("the homepage puts real app examples and the Craft simulation before product details", () => {
+  const html = contents["/"];
+  const sections = [...html.matchAll(/<section[^>]* id="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(sections.slice(0, 3), ["top", "showcase", "asks"]);
+  const hero = html.slice(html.indexOf('id="top"'), html.indexOf('id="showcase"'));
+  assert.match(hero, /class="btn btn-primary" href="#showcase"/);
+  const showcase = html.slice(html.indexOf('id="showcase"'), html.indexOf('id="asks"'));
+  assert.match(showcase, /href="\/piblocraft\/#mission"/);
+  for (const screen of ["home", "ask"]) {
+    assert.ok(showcase.includes(`src="/media/work/windows-${screen}.png"`));
+  }
+});
 test("no aluminium anywhere under site/ (case-insensitive)", () => {
   const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (["node_modules", "tests"].includes(e.name) ? [] : walk(join(dir, e.name))) : [join(dir, e.name)]);
   for (const file of walk(root)) {
@@ -238,4 +250,12 @@ test("homepage images have alt attributes and existing files; Buddy images are u
     assert.ok(existsSync(file), file);
     assert.ok(statSync(file).size < 300 * 1024, f + " over 300 KB");
   }
+});
+
+test("reservation summary and FAQ explain the refund on shipping", () => {
+  const html = contents["/"];
+  const hero = html.match(/<p class="note">(We&rsquo;ll refund[\s\S]*?)<\/p>/)[1];
+  const batch = html.match(/<div class="reserve-box">([\s\S]*?)<\/div>/)[1];
+  const faq = html.match(/<summary>How does the &pound;5 reservation work\?<\/summary><p>([\s\S]*?)<\/p>/)[1];
+  for (const text of [hero, batch, faq]) assert.match(text, /refund.{0,35}when.{0,20}ships/i);
 });
