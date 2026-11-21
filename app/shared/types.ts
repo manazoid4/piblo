@@ -80,7 +80,39 @@ export interface UsageSnapshot {
   openrouter: { status: 'ok' | 'not-connected' | 'error'; totalCredits?: number; totalUsage?: number; message?: string };
 }
 
+export interface CraftDraft {
+  prompt: string;
+  model: string;
+}
+
+export interface CraftTaskRecord extends CraftDraft {
+  last: (CraftDraft & { result: string }) | null;
+}
+
+export interface CraftTaskBridge {
+  load(): Promise<CraftTaskRecord>;
+  save(draft: CraftDraft): Promise<void>;
+  models(): Promise<string[]>;
+  run(draft: CraftDraft): Promise<CraftTaskRecord>;
+  cancel(): Promise<void>;
+}
+
+export interface CraftVoiceBridge {
+  arm(): Promise<void>;
+  read(): Promise<{ status: 'waiting' | 'expired' } | { status: 'ready'; text: string }>;
+  cancel(): Promise<void>;
+}
+
 export interface PibloBridge {
+  craftTask?: CraftTaskBridge;
+  craftVoice?: CraftVoiceBridge;
+  craftTerminal?: {
+    open(cols: number, rows: number): Promise<{ id: number; data: string; end: number }>;
+    read(id: number, offset: number): Promise<{ data: string; end: number; exited: boolean; truncated: boolean }>;
+    write(id: number, data: string): Promise<void>;
+    resize(id: number, cols: number, rows: number): Promise<void>;
+    close(id: number): Promise<void>;
+  };
   platform: string;
   version: string;
   core: {

@@ -1,5 +1,5 @@
 /* PibloCraft page. Builds on /home.css and /pages.css tokens. */
-.pc-hero-inner { padding-top: 40px; padding-bottom: 8px; display: grid; justify-items: center; text-align: center; }
+.pc-hero-inner { padding-block: clamp(60px, 10vw, 112px) 24px; display: grid; justify-items: center; text-align: center; }
 .pc-hero h1 { max-width: 11em; }
 .pc-lead { max-width: 34em; margin: 18px auto 0; font-size: clamp(17px, 1.55vw, 20px); line-height: 1.5; color: var(--ink-2); }
 .pc-shot { width: 100%; max-width: 860px; margin: 36px auto 0; }
@@ -7,7 +7,7 @@
 .pc-shot figcaption { margin-top: 10px; font-size: 13px; color: var(--ink-3); }
 
 .pc-grid { display: grid; gap: 14px; }
-.pc-card { padding: 24px; background: var(--card); border-radius: 24px; box-shadow: var(--shadow), inset 0 0 0 1px var(--line); }
+.pc-card { padding: clamp(26px, 4vw, 44px); background: var(--card); border-radius: 24px; box-shadow: var(--shadow), inset 0 0 0 1px var(--line); }
 .pc-card h3 { margin-bottom: 8px; font-size: 20px; letter-spacing: -.02em; line-height: 1.2; }
 .pc-card p { color: var(--ink-2); font-size: 16px; }
 .pc-card .road-meta { margin-bottom: 12px; background: var(--tint); }
