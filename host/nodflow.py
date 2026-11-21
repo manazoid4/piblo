@@ -7,8 +7,12 @@ Env: NOD_CORE_URL (default http://127.0.0.1:8787), MAZ_TOKEN (or MAZ_ENV=path to
 from __future__ import annotations
 
 import io
+import json
 import os
+import queue
+import statistics
 import sys
+import threading
 import time
 import wave
 from array import array
@@ -72,6 +76,72 @@ def send(client: httpx.Client, wav: bytes, released_at: float, paste_fn=None) ->
     print(f"{elapsed} ms  [{intent}] {text}")
 
 
+# ---- streaming push-to-talk: audio is decoded while the key is held, so release -> text is ~70 ms
+def stream_available() -> bool:
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    from mazhost import stt_stream
+    return os.environ.get("PIBLO_PTT_ENGINE", "stream") == "stream" and stt_stream.available()
+
+
+class Hold:
+    """One key hold. feed() is called from the audio callback; a worker decodes off that thread."""
+
+    def __init__(self, stt) -> None:
+        self.utt, self.q = stt.stream(), queue.Queue()
+        self.worker = threading.Thread(target=self._run, daemon=True)
+        self.worker.start()
+
+    def _run(self) -> None:
+        while (c := self.q.get()) is not None:
+            self.utt.feed(c)
+
+    def feed(self, pcm: bytes) -> None:
+        self.q.put(pcm)
+
+    def release(self) -> str:
+        """Drain what is queued, flush, return the transcript."""
+        self.q.put(None)
+        self.worker.join()
+        return self.utt.finish()
+
+
+def finish_hold(hold: Hold, flow, released: float, paste_fn, hwnd: int = 0, safe_fn=None) -> dict:
+    """Release -> final text -> cleanup -> paste (focus-guarded). Logs one `ptt` line with release_to_text."""
+    from mazhost.flow import safe_paste
+
+    raw = hold.release()
+    stt_ms = round((time.perf_counter() - released) * 1000)
+    if not raw.strip():
+        return {"text": "", "intent": "paste", "ms": {"release_to_text": stt_ms}}
+    result = flow.finish(raw.lower(), "zipformer-stream", stt_ms)
+    typed: list[float] = []
+    if result["intent"] in ("paste", "claude") and result["text"]:
+        result["pc"] = (safe_fn or safe_paste)(result["text"], result["intent"] == "claude", hwnd,
+                                               lambda t, enter=False: paste_fn(t, enter=enter, on_typed=lambda: typed.append(time.perf_counter())))
+    else:
+        result["pc"] = "saved"
+    result["ms"]["release_to_text"] = round(((typed[0] if typed else time.perf_counter()) - released) * 1000)
+    flow._append("latency.log", f"{time.strftime('%Y-%m-%dT%H:%M:%S')} ptt mode=ptt release_to_text={result['ms']['release_to_text']} "
+                 f"stt={stt_ms} clean={result['ms']['clean']} intent={result['intent']} stt_via=zipformer-stream "
+                 f"pc={result['pc']} chars={len(result['text'])}")
+    return result
+
+
+def stats(log_path: Path, as_json: bool = False) -> dict:
+    """p50/p95 of release_to_text per mode from latency.log. Callable by PibloCraft: `nodflow.py --stats --json`."""
+    by_mode: dict[str, list[int]] = {}
+    for line in log_path.read_text(encoding="utf-8").splitlines() if log_path.exists() else []:
+        if " ptt " in line and "release_to_text=" in line:
+            f = dict(p.split("=", 1) for p in line.split() if "=" in p)
+            by_mode.setdefault(f.get("mode", "ptt"), []).append(int(f["release_to_text"]))
+    out = {}
+    for mode, xs in by_mode.items():
+        xs.sort()
+        out[mode] = {"n": len(xs), "p50_ms": round(statistics.median(xs)), "p95_ms": xs[min(len(xs) - 1, round(0.95 * (len(xs) - 1)))]}
+    print(json.dumps(out) if as_json else "\n".join(f"{m}: n={v['n']} p50={v['p50_ms']} ms p95={v['p95_ms']} ms" for m, v in out.items()) or "no ptt turns logged yet")
+    return out
+
+
 def test_paste_window(client: httpx.Client, wav: bytes) -> str:
     """Paste into our own Tk window, only if it is the foreground window; print what landed."""
     import ctypes
@@ -105,7 +175,71 @@ def test_paste_window(client: httpx.Client, wav: bytes) -> str:
         root.destroy()
 
 
+def test_stream_window(wavs: list[Path]) -> list[dict]:
+    """Streaming path end to end on this PC, no mic: each wav is fed at real-time pace, then
+    released into a Tk text box we own (real focus guard, real Ctrl+V). Prints/returns per-clip results."""
+    import ctypes
+    import tkinter as tk
+
+    from mazhost import stt_stream
+    from mazhost.config import Settings
+    from mazhost.flow import Flow, foreground, paste
+
+    stt, flow = stt_stream.StreamingSTT(), Flow(Settings(), None)
+    root = tk.Tk()
+    box = tk.Text(root, width=80, height=5)
+    box.pack()
+    root.attributes("-topmost", True)
+    root.update()
+    hwnd = ctypes.windll.user32.GetAncestor(root.winfo_id(), 2)
+    ctypes.windll.user32.keybd_event(0x12, 0, 0, 0)
+    ctypes.windll.user32.SetForegroundWindow(hwnd)
+    ctypes.windll.user32.keybd_event(0x12, 0, 2, 0)
+    box.focus_force()
+    for _ in range(20):
+        root.update()
+        time.sleep(0.02)
+    out = []
+    try:
+        for w in wavs:
+            with wave.open(str(w)) as f:
+                pcm = f.readframes(f.getnframes())
+            box.delete("1.0", "end")
+            hold, t_start = Hold(stt), time.perf_counter()
+            chunks = [pcm[i:i + 3200] for i in range(0, len(pcm), 3200)]
+            for n, c in enumerate(chunks):
+                hold.feed(c)
+                time.sleep(max(0, t_start + (n + 1) * 0.1 - time.perf_counter()))
+                root.update()
+            released = time.perf_counter()
+            box_out: list[dict] = []
+            th = threading.Thread(target=lambda: box_out.append(finish_hold(hold, flow, released, paste, foreground())))
+            th.start()
+            while th.is_alive():  # keep the Tk window pumping so it reads the clipboard while paste() waits
+                root.update()
+                time.sleep(0.002)
+            r = box_out[0]
+            for _ in range(10):
+                root.update()
+                time.sleep(0.01)
+            r["landed"] = box.get("1.0", "end").strip()
+            out.append(r)
+            print(f"{r['ms']['release_to_text']} ms  [{r['intent']}] {r['text']!r} landed={r['landed']!r}")
+    finally:
+        root.destroy()
+    return out
+
+
 def main() -> None:
+    if "--stream-test" in sys.argv:  # --stream-test a.wav b.wav ... : writes the ptt lines to $MAZ_FLOW_DIR/latency.log
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        test_stream_window([Path(a) for a in sys.argv[sys.argv.index("--stream-test") + 1:]])
+        return
+    if "--stats" in sys.argv:
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from mazhost.config import Settings
+        stats(Path(Settings().flow_dir).expanduser() / "latency.log", "--json" in sys.argv)
+        return
     url = os.environ.get("NOD_CORE_URL", f"http://127.0.0.1:{_port()}")
     client = httpx.Client(base_url=url, headers={"Authorization": f"Bearer {_token()}"}, timeout=30)
     if "--wav" in sys.argv:
@@ -120,17 +254,40 @@ def main() -> None:
     import sounddevice as sd
 
     down = ctypes.windll.user32.GetAsyncKeyState
-    log(f"nodflow started core={url}")
+    streaming = None
+    if stream_available():
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from mazhost import stt_stream
+        from mazhost.config import Settings
+        from mazhost.flow import Flow, foreground, paste
+        streaming = (stt_stream.StreamingSTT(), Flow(Settings(), None))
+    log(f"nodflow started core={url} engine={'stream' if streaming else 'batch'}")
     while True:
         if not down(VK_RCONTROL) & 0x8000:
-            time.sleep(0.01)
+            time.sleep(0.005)
             continue
         t0, chunks = time.perf_counter(), []
-        with sd.InputStream(samplerate=RATE, channels=1, dtype="int16",
-                            callback=lambda d, *_: chunks.append(bytes(d))):
+        hold = Hold(streaming[0]) if streaming else None
+
+        def on_audio(d, *_):
+            chunks.append(bytes(d))
+            if hold:
+                hold.feed(bytes(d))
+
+        with sd.InputStream(samplerate=RATE, channels=1, dtype="int16", blocksize=800, callback=on_audio):
             while down(VK_RCONTROL) & 0x8000:
-                time.sleep(0.01)
+                time.sleep(0.003)
         released = time.perf_counter()
+        if hold:
+            try:
+                short = released - t0 < MIN_HOLD_S or max(map(abs, array("h", b"".join(chunks))), default=0) < SILENCE_PEAK
+                r = finish_hold(hold, streaming[1], released, paste if "--dry-run" not in sys.argv else (lambda t, enter=False, on_typed=None: on_typed and on_typed()),
+                                foreground()) if not short else hold.release()
+                if not short:
+                    print(f"{r['ms']['release_to_text']} ms  [{r['intent']}] {r['text']}")
+            except Exception as e:  # noqa: BLE001
+                log(f"error {type(e).__name__}: {e}")
+            continue
         pcm = b"".join(chunks)
         if released - t0 < MIN_HOLD_S or max(map(abs, array("h", pcm)), default=0) < SILENCE_PEAK:
             continue

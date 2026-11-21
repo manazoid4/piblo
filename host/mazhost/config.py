@@ -75,6 +75,10 @@ class Settings(BaseSettings):
     # Dictation flow directory (PR #43)
     flow_dir: str = "~/.maz-pocket/flow"
 
+    # Piblo device -> PibloCraft job queue (empty = approved jobs are logged but not sent)
+    live_stream_stt: bool = False  # MAZ_LIVE_STREAM_STT=1: Talk decodes speech while you talk (faster, less accurate)
+    piblocraft_bridge_url: str = ""  # MAZ_PIBLOCRAFT_BRIDGE_URL
+
     cloud_url: str = "https://openrouter.ai/api/v1"
     cloud_key: str = ""
     cloud_model: str = "anthropic/claude-3.5-haiku"
