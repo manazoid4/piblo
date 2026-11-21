@@ -10,6 +10,8 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI
 
+from .nowindow import no_window
+
 CACHE_S = 120
 TIMEOUT_S = 8
 _cache: dict = {"at": 0.0, "value": None}
@@ -33,7 +35,7 @@ def _left(usage: dict) -> tuple[int, str | None]:
 
 def _claude_agents() -> list[dict] | None:
     try:
-        out = subprocess.run(["cswap", "list", "--json"], capture_output=True, text=True, timeout=TIMEOUT_S, check=True).stdout
+        out = subprocess.run(["cswap", "list", "--json"], capture_output=True, text=True, timeout=TIMEOUT_S, check=True, **no_window()).stdout
         agents = []
         for a in json.loads(out)["accounts"]:
             ok = a.get("usageStatus") == "ok" and a.get("usage")

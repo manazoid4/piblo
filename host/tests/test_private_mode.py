@@ -102,6 +102,7 @@ LOCAL_PROCESSES = {
     ("teach_capture.py", "TeachCapture._extract_scene_frames"),  # local recorded file -> images
     ("teach_capture.py", "TeachCapture._transcribe"),  # local recording -> WAV
     ("subtitles.py", "SubtitleJobs._extract_audio"),  # validated local video -> WAV
+    ("craft_agents.py", "_claude_agents"),  # fixed argv: cswap list --json (local usage cache)
     ("subtitles.py", "open_in_vlc"),  # validated local video/subtitle paths
 }
 LOCAL_SOCKETS = {
