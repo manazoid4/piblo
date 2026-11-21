@@ -39,10 +39,17 @@ export function toDecision(core: { decision: string | null; expired?: boolean })
   return "rejected";
 }
 
-export function createServer(core: CoreClient, defaultAgent: string): McpServer {
+export function createServer(core: CoreClient, defaultAgent: string, readOnly = false): McpServer {
   const server = new McpServer({ name: "piblo-mcp", version: VERSION });
   // Agent identity: PIBLO_AGENT_NAME, else the name the MCP app announced in its initialize call.
   const agent = () => defaultAgent || cleanAgentName(server.server.getClientVersion()?.name) || "mcp-agent";
+  const status = async () => {
+    const s = await core.get<StatusReply>("/buddy/status");
+    if (typeof s?.connected !== "boolean" || typeof s?.simulated !== "boolean" || !s.device || typeof s.device !== "object") {
+      throw new CoreError("invalid_status", "Core returned an invalid device status");
+    }
+    return s;
+  };
 
   server.registerTool(
     "piblo_status",
@@ -54,7 +61,7 @@ export function createServer(core: CoreClient, defaultAgent: string): McpServer 
     },
     async () => {
       try {
-        const s = await core.get<StatusReply>("/buddy/status");
+        const s = await status();
         return text({
           ok: true,
           state: !s.connected ? "disconnected" : s.simulated ? "simulated" : "connected",
@@ -68,7 +75,7 @@ export function createServer(core: CoreClient, defaultAgent: string): McpServer 
     },
   );
 
-  server.registerTool(
+  if (!readOnly) server.registerTool(
     "piblo_notify",
     {
       title: "Send a notification",
@@ -102,7 +109,7 @@ export function createServer(core: CoreClient, defaultAgent: string): McpServer 
     },
   );
 
-  server.registerTool(
+  if (!readOnly) server.registerTool(
     "piblo_task_update",
     {
       title: "Report task progress",
@@ -133,7 +140,7 @@ export function createServer(core: CoreClient, defaultAgent: string): McpServer 
     },
   );
 
-  server.registerTool(
+  if (!readOnly) server.registerTool(
     "piblo_request_approval",
     {
       title: "Ask the user to approve an action",
@@ -204,7 +211,7 @@ export function createServer(core: CoreClient, defaultAgent: string): McpServer 
     },
     async () => {
       try {
-        const s = await core.get<StatusReply>("/buddy/status");
+        const s = await status();
         // Allow-list, not pass-through: new Core fields never leak to agents by accident.
         return text({
           ok: true,
@@ -220,5 +227,23 @@ export function createServer(core: CoreClient, defaultAgent: string): McpServer 
     },
   );
 
+  if (readOnly) server.registerTool(
+    "piblo_devices",
+    {
+      title: "Device status",
+      description: "Report the Core device status and whether status for the secondary display is available.",
+      inputSchema: z.object({}),
+      annotations: { readOnlyHint: true, openWorldHint: false },
+    },
+    async () => {
+      try {
+        const s = await status();
+        return text({ ok: true, devices: [
+          { id: "primary", state: !s.connected ? "offline" : s.simulated ? "simulated" : "connected", battery_pct: s.device?.battery_pct ?? null },
+          { id: "display", ...await core.displayStatus() },
+        ] });
+      } catch (e) { return failure(e); }
+    },
+  );
   return server;
 }

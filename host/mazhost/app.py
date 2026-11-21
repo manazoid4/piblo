@@ -76,6 +76,7 @@ from .prompts import EXTRACT_PROMPTS, SYSTEM_PROMPT
 from .refine import FILLER, refine
 from .remote import RemoteInfo
 from .security import RemoteGuardMiddleware, Security
+from .mcp_service import McpService
 from .selfupdate import SelfUpdater
 from .sessions import SessionStore
 from .skill_vault import SkillVault
@@ -268,6 +269,9 @@ def create_app(
     )
     install_validation_exception_handler(api)
     api.add_middleware(RemoteGuardMiddleware)
+    mcp_service = McpService(cfg)
+    api.add_event_handler("startup", mcp_service.start)
+    api.add_event_handler("shutdown", mcp_service.stop)
 
     @api.exception_handler(private_mode.PrivateModeError)
     async def private_error_handler(_request: Request, error: private_mode.PrivateModeError):
