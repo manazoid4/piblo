@@ -1,120 +1,135 @@
-// PibloCraft page: before/after slider + a simulated mission control. Nothing here talks to a server.
+// PibloCraft page: draws the simulated workspace from demo-core.js. Nothing here talks to a server.
 (function () {
   "use strict";
-  var compare = document.getElementById("pc-compare");
-  var range = document.getElementById("compare-range");
-  if (compare && range) {
-    var set = function () { compare.style.setProperty("--pos", range.value + "%"); };
-    range.addEventListener("input", set); set();
-  }
-
-  var grid = document.getElementById("mc-grid");
-  if (!grid) return;
-  var feed = document.getElementById("mc-feed");
-  var form = document.getElementById("mc-form");
-  var input = document.getElementById("mc-input");
+  var $ = function (id) { return document.getElementById(id); };
+  var root = $("mc");
+  if (!root || !window.PibloCraftDemo) return;
+  var demo = window.PibloCraftDemo.createDemo();
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  var TICK = reduce ? 120 : 400;
-  var done = 0;
-  var queue = [];
+  var TICK = reduce ? 450 : 1300;
+  var LABEL = { working: "Working", ready: "Ready", needs: "Needs you", paused: "Paused", completed: "Completed", unavailable: "Unavailable",
+    done: "Completed", stopped: "Stopped" };
+  var STAGE = { working: "Working", needs: "Needs you", done: "Completed", stopped: "Stopped" };
+  var showAll = false, timer = null;
 
-  // left = usage left (%), cost = usage per task. Claude 1 is nearly out so the auto-switch shows up early.
-  var agents = [
-    { name: "Claude 1", kind: "Claude", left: 14, cost: 12 },
-    { name: "Claude 2", kind: "Claude", left: 82, cost: 12 },
-    { name: "Codex", kind: "OpenAI", left: 64, cost: 10 },
-    { name: "Hermes", kind: "Nous", left: 90, cost: 8 },
-    { name: "Ollama", kind: "This PC", left: 100, cost: 0 }
-  ];
-  agents.forEach(function (a) {
-    a.state = "ready"; a.task = ""; a.progress = 0;
-    var el = document.createElement("article");
-    el.className = "mc-tile";
-    el.innerHTML = '<h4><span></span><small></small></h4><span class="mc-pill"></span><p class="mc-task"></p><div class="mc-bar"><i></i></div><span class="mc-left"></span><div class="mc-act" hidden><button type="button" class="yes">Allow once</button><button type="button" class="no">Deny</button></div>';
-    el.querySelector("h4 span").textContent = a.name;
-    el.querySelector("h4 small").textContent = a.kind;
-    el.querySelector(".yes").addEventListener("click", function () { decide(a, true); });
-    el.querySelector(".no").addEventListener("click", function () { decide(a, false); });
-    a.el = el; grid.appendChild(el);
-  });
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function fill(list, items, make) { list.textContent = ""; items.forEach(function (x) { list.appendChild(make(x)); }); }
 
-  var LABEL = { ready: "Ready", work: "Working", done: "Done", need: "Needs you", limit: "Limit reached" };
-  function draw(a) {
-    a.el.className = "mc-tile is-" + a.state;
-    a.el.querySelector(".mc-pill").textContent = LABEL[a.state];
-    a.el.querySelector(".mc-task").textContent = a.task || (a.state === "limit" ? "Back after the reset" : "Free for a task");
-    a.el.querySelector(".mc-bar i").style.width = a.progress + "%";
-    a.el.querySelector(".mc-left").textContent = a.cost ? a.left + "% usage left" : "Free, unlimited";
-    a.el.querySelector(".mc-act").hidden = a.state !== "need";
-    var c = { work: 0, need: 0 };
-    agents.forEach(function (x) { if (c[x.state] !== undefined) c[x.state]++; });
-    document.getElementById("mc-working").textContent = c.work;
-    document.getElementById("mc-need").textContent = c.need;
-    document.getElementById("mc-done").textContent = done;
-  }
-  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
-  function log(html) {
-    var li = document.createElement("li"); li.innerHTML = html;
-    feed.insertBefore(li, feed.firstChild);
-    while (feed.children.length > 30) feed.removeChild(feed.lastChild);
+  function drawTask(s) {
+    var box = $("mc-task"), t = s.task;
+    box.textContent = "";
+    if (!t) { box.appendChild(el("p", "ws-empty", "No task yet. Choose one above to see the agents get to work.")); return; }
+    var head = el("div", "ws-task-head");
+    head.appendChild(el("span", "st st-" + t.stage, STAGE[t.stage]));
+    head.appendChild(el("small", "ws-kind", t.kind));
+    box.appendChild(head);
+    box.appendChild(el("h3", "ws-task-title", t.title));
+    var bar = el("div", "ws-progress"); bar.setAttribute("role", "progressbar");
+    bar.setAttribute("aria-label", "Steps finished"); bar.setAttribute("aria-valuemin", "0");
+    bar.setAttribute("aria-valuemax", String(t.total)); bar.setAttribute("aria-valuenow", String(t.done));
+    var fillEl = el("i"); fillEl.style.width = Math.round(100 * t.done / t.total) + "%"; bar.appendChild(fillEl);
+    box.appendChild(bar);
+    var next = t.stage === "needs" ? "Next: your decision below" : t.stage === "done" ? "Next: open the handoff to pick up later"
+      : t.stage === "stopped" ? "Next: try again or ask for something different" : "Next: agents keep going, nothing needs you yet";
+    var meta = el("p", "ws-task-meta"); meta.appendChild(el("b", null, "Step " + t.done + " of " + t.total)); meta.appendChild(document.createTextNode(" · " + next));
+    box.appendChild(meta);
   }
 
-  // best = free with the most usage left; the free local model is the last resort
-  function best(skip) {
-    var free = agents.filter(function (a) { return a !== skip && (a.state === "ready" || a.state === "done") && (a.cost === 0 || a.left >= a.cost); });
-    free.sort(function (x, y) { return (x.cost === 0) - (y.cost === 0) || y.left - x.left; });
-    return free[0];
-  }
-
-  function assign(task, risky, from) {
-    var a = best(from);
-    if (!a) { log("Everyone is busy. <b>" + esc(task) + "</b> waits in the queue."); queue.push({ task: task, risky: risky }); return; }
-    a.state = "work"; a.task = task; a.progress = 0; a.risky = risky;
-    log(from ? "<b>" + esc(from.name) + "</b> hit its limit, so <b>" + esc(a.name) + "</b> carries on: " + esc(task)
-             : "<b>" + esc(a.name) + "</b> picked up: " + esc(task));
-    draw(a);
-  }
-
-  function decide(a, ok) {
-    if (a.state !== "need") return;
-    if (ok) { a.state = "work"; a.risky = false; log("You allowed <b>" + esc(a.name) + "</b> once. Carrying on."); }
-    else { a.state = "ready"; a.task = ""; a.progress = 0; log("You denied it. <b>" + esc(a.name) + "</b> stopped; nothing was pushed."); }
-    draw(a);
-  }
-
-  setInterval(function () {
-    agents.forEach(function (a) {
-      if (a.state !== "work") return;
-      a.progress = Math.min(100, a.progress + (a.cost ? 4 : 3));
-      if (a.risky && a.progress >= 45) { a.state = "need"; log("<b>" + esc(a.name) + "</b> wants to push to main. Allow once or deny?"); draw(a); return; }
-      if (a.cost && a.progress >= 50 && a.left < a.cost * 1.5) {   // running dry mid-task: hand over
-        var t = a.task, r = a.risky; a.left = 0; a.state = "limit"; a.task = ""; a.progress = 0; draw(a); assign(t, r, a); return;
-      }
-      if (a.progress >= 100) {
-        a.left = Math.max(0, a.left - a.cost); done++;
-        log("<b>" + esc(a.name) + "</b> finished: " + esc(a.task) + ". Report saved.");
-        a.state = a.cost && a.left < a.cost ? "limit" : "done"; a.task = ""; a.progress = 100;
-        draw(a);
-        var next = queue.shift(); if (next) assign(next.task, next.risky);
-        return;
-      }
-      draw(a);
+  function drawAgents(s) {
+    var order = { needs: 0, working: 1, completed: 2, ready: 3, paused: 4, unavailable: 5 };
+    var list = s.agents.slice().sort(function (a, b) { return order[a.state] - order[b.state]; });
+    var visible = showAll ? list : list.slice(0, 4);
+    fill($("mc-agents"), visible, function (a) {
+      var li = el("li", "ag ag-" + a.state);
+      var top = el("div", "ag-top"); top.appendChild(el("b", null, a.name)); top.appendChild(el("small", null, a.provider));
+      li.appendChild(top);
+      var row = el("div", "ag-row"); row.appendChild(el("span", "st st-" + a.state, LABEL[a.state])); row.appendChild(el("span", "ag-doing", a.doing));
+      li.appendChild(row);
+      return li;
     });
-  }, TICK);
+    var more = $("mc-more");
+    more.hidden = list.length <= 4;
+    more.textContent = showAll ? "Show fewer" : "Show all " + list.length + " agents";
+    more.setAttribute("aria-expanded", String(showAll));
+    var c = { working: 0, needs: 0 };
+    s.agents.forEach(function (a) { if (c[a.state] != null) c[a.state]++; });
+    $("mc-counts").textContent = c.working + " working · " + c.needs + " needs you";
+  }
 
-  form.addEventListener("submit", function (e) {
+  function draw(s) {
+    drawTask(s);
+    drawAgents(s);
+    var ap = $("mc-approval");
+    ap.hidden = !s.approval;
+    if (s.approval) {
+      $("ap-agent").textContent = s.approval.agent;
+      $("ap-want").textContent = s.approval.want.charAt(0).toLowerCase() + s.approval.want.slice(1);
+      $("ap-change").textContent = s.approval.change;
+      $("ap-then").textContent = s.approval.then;
+      $("ap-changes").hidden = s.revised;
+    }
+    var res = $("mc-result");
+    res.hidden = !s.result;
+    if (s.result) {
+      res.className = "ws-result" + (s.decision === "denied" ? " is-stopped" : "");
+      $("res-title").textContent = s.decision === "denied" ? "Stopped. Nothing was changed." : "Done. Here’s what you got.";
+      fill($("res-list"), s.result, function (x) { return el("li", null, x); });
+    }
+    var ho = $("mc-handoff");
+    var hadHandoff = !ho.hidden;
+    ho.hidden = !s.handoff;
+    if (s.handoff) {
+      $("ho-requested").textContent = s.handoff.requested;
+      fill($("ho-happened"), s.handoff.happened, function (x) { return el("li", null, x); });
+      $("ho-decided").textContent = s.handoff.decided;
+      $("ho-remains").textContent = s.handoff.remains;
+      $("ho-resume").textContent = s.handoff.resume;
+      if (!hadHandoff) ho.open = window.innerWidth >= 760;
+    }
+    fill($("mc-feed"), s.activity.slice(0, 8), function (e) {
+      var li = el("li");
+      if (e.agent) li.appendChild(el("b", null, e.agent + " "));
+      li.appendChild(document.createTextNode(e.text));
+      return li;
+    });
+  }
+
+  function run() {
+    clearInterval(timer);
+    timer = setInterval(function () { if (!demo.tick()) clearInterval(timer); }, TICK);
+  }
+  function start(task) {
+    demo.start(task); run();
+  }
+
+  demo.subscribe(draw);
+  // Play one example as soon as the demo scrolls into view, so it never sits empty. It still stops for your decision.
+  if ("IntersectionObserver" in window) {
+    var seen = new IntersectionObserver(function (entries) {
+      if (!entries[0].isIntersecting) return;
+      seen.disconnect();
+      if (!demo.state.task) start("research");
+    }, { threshold: 0.35 });
+    seen.observe(root);
+  }
+  $("mc-form").addEventListener("submit", function (e) {
     e.preventDefault();
-    var t = input.value.trim(); if (!t) return;
-    assign(t, /\b(push|deploy|delete|merge)\b/i.test(t)); input.value = "";
+    var input = $("mc-input"), t = input.value.trim();
+    if (!t) { input.focus(); return; }
+    start(t); input.value = "";
   });
-  document.getElementById("mc-chips").addEventListener("click", function (e) {
-    var b = e.target.closest("button[data-task]"); if (!b) return;
-    assign(b.dataset.task, b.dataset.risky === "1");
+  $("mc-chips").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-task]"); if (b) start(b.dataset.task);
   });
-
-  agents.forEach(draw);
-  log("Mission control is ready. Give your team a task.");
-  // Claude 1 starts mid-task and nearly out of usage, so the hand-over plays without a click
-  var c1 = agents[0]; c1.state = "work"; c1.task = "Refactor auth"; c1.progress = 30; draw(c1);
-  log("<b>Claude 1</b> is on: Refactor auth");
+  $("mc-approval").addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-decide]");
+    if (b && demo.decide(b.dataset.decide)) run();
+  });
+  $("mc-more").addEventListener("click", function () { showAll = !showAll; drawAgents(demo.state); });
+  $("mc-reset").addEventListener("click", function () { clearInterval(timer); demo.reset(); });
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("button[data-try]"); if (!b) return;
+    root.scrollIntoView({ behavior: reduce ? "auto" : "smooth", block: "start" });
+    start(b.dataset.try);
+  });
 })();
