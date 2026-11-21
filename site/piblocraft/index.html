@@ -5,142 +5,214 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#fbfaf7">
-  <meta name="description" content="See which AI task needs a decision. Try a simulated approval and follow the work into a handoff.">
-  <meta property="og:title" content="PibloCraft. Mission control for your AI.">
-  <meta property="og:description" content="Follow a task from request to review, then see what the next person needs to pick it up.">
+  <meta name="description" content="Give your AI tools work to do, see what each one is doing, make the decisions that matter and pick up where you left off. Try the demo.">
+  <meta property="og:title" content="PibloCraft. Your ideas. Your agents. One place.">
+  <meta property="og:description" content="Give your AI tools work to do. See what's happening, make decisions when needed, and pick up where you left off.">
   <meta property="og:type" content="website">
   <link rel="canonical" href="https://piblo.co.uk/piblocraft/">
   <meta property="og:url" content="https://piblo.co.uk/piblocraft/">
   <meta property="og:image" content="https://piblo.co.uk/piblocraft/og.svg">
-  <meta property="og:image:alt" content="PibloCraft. Mission control for your AI. See what needs you.">
+  <meta property="og:image:alt" content="PibloCraft. Your ideas. Your agents. One place.">
   <meta property="og:image:width" content="1200">
   <meta property="og:image:height" content="630">
   <meta property="og:site_name" content="Piblo">
   <meta name="twitter:card" content="summary_large_image">
   <meta name="twitter:site" content="@Piblo_UK">
-  <meta name="twitter:title" content="PibloCraft. Mission control for your AI.">
-  <meta name="twitter:description" content="Give your agents a job and see what needs you. Early access.">
+  <meta name="twitter:title" content="PibloCraft. Your ideas. Your agents. One place.">
+  <meta name="twitter:description" content="Give your AI tools work to do, and stay in control. Early access.">
   <meta name="twitter:image" content="https://piblo.co.uk/piblocraft/og.svg">
-  <meta name="twitter:image:alt" content="PibloCraft. Mission control for your AI. See what needs you.">
-  <title>PibloCraft. Mission control for your AI.</title>
+  <meta name="twitter:image:alt" content="PibloCraft. Your ideas. Your agents. One place.">
+  <title>PibloCraft. Your ideas. Your agents. One place.</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/home-base.css"><link rel="stylesheet" href="/home.css"><link rel="stylesheet" href="/pages.css">
   <link rel="stylesheet" href="/piblocraft/piblocraft.css">
   <script defer src="/_vercel/insights/script.js"></script>
+  <script defer src="/piblocraft/demo-core.js"></script>
   <script defer src="/piblocraft/mission.js"></script>
 </head>
-<body>
+<body class="pc-page">
 <a class="skip-link" href="#main">Skip to content</a>
 <header class="header">
   <div class="wrap header-inner">
     <a class="logo" href="/" aria-label="Piblo home"><img src="/media/brand/piblo-wordmark.svg" alt="Piblo" width="61" height="26"></a>
-    <nav class="nav" aria-label="Site sections"><a href="/#showcase">Showcase</a><a href="#mission">Try the demo</a><a href="#access">Early access</a></nav>
-    <a class="btn btn-primary btn-small" href="#access" data-va="cta_click">Get early access</a>
+    <nav class="nav" aria-label="Page sections"><a href="#mission">Demo</a><a href="#how">How it works</a><a href="#uses">Uses</a><a href="#access">Early access</a></nav>
+    <a class="btn btn-primary btn-small" href="#mission" data-va="cta_click">Explore the demo</a>
   </div>
 </header>
 <main id="main">
-  <section class="pc-hero">
-    <div class="container pc-hero-inner">
-      <span class="eyebrow"><span class="road-pulse" aria-hidden="true"></span> PIBLOCRAFT &middot; EARLY ACCESS</span>
-      <h1>See which task <em>needs you.</em></h1>
-      <p class="pc-lead">When several AI assistants are working, one may be waiting for an answer. PibloCraft brings that decision back to you.</p>
-      <div class="actions"><a class="btn btn-primary btn-big" href="#mission" data-va="cta_click">Try the demo</a><a class="btn btn-quiet btn-big" href="#access">Get early access</a></div>
+  <section class="pc-hero" aria-labelledby="hero-title">
+    <div class="container pc-hero-grid">
+      <div class="pc-hero-copy">
+        <span class="pc-kicker">PibloCraft &middot; private testing</span>
+        <h1 id="hero-title">Your ideas. Your agents. <span>One place.</span></h1>
+        <p class="pc-lead">Give your AI tools work to do. See what&rsquo;s happening, make decisions when needed, and pick up where you left off.</p>
+        <div class="actions"><a class="btn btn-primary btn-big" href="#mission" data-va="cta_click">Explore the demo</a><a class="btn btn-quiet btn-big" href="#how">How it works</a></div>
+      </div>
+      <figure class="pc-hero-shot" aria-label="Example PibloCraft screen with illustrative tasks">
+        <div class="ws ws-preview">
+          <div class="ws-top"><b>Today</b><span>2 working &middot; 1 needs you</span></div>
+          <ul class="ws-tasks">
+            <li><span class="st st-working">Working</span><b>Research three competitors</b><small>Hermes &middot; step 2 of 4</small></li>
+            <li class="is-needs"><span class="st st-needs">Needs you</span><b>Draft an announcement</b><small>Claude asks: schedule it for 9:00?</small></li>
+            <li><span class="st st-working">Working</span><b>Fix a website issue</b><small>Codex &middot; step 3 of 5</small></li>
+            <li class="ws-extra"><span class="st st-done">Completed</span><b>Organise ideas</b><small>Handoff saved</small></li>
+          </ul>
+        </div>
+        <figcaption>Example screen. Tasks and agents are illustrative.</figcaption>
+      </figure>
     </div>
   </section>
 
-  <section class="section container" id="mission" aria-labelledby="mission-title">
+  <section class="section container pc-demo" id="mission" aria-labelledby="mission-title">
     <div class="section-top">
-      <h2 id="mission-title">Give it a task. <span>Decide what happens.</span></h2>
-      <p>Try &ldquo;Push the fix to main&rdquo; in this simulation. Watch the agent pause for review. Allow it to finish, or deny the push and see the result in Activity.</p>
+      <h2 id="mission-title">Start something. <span>Stay in control.</span></h2>
+      <p>Pick a task and watch simulated agents share the work. When one wants to change something, it asks you first.</p>
     </div>
-    <div class="mc" id="mc">
-      <div class="mc-heading">
-        <span class="mc-orb" aria-hidden="true"></span>
-        <h3>Today</h3>
-        <span class="mc-demo-label">Browser simulation</span>
+    <div class="ws ws-demo" id="mc">
+      <div class="ws-bar">
+        <span class="ws-dot" aria-hidden="true"></span><b>PibloCraft</b>
+        <span class="ws-sim">Simulated agents &middot; runs in your browser</span>
       </div>
-      <div class="mc-stats"><span><b id="mc-working">0</b> working</span><span><b id="mc-need">0</b> needs you</span><span><b id="mc-done">0</b> done</span></div>
-      <form class="mc-cmd" id="mc-form">
-        <label class="pc-sr" for="mc-input">Task for your agents</label>
-        <input id="mc-input" type="text" autocomplete="off" maxlength="80" placeholder="Tell your team what to do&hellip;">
-        <button class="btn btn-primary" type="submit">Go</button>
+      <form class="ws-ask" id="mc-form">
+        <label for="mc-input">What would you like to get done?</label>
+        <div class="ws-ask-row">
+          <input id="mc-input" type="text" autocomplete="off" maxlength="80" placeholder="e.g. Research three competitors">
+          <button class="btn btn-primary" type="submit">Start</button>
+        </div>
       </form>
-      <div class="mc-chips" id="mc-chips">
-        <button type="button" data-task="Fix the login bug">Fix the login bug</button>
-        <button type="button" data-task="Research three competitors">Research three competitors</button>
-        <button type="button" data-task="Write the release notes">Write the release notes</button>
-        <button type="button" data-task="Push the fix to main" data-risky="1">Push the fix to main</button>
+      <div class="ws-chips" id="mc-chips" role="group" aria-label="Example tasks">
+        <button type="button" data-task="fix">Fix a website issue</button>
+        <button type="button" data-task="research">Research three competitors</button>
+        <button type="button" data-task="plan">Prepare a project plan</button>
+        <button type="button" data-task="draft">Draft an announcement</button>
+        <button type="button" data-task="organise">Organise a collection of ideas</button>
+        <button type="button" data-task="review">Review a change before publishing</button>
       </div>
-      <div class="mc-grid" id="mc-grid"></div>
-      <div class="mc-feed"><h3>Activity</h3><ol id="mc-feed" aria-live="polite"></ol></div>
-      <p class="pc-cap">This demo runs in your browser with simulated agents. Your task stays on this page.</p>
+
+      <div class="ws-body">
+        <div class="ws-main">
+          <p class="pc-sr" id="mc-live" aria-live="polite"></p>
+          <article class="ws-task" id="mc-task" tabindex="-1" aria-label="Current task">
+            <p class="ws-empty">No task yet. Choose one above to see the agents get to work.</p>
+          </article>
+          <section class="ws-approval" id="mc-approval" hidden aria-labelledby="ap-title">
+            <span class="st st-needs">Needs you</span>
+            <h3 id="ap-title"><span id="ap-agent"></span> wants to <span id="ap-want"></span></h3>
+            <dl>
+              <div><dt>What changes</dt><dd id="ap-change"></dd></div>
+              <div><dt>If you approve</dt><dd id="ap-then"></dd></div>
+            </dl>
+            <div class="ws-approval-actions">
+              <button type="button" class="btn btn-primary" data-decide="approve">Approve</button>
+              <button type="button" class="btn ws-btn" data-decide="changes" id="ap-changes">Ask for changes</button>
+              <button type="button" class="btn ws-btn" data-decide="deny">Deny</button>
+            </div>
+          </section>
+          <section class="ws-result" id="mc-result" hidden aria-labelledby="res-title">
+            <h3 id="res-title"></h3>
+            <ul id="res-list"></ul>
+          </section>
+          <details class="ws-handoff" id="mc-handoff" hidden>
+            <summary><span>Pick up where you left off</span><small>Handoff summary</small></summary>
+            <dl>
+              <div><dt>You asked for</dt><dd id="ho-requested"></dd></div>
+              <div><dt>What happened</dt><dd><ol id="ho-happened"></ol></dd></div>
+              <div><dt>What you decided</dt><dd id="ho-decided"></dd></div>
+              <div><dt>What&rsquo;s left</dt><dd id="ho-remains"></dd></div>
+              <div class="ho-resume"><dt>Resume here</dt><dd id="ho-resume"></dd></div>
+            </dl>
+          </details>
+        </div>
+        <aside class="ws-side" aria-label="Agents and activity">
+          <section aria-labelledby="ag-title">
+            <h3 class="ws-h" id="ag-title">Agents <small id="mc-counts"></small></h3>
+            <ul class="ws-agents" id="mc-agents"></ul>
+            <button type="button" class="ws-more" id="mc-more" aria-expanded="false" aria-controls="mc-agents">Show all agents</button>
+          </section>
+          <section aria-labelledby="act-title">
+            <h3 class="ws-h" id="act-title">Activity</h3>
+            <ol class="ws-feed" id="mc-feed"></ol>
+          </section>
+        </aside>
+      </div>
+      <p class="ws-foot">Everything here is simulated: no real agents, and nothing you type leaves this page. <button type="button" class="ws-link" id="mc-reset">Start over</button></p>
     </div>
   </section>
 
-  <section class="container pc-compare-wrap" id="compare" aria-labelledby="compare-title">
-    <h2 id="compare-title" class="pc-sr">Before and after PibloCraft</h2>
-    <div class="pc-compare" id="pc-compare">
-      <div class="pc-scene pc-before" aria-hidden="true">
-        <div class="pc-desk">
-          <div class="pc-win w1"><b>claude &mdash; tab 1</b><i>&gt; refactor auth&hellip;</i><i>&gt; still thinking</i></div>
-          <div class="pc-win w2"><b>codex</b><i>Waiting for your input&hellip;</i></div>
-          <div class="pc-win w3"><b>claude &mdash; tab 2</b><i class="pc-err">Usage limit reached</i></div>
-          <div class="pc-win w4"><b>hermes</b><i>&gt; researching&hellip;</i></div>
-          <div class="pc-win w5"><b>terminal (3)</b><i>which one was fixing the login?</i></div>
-          <div class="pc-win w6"><b>claude &mdash; tab 7</b><i>Allow this command? (y/n)</i></div>
-          <div class="pc-win w7"><b>notes.txt</b><i>todo: check codex??</i></div>
-          <div class="pc-win w8"><b>claude &mdash; tab 4</b><i>&gt; npm test</i><i class="pc-err">3 failing</i></div>
-          <div class="pc-win w9"><b>chrome &mdash; 23 tabs</b><i>usage dashboard</i></div>
-          <div class="pc-win w10"><b>codex &mdash; 2</b><i>Session expired. Sign in again.</i></div>
-          <span class="pc-toast t4">Claude needs you</span>
-          <span class="pc-toast t5">Rate limited</span>
-          <span class="pc-toast t1">5h limit hit</span>
-          <span class="pc-toast t2">Needs approval</span>
-          <span class="pc-toast t3">3 agents idle</span>
-          <span class="pc-tabs">+14 tabs</span>
-        </div>
-        <span class="pc-tag">Before</span>
-      </div>
-      <div class="pc-scene pc-after" aria-hidden="true">
-        <div class="pc-mc">
-          <div class="pc-mc-top"><b>PibloCraft</b><span>4 working &middot; 1 needs you &middot; 12 done today</span></div>
-          <div class="pc-mc-grid">
-            <div class="pc-tile is-work"><b>Claude 1</b><em>Working</em><i>Refactor auth</i><u class="u62"></u></div>
-            <div class="pc-tile is-done"><b>Claude 2</b><em>Done</em><i>Release notes</i><u class="u100"></u></div>
-            <div class="pc-tile is-work"><b>Codex</b><em>Working</em><i>Fix the login bug</i><u class="u38"></u></div>
-            <div class="pc-tile is-need"><b>Hermes</b><em>Needs you</em><i>Push to main?</i><span class="pc-mini">Allow &middot; Deny</span></div>
-            <div class="pc-tile is-work"><b>Research &times;3</b><em>Working</em><i>Competitor scan</i><u class="u80"></u></div>
-            <div class="pc-tile"><b>Ollama</b><em>Ready</em><i>Free, on this PC</i></div>
-          </div>
-        </div>
-        <span class="pc-tag">After</span>
-      </div>
-      <div class="pc-handle" aria-hidden="true"><span></span></div>
-      <label class="pc-sr" for="compare-range">Drag to compare before and after</label>
-      <input class="pc-range" id="compare-range" type="range" min="0" max="100" value="50">
-    </div>
-    <p class="pc-cap">Drag to compare the illustrated workspaces. On the right, Hermes is waiting for permission to push a change.</p>
-  </section>
-
-  <section class="section container" aria-labelledby="exp-title">
+  <section class="section container" id="how" aria-labelledby="how-title">
     <div class="section-top">
-      <span class="eyebrow">Example handoff</span>
-      <h2 id="exp-title">Pick it up <span>tomorrow.</span></h2>
-      <p>A task name tells you what you started. A handoff tells you where to resume. Here is what one could look like after reviewing a login fix.</p>
+      <h2 id="how-title">How work flows</h2>
+      <p>Four steps, whichever AI tools you use.</p>
     </div>
-    <div class="pc-grid pc-grid-3">
-      <article class="pc-card"><h3>The request</h3><p>&ldquo;When my session expires, take me back to sign in.&rdquo;</p></article>
-      <article class="pc-card"><h3>The decision</h3><p>The agent prepared a fix. You chose to review it before publishing.</p></article>
-      <article class="pc-card"><h3>The next step</h3><p>&ldquo;The redirect is ready to try. Open an expired session and check that signing in returns you to the same page.&rdquo;</p></article>
+    <ol class="pc-flow">
+      <li><span class="pc-step">1</span><h3>Give it a task</h3><p>Type what you want done. PibloCraft picks the agents for the job.</p></li>
+      <li><span class="pc-step">2</span><h3>Watch the work</h3><p>Each agent says what it&rsquo;s doing in plain words, not terminal output.</p></li>
+      <li class="is-you"><span class="pc-step">3</span><h3>Make the decisions</h3><p>Anything that changes things comes back to you: approve, change or deny.</p></li>
+      <li><span class="pc-step">4</span><h3>Pick up later</h3><p>Tomorrow, you&rsquo;re not starting over. Handoff summaries (coming soon) say where to resume.</p></li>
+    </ol>
+
+    <div class="pc-vs" aria-label="Scattered AI sessions compared with PibloCraft">
+      <div class="pc-vs-col pc-vs-before">
+        <h3>Without it</h3>
+        <ul>
+          <li><b>Claude, tab 4</b><span>Waiting for your answer since 11:02</span></li>
+          <li><b>Codex</b><span>Session expired. Sign in again.</span></li>
+          <li><b>notes.txt</b><span>&ldquo;Which one was doing the pricing page?&rdquo;</span></li>
+          <li><b>23 browser tabs</b><span>Somewhere, a half-finished draft</span></li>
+        </ul>
+      </div>
+      <div class="pc-vs-col pc-vs-after">
+        <h3>With PibloCraft</h3>
+        <ul>
+          <li><span class="st st-needs">Needs you</span><b>Pricing page</b><span>Claude asks to publish</span></li>
+          <li><span class="st st-working">Working</span><b>Competitor research</b><span>Hermes &middot; step 2 of 3</span></li>
+          <li><span class="st st-done">Completed</span><b>Announcement draft</b><span>Handoff saved</span></li>
+        </ul>
+      </div>
     </div>
-    <p class="fine pc-note">PibloCraft is in private testing on Windows. The device connection is also in testing.</p>
+    <p class="pc-cap">Illustration.</p>
+
+    <details class="pc-more">
+      <summary>What&rsquo;s under the hood?</summary>
+      <ul>
+        <li><b>Your choice of AI.</b> Use cloud models such as Claude and Codex alongside free models that run on your own PC. PibloCraft can send each job to the one that suits it.</li>
+        <li><b>Piblo Core for Windows</b> is the small companion app that keeps the shared task list on your computer.</li>
+        <li><b>Approvals stay with you.</b> Actions that publish, delete or spend wait for your answer.</li>
+      </ul>
+    </details>
   </section>
 
-  <section class="road-close container" id="access" aria-labelledby="access-title">
-    <span class="eyebrow">EARLY ACCESS</span>
-    <h2 id="access-title">PibloCraft is in <span>private testing.</span></h2>
-    <p>Join the Piblo list for news of the Windows beta. We will email you when early access opens.</p>
-    <div class="actions"><a class="btn btn-primary" href="/#waitlist" data-va="cta_click">Get early access</a><a class="btn btn-quiet" href="/">Back to Piblo</a></div>
+  <section class="section container" id="uses" aria-labelledby="uses-title">
+    <div class="section-top">
+      <h2 id="uses-title">Made for different kinds of work</h2>
+      <p>Not just code. Try any of these in the demo.</p>
+    </div>
+    <div class="pc-uses">
+      <article class="pc-use"><h3>Build</h3><p>Create, fix, test and ship.</p><div><button type="button" data-try="fix">Fix a website issue</button><button type="button" data-try="review">Review before publishing</button></div></article>
+      <article class="pc-use"><h3>Research</h3><p>Find, compare and understand.</p><div><button type="button" data-try="research">Research three competitors</button></div></article>
+      <article class="pc-use"><h3>Create &amp; organise</h3><p>Write, plan and manage ideas.</p><div><button type="button" data-try="draft">Draft an announcement</button><button type="button" data-try="plan">Prepare a project plan</button><button type="button" data-try="organise">Organise ideas</button></div></article>
+    </div>
+    <p class="pc-cap">Example workflows. Real results depend on the AI tools you connect.</p>
+  </section>
+
+  <section class="section container" id="access" aria-labelledby="access-title">
+    <div class="pc-access">
+      <div class="section-top">
+        <span class="pc-kicker">Early access</span>
+        <h2 id="access-title">Where PibloCraft is today</h2>
+        <p>It&rsquo;s in private testing on Windows. Here&rsquo;s what&rsquo;s real and what&rsquo;s coming.</p>
+      </div>
+      <div class="pc-status">
+        <section><h3><span class="st st-done">Works in testing</span></h3><ul><li>One board for tasks from several AI tools</li><li>Approvals before risky actions</li><li>Free local models alongside cloud ones</li></ul></section>
+        <section><h3><span class="st st-working">Next</span></h3><ul><li>Windows beta for early-access members</li><li>Talking to it through Piblo voice</li></ul></section>
+        <section><h3><span class="st st-planned">Planned</span></h3><ul><li>Handoff summaries for every task</li><li>Approvals and alerts on the Piblo handheld</li></ul></section>
+      </div>
+      <div class="pc-join">
+        <p>Join the list and we&rsquo;ll email you when the Windows beta opens. Early members get the first builds and a direct line to us for feedback.</p>
+        <a class="btn btn-primary btn-big" href="/#waitlist" data-va="cta_click">Join the early-access list</a>
+        <p class="fine">Free to join. PibloCraft is software and is separate from the &pound;5 reservation for the <a href="/">Piblo handheld</a>.</p>
+      </div>
+    </div>
   </section>
 </main>
 <footer class="footer">
