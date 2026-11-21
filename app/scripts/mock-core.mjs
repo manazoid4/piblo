@@ -263,6 +263,14 @@ export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline
       db.pending = [];
       return json(res, 200, { ok: true });
     }
+    if (p === '/craft/agents') return json(res, 200, { ok: true, agents: [
+      { id: 'claude-1', label: 'Claude 1', kind: 'claude', installed: true, active: false, pct_left: 11, resets_at: '2026-11-22T09:59:59Z' },
+      { id: 'claude-2', label: 'Claude 2', kind: 'claude', installed: true, active: true, pct_left: 55, resets_at: '2026-11-22T14:00:00Z' },
+      { id: 'codex', label: 'Codex', kind: 'codex', installed: true, active: false, pct_left: null, resets_at: null }] });
+    if (p === '/buddy/tasks') return json(res, 200, { ok: true, tasks: [
+      { id: 't1', agent: 'claude-1', title: 'Core: /craft/agents + task proof', status: 'running', progress: 60, detail: 'Writing tests', proof: '', updated: now() },
+      { id: 't2', agent: 'claude-2', title: 'App: Mission control card', status: 'running', progress: 40, detail: 'Building the card', proof: 'https://github.com/manazoid4/piblo/pull/206', updated: now() },
+      { id: 't3', agent: 'codex', title: 'Windows UI polish', status: 'waiting', progress: null, detail: 'Needs a decision on spacing', proof: '', updated: now() }] });
     if (p === '/buddy/summary') return json(res, 200, { ok: true, today: { done: 7, needs: 2 } });
     if (p === '/buddy/today') return json(res, 200, { ok: true, done: 7, needs: 2, errors: 0, approved: 3, denied: 1, agents: [{ source: 'claude', done: 5 }], last: { text: 'Finished the desktop app build' } });
     if (p === '/buddy/halt') {

@@ -5,7 +5,7 @@ import { registerCraftTasks } from './craft-task-ipc';
 import type { CraftVoiceBridge } from '../shared/types';
 import type { IPty } from 'node-pty';
 
-export function registerCraftTerminal(window: BrowserWindow, trustedUrl: string, voice: CraftVoiceBridge) {
+export function registerCraftTerminal(window: BrowserWindow, trustedUrl: string, voice: CraftVoiceBridge, mission: () => Promise<unknown>) {
   const limit = 128 * 1024;
   let session: { pty: IPty; history: string; end: number; exited: boolean; id: number } | undefined;
   let generation = 0;
@@ -20,6 +20,7 @@ export function registerCraftTerminal(window: BrowserWindow, trustedUrl: string,
   for (const method of ['arm', 'read', 'cancel'] as const) {
     ipcMain.handle('craft-voice:' + method, event => { authorize(event); return voice[method](); });
   }
+  ipcMain.handle('craft-mission:get', event => { authorize(event); return mission(); });
   function current(id: unknown) {
     if (!session || id !== session.id) throw new Error('Terminal session closed.');
     return session;
@@ -74,6 +75,7 @@ export function registerCraftTerminal(window: BrowserWindow, trustedUrl: string,
   window.webContents.on('render-process-gone', () => { tasks.cancel(); close(); });
   window.once('closed', () => {
     tasks.dispose();
+    ipcMain.removeHandler('craft-mission:get');
     void voice.cancel().catch(() => {});
     for (const method of ['arm', 'read', 'cancel']) ipcMain.removeHandler('craft-voice:' + method);
     for (const channel of ['open', 'read', 'write', 'resize', 'close']) ipcMain.removeHandler('craft:' + channel);

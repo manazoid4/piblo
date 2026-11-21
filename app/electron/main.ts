@@ -56,6 +56,12 @@ const port = () => discoverPort(locate(), realFs, process.env);
 const token = () => discoverToken(locate(), realFs, process.env);
 const api = createApiClient({ baseUrl: () => `http://127.0.0.1:${port()}`, token, refreshToken: token });
 
+/** Agents + tasks for the Craft Mission control card. Missing /craft/agents (old Core) gives no agents; tasks failing throws so the card shows "not reachable". */
+async function craftMission() {
+  const [a, t] = await Promise.all([api.request<{ agents?: unknown[]; error?: string }>('GET', '/craft/agents'), api.request<{ tasks?: unknown[] }>('GET', '/buddy/tasks')]);
+  if (!t.ok) throw new Error(t.message);
+  return { agents: (a.ok && a.data.agents) || [], tasks: t.data.tasks || [], error: a.ok ? a.data.error : undefined };
+}
 const logFile = () => path.join(locate().installDir, 'logs', 'core.log');
 function logTail(): string {
   try {
@@ -134,7 +140,7 @@ function createWindow(): BrowserWindow {
       additionalArguments: [`--piblo-version=${app.getVersion()}`, ...(craftPilot ? ['--craft-terminal-pilot'] : [])],
     },
   });
-  if (craftPilot) registerCraftTerminal(w, pathToFileURL(rendererFile).href, craftVoice(() => `http://127.0.0.1:${port()}`, token));
+  if (craftPilot) registerCraftTerminal(w, pathToFileURL(rendererFile).href, craftVoice(() => `http://127.0.0.1:${port()}`, token), craftMission);
   w.setMenuBarVisibility(false);
   // First paint is not guaranteed: if the renderer never becomes ready the window would stay
   // invisible, so the gate also reveals on did-finish-load and after a failsafe timeout.

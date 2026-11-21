@@ -29,7 +29,12 @@ await shot('00-start-1280');
 await check('craft', async () => {
   await page.locator('nav.rail button', { hasText: 'Craft' }).click({ timeout: 10_000 });
   await page.waitForSelector('h1:has-text("Craft")', { timeout: 10_000 });
+  await page.waitForSelector('text=Unblock: Windows UI polish', { timeout: 10_000 });
   await page.waitForTimeout(800); await shot('01-craft-1280');
+  await shot('06-mission-1280');
+  await size(900, 700); await shot('06-mission-900');
+  if (await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)) throw new Error('horizontal overflow at 900');
+  await size(1280, 800);
   await size(900, 700); await shot('01-craft-900'); await size(1280, 800);
   await page.getByRole('button', { name: 'Open terminal' }).click();
   await page.waitForTimeout(2500); await shot('02-craft-terminal-1280');

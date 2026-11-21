@@ -14,6 +14,8 @@ const bridge: PibloBridge = {
     arm: () => invoke('craft-voice:arm'),
     read: () => invoke('craft-voice:read'),
     cancel: () => invoke('craft-voice:cancel'),
+  }, craftMission: {
+    get: () => invoke<never>('craft-mission:get'),
   }, craftTerminal: {
     open: (cols: number, rows: number) => invoke<{ id: number; data: string; end: number }>('craft:open', cols, rows),
     read: (id: number, offset: number) => invoke<{ data: string; end: number; exited: boolean; truncated: boolean }>('craft:read', id, offset),
