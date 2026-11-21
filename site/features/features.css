@@ -196,3 +196,5 @@
 .c1 h3, .c3 h3, .c4 h3, .c6 h3 { color: #1d1b18; text-shadow: none; }
 @media (hover: hover) and (min-width: 760px) { .pf-arrows { display: flex; } }
 @media (prefers-reduced-motion: reduce) { .b-wave i { animation: none; height: 60%; } .pf-reel { scroll-behavior: auto; } }
+
+.reel h3 small { display: block; margin-top: 6px; font-size: 13px; letter-spacing: .02em; font-weight: 600; opacity: .85; }

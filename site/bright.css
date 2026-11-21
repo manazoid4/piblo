@@ -239,3 +239,42 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 .ask .flow li { counter-increment: f; display: flex; gap: 10px; align-items: baseline; }
 .ask .flow li::before { content: counter(f); flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); font-size: 12px; font-weight: 700; color: var(--ink); }
 .hero .note-needs { margin-top: 8px; color: var(--ink-2); }
+
+/* ---------- prototype frames (21 Nov): scaffold now, real photos later ---------- */
+.proto-grid { display: grid; gap: 14px; }
+.proto-shot { margin: 0; }
+.proto-frame { position: relative; aspect-ratio: 4 / 3; border-radius: 20px; overflow: hidden; background: var(--panel); }
+.proto-wide .proto-frame { aspect-ratio: 16 / 9; }
+.proto-frame > img, .proto-frame > video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.proto-frame[data-pending] {
+  display: grid; place-items: center;
+  background-color: var(--panel);
+  background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+  background-size: 28px 28px; background-position: center;
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+/* crop marks in the four corners */
+.proto-frame[data-pending]::before, .proto-frame[data-pending]::after {
+  content: ""; position: absolute; inset: 14px; pointer-events: none;
+  background:
+    linear-gradient(var(--ink-3), var(--ink-3)) top left / 18px 1.5px no-repeat,
+    linear-gradient(var(--ink-3), var(--ink-3)) top left / 1.5px 18px no-repeat,
+    linear-gradient(var(--ink-3), var(--ink-3)) bottom right / 18px 1.5px no-repeat,
+    linear-gradient(var(--ink-3), var(--ink-3)) bottom right / 1.5px 18px no-repeat;
+}
+.proto-frame[data-pending]::after { transform: scaleX(-1); }
+.proto-tag { position: absolute; top: 24px; left: 42px; font-family: var(--font-mono); font-size: 11.5px; letter-spacing: .06em; text-transform: uppercase; color: var(--ink-3); }
+.proto-wait { padding: 7px 14px; border-radius: 999px; background: var(--white); box-shadow: 0 0 0 1px var(--line); font-size: 13.5px; font-weight: 600; color: var(--ink-2); }
+.proto-frame:not([data-pending]) .proto-tag, .proto-frame:not([data-pending]) .proto-wait { display: none; }
+.proto-shot figcaption { margin-top: 10px; font-size: 14.5px; color: var(--ink-2); }
+.proto-shot figcaption b { color: var(--ink); }
+/* phones: the three photos swipe sideways so empty frames don't fill the page */
+.proto-row { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 20px; scrollbar-width: none; margin-inline: -20px; padding-inline: 20px; }
+.proto-row::-webkit-scrollbar { display: none; }
+.proto-row .proto-shot { flex: 0 0 78%; scroll-snap-align: start; }
+@media (min-width: 760px) {
+  .proto-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; overflow: visible; margin-inline: 0; padding-inline: 0; }
+  .proto-wide .proto-frame { aspect-ratio: 21 / 9; }
+}
+.why-price { margin-top: 14px; font-size: 15px; color: var(--ink-2); }
+.why-price b { color: var(--ink); }

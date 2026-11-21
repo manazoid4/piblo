@@ -196,10 +196,10 @@ test("homepage structure: screen cards replace phone frames, every image has alt
   assert.doesNotMatch(html, /149|£280|counts towards/);
   assert.match(html, /Reserve your place/);
 });
-test("the homepage puts real app examples and the Craft simulation before product details", () => {
+test("the homepage puts real prototype proof, app examples and the Craft simulation before product details", () => {
   const html = contents["/"];
   const sections = [...html.matchAll(/<section[^>]* id="([^"]+)"/g)].map(match => match[1]);
-  assert.deepEqual(sections.slice(0, 3), ["top", "showcase", "asks"]);
+  assert.deepEqual(sections.slice(0, 4), ["top", "prototype", "showcase", "asks"]); // 21 Nov: prototype photo frames sit right after the hero
   const hero = html.slice(html.indexOf('id="top"'), html.indexOf('id="showcase"'));
   assert.match(hero, /class="btn btn-primary" href="#showcase"/);
   const showcase = html.slice(html.indexOf('id="showcase"'), html.indexOf('id="asks"'));
@@ -258,4 +258,20 @@ test("reservation summary and FAQ explain the refund on shipping", () => {
   const batch = html.match(/<div class="reserve-box">([\s\S]*?)<\/div>/)[1];
   const faq = html.match(/<summary>How does the &pound;5 reservation work\?<\/summary><p>([\s\S]*?)<\/p>/)[1];
   for (const text of [hero, batch, faq]) assert.match(text, /refund.{0,35}when.{0,20}ships/i);
+});
+
+test("Kickstarter premortem fixes stay in place", () => {
+  const html = contents["/"];
+  assert.match(html, /small screen for your desk with a real YES key/);
+  assert.match(html, /Why &pound;129\?/);
+  assert.match(html, /source-available rather than open source/);
+  assert.doesNotMatch(html, /<b>Open code\.<\/b>/);
+  const frames = html.match(/class="proto-frame"/g) || [];
+  assert.equal(frames.length, 4, "one video and three photo frames");
+  const sub = ["/roadmap/", "/timeline/", "/readiness/", "/privacy/", "/features/"];
+  const nav = h => (h.match(/<nav class="nav"[^>]*>(.*?)<\/nav>/s) || [])[1];
+  for (const path of sub) assert.equal(nav(contents[path]), nav(contents["/roadmap/"]), path + " uses the shared nav");
+  for (const path of sub) assert.doesNotMatch(contents[path], />(Join the list|Get updates|Get an email when it moves)</, path);
+  assert.doesNotMatch(contents["/readiness/"], /kept privately/);
+  assert.doesNotMatch(contents["/features/"], /Push the fix/);
 });
