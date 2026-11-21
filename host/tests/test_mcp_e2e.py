@@ -38,6 +38,9 @@ DIST = MCP_DIR / "dist" / "index.js"
 def legacy_unsigned_device(monkeypatch):
     # These existing tests exercise the current unsigned simulator/firmware path.
     monkeypatch.setenv("MAZ_ASK_LEGACY_DEVICE_DECIDE", "1")
+    # These tests exercise the bridge, not model startup or project discovery.
+    for warmup in ("SpeechToText.warm", "SpeechOut.warm", "Models.warm", "MazCore._kick_refresh"):
+        monkeypatch.setattr(f"mazhost.app.{warmup}", lambda *_: None)
 
 TOKEN = "e2e-token-not-default"
 H = {"Authorization": f"Bearer {TOKEN}", "X-Piblo-Client": "simulator/1"}
@@ -122,10 +125,15 @@ def _wait_until(pred, timeout=15.0, interval=0.2):
 class CoreHandle:
     """Core running on a real port (needed because the node MCP process and the sim both use HTTP)."""
 
-    def __init__(self, data_dir: Path):
+    def __init__(self, data_dir: Path, mcp_port: int = 0):
         self.port = _free_port()
         self.data_dir = data_dir
-        cfg = Settings(token=TOKEN, buddy_db=str(data_dir / "buddy.sqlite3"), _env_file=None)
+        cfg = Settings(
+            token=TOKEN, port=self.port, mcp_port=mcp_port, repo_dir=str(REPO),
+            data_dir=str(data_dir), buddy_db=str(data_dir / "buddy.sqlite3"),
+            work_dir=str(data_dir / "work"), discovery_port=0, remote_detect=False,
+            autoupdate=False, _env_file=None,
+        )
         self.app = create_app(cfg)
         self.server = uvicorn.Server(uvicorn.Config(self.app, host="127.0.0.1", port=self.port, log_level="error"))
         self._thread = threading.Thread(target=self.server.run, daemon=True)
@@ -166,6 +174,33 @@ def core(tmp_path):
 
 
 # ---------------------------------------------------------------------------
+
+
+def test_core_manages_authenticated_http_mcp(tmp_path):
+    if not NODE:
+        pytest.skip("node unavailable, skipping piblo-mcp e2e")
+    _build_mcp()
+    mcp_port = _free_port()
+    handle = CoreHandle(tmp_path, mcp_port=mcp_port)
+    url = f"http://127.0.0.1:{mcp_port}/mcp"
+    try:
+        def rejected_without_token():
+            try:
+                return httpx.post(url, timeout=1, trust_env=False).status_code == 401
+            except (httpx.ConnectError, httpx.ConnectTimeout):
+                return False
+
+        assert _wait_until(rejected_without_token), "Core did not start the authenticated MCP listener"
+        assert httpx.post(url, headers={"Authorization": "Bearer wrong"}, timeout=2).status_code == 401
+        result = mcp_call(url, "piblo_status", {}, timeout=10)
+        assert result["ok"] is True and result["state"] == "disconnected"
+        assert httpx.get(handle.base + "/health", timeout=2).status_code == 200
+    finally:
+        handle.stop()
+
+    with pytest.raises(OSError):
+        with socket.create_connection(("127.0.0.1", mcp_port), timeout=2):
+            pass
 
 
 def test_success_flow_restart_and_history(core):
