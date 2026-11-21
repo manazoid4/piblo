@@ -18,7 +18,7 @@ Log SHA-256: 86ad1a2ff4b93fe2d8fe798ffcf975fa23db1c0df23378fe5e89765ed0f53837
 FAIL | Persona LoRA | piblo-persona-lora
 KernelWorkerStatus.ERROR. Could not resolve pypi.org. The notebook ended with
 ModuleNotFoundError for unsloth. No adapter or held-out metrics were produced.
-Log SHA-256: a1df879db1961d9793aa5e7fca4184adccc42bda98839920df3ccb1c17901b1
+Log SHA-256: a1df879db1961d9793aa5e7fca4184adccc42bda98839920ddf3ccb1c17901b1
 
 Verify notebook internet access before rerunning. No jobs were relaunched
 and no models were installed or flashed during this collection.
