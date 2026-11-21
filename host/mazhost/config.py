@@ -108,6 +108,16 @@ class Settings(BaseSettings):
     wakeword_engine: Literal["openwakeword", "sherpa"] = "openwakeword"  # MAZ_WAKEWORD_ENGINE
     wakeword_model: str = ""  # openWakeWord name or .onnx path; empty = <model dir>/hey_piblo.onnx, else hey_jarvis
     wakeword_threshold: float = Field(default=0.5, ge=0.05, le=0.99)
+    # Hermes Agent as a selectable brain, through the Hermes Gadget gateway (docs/plans/2026-11-20-hermes-gadget-port.md).
+    # Off by default: Piblo's own brain answers. MAZ_HERMES_ENABLED=1 connects; MAZ_AGENT=hermes routes turns to it.
+    hermes_enabled: bool = False
+    agent: Literal["piblo", "hermes"] = "piblo"  # MAZ_AGENT: who answers ordinary questions (also POST /hermes/agent)
+    hermes_url: str = "ws://127.0.0.1:8765/gadget"  # `hermes gadget info` prints it; wss:// off this PC
+    hermes_token: str = ""  # MAZ_HERMES_TOKEN: the gateway's GADGET_ACCESS_TOKEN, if it sets one; never logged
+    hermes_stt: Literal["core", "hermes"] = "core"  # who transcribes push-to-talk: Piblo's STT, or Hermes's own
+    hermes_voice: Literal["piblo", "hermes"] = "piblo"  # "hermes" also asks Hermes for reply audio
+    hermes_default_provider: str = "openrouter"  # "switch to deepseek" with no provider named means this one
+    hermes_timeout_s: float = Field(default=90.0, ge=5.0, le=600.0)
     vault_dir: str = ""  # explicitly selected document folder; disabled by default
     vault_remote_url: str = ""  # home PC's Tailscale Core, for a travelling client
     vault_remote_token: str = ""  # stays on this PC, never in a URL or device reply
