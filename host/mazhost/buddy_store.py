@@ -57,6 +57,7 @@ MIGRATIONS: list[str] = [
     ALTER TABLE approvals ADD COLUMN digest TEXT NOT NULL DEFAULT '';
     ALTER TABLE approvals ADD COLUMN instruction TEXT NOT NULL DEFAULT '';
     """,
+    "ALTER TABLE tasks ADD COLUMN proof TEXT NOT NULL DEFAULT ''",
 ]
 SCHEMA_VERSION = len(MIGRATIONS)
 
@@ -270,12 +271,14 @@ class BuddyStore:
         return self._all("SELECT id, kind, text, source, agent, ts FROM notifications ORDER BY id DESC LIMIT ?", (limit,))
 
     # ---- tasks
-    def upsert_task(self, tid: str, agent: str, title: str, status: str, progress: int | None, detail: str) -> dict:
+    def upsert_task(self, tid: str, agent: str, title: str, status: str, progress: int | None, detail: str,
+                    proof: str = "") -> dict:
         now = time.time()
-        self._run("INSERT INTO tasks(id, agent, title, status, progress, detail, created, updated) "
-                  "VALUES (?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status, "
+        self._run("INSERT INTO tasks(id, agent, title, status, progress, detail, proof, created, updated) "
+                  "VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET status=excluded.status, "
                   "progress=COALESCE(excluded.progress, progress), detail=excluded.detail, updated=excluded.updated, "
-                  "title=excluded.title", (tid, agent, title, status, progress, detail, now, now))
+                  "title=excluded.title, proof=CASE WHEN excluded.proof<>'' THEN excluded.proof ELSE proof END",
+                  (tid, agent, title, status, progress, detail, proof, now, now))
         return self._all("SELECT * FROM tasks WHERE id=?", (tid,))[0]
 
     def get_task(self, tid: str) -> dict | None:

@@ -33,6 +33,7 @@ from .library_routes import build_library_router
 from .bridge import BridgeWorker
 from .buddy import AlertIn, Buddy, install_buddy_routes
 from .buddy_companion import install_companion_routes
+from .craft_agents import install_craft_agents_routes
 from .buddy_store import BuddyStore
 from .needs_routes import build_needs_router
 from .commands import parse_command
@@ -1277,6 +1278,7 @@ def create_app(
         except ValueError as error:
             raise HTTPException(404, str(error)) from error
     install_companion_routes(api, buddy, cfg.port)
+    install_craft_agents_routes(api)
 
     learning = Learning(resolve_data_dir(cfg), model_router)
     speaks_first = SpeaksFirst(buddy, focus, learning=learning)
