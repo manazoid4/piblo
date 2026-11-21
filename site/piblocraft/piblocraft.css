@@ -12,6 +12,8 @@
 .pc-page .section { padding-top: clamp(56px, 9vw, 104px); }
 .pc-page .section-top p { font-size: 17px; }
 .pc-kicker { display: inline-block; margin-bottom: 14px; font-family: var(--font-mono); font-size: 12px; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); }
+.pc-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.ws-task:focus-visible { outline: 3px solid var(--pc-teal); outline-offset: 2px; }
 .pc-cap { margin-top: 12px; text-align: center; font-size: 13px; color: var(--ink-3); }
 .pc-page .actions { display: flex; flex-wrap: wrap; gap: 10px; }
 

@@ -10,7 +10,7 @@
   var LABEL = { working: "Working", ready: "Ready", needs: "Needs you", paused: "Paused", completed: "Completed", unavailable: "Unavailable",
     done: "Completed", stopped: "Stopped" };
   var STAGE = { working: "Working", needs: "Needs you", done: "Completed", stopped: "Stopped" };
-  var showAll = false, timer = null;
+  var showAll = false, timer = null, lastStage = null;
 
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
   function fill(list, items, make) { list.textContent = ""; items.forEach(function (x) { list.appendChild(make(x)); }); }
@@ -31,6 +31,7 @@
     box.appendChild(bar);
     var next = t.stage === "needs" ? "Next: your decision below" : t.stage === "done" ? "Next: open the handoff to pick up later"
       : t.stage === "stopped" ? "Next: try again or ask for something different" : "Next: agents keep going, nothing needs you yet";
+    if (t.stage !== lastStage) { lastStage = t.stage; $("mc-live").textContent = t.title + ": " + STAGE[t.stage] + ". " + next; }
     var meta = el("p", "ws-task-meta"); meta.appendChild(el("b", null, "Step " + t.done + " of " + t.total)); meta.appendChild(document.createTextNode(" · " + next));
     box.appendChild(meta);
   }
@@ -123,7 +124,7 @@
   });
   $("mc-approval").addEventListener("click", function (e) {
     var b = e.target.closest("button[data-decide]");
-    if (b && demo.decide(b.dataset.decide)) run();
+    if (b && demo.decide(b.dataset.decide)) { run(); $("mc-task").focus(); }
   });
   $("mc-more").addEventListener("click", function () { showAll = !showAll; drawAgents(demo.state); });
   $("mc-reset").addEventListener("click", function () { clearInterval(timer); demo.reset(); });

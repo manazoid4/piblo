@@ -103,3 +103,11 @@ test("page: honest labels, no invented quota numbers, software separate from the
   const js = readFileSync(join(root, "piblocraft/mission.js"), "utf8") + readFileSync(join(root, "piblocraft/demo-core.js"), "utf8");
   assert.doesNotMatch(js, /fetch\(|XMLHttpRequest|sendBeacon|innerHTML/, "demo never sends data or injects HTML");
 });
+
+test("demo: typed text that matches an Object built-in name does not crash", () => {
+  const demo = load().createDemo();
+  for (const t of ["constructor", "toString", "__proto__", "valueOf"]) {
+    assert.doesNotThrow(() => demo.start(t));
+    assert.equal(demo.state.task.title, t);
+  }
+});

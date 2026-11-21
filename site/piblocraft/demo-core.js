@@ -92,7 +92,7 @@
 
   function pick(text) {
     var t = String(text || "");
-    for (var id in SCENARIOS) if (SCENARIOS[id].keys.test(t)) return id;
+    for (var id in SCENARIOS) if (Object.prototype.hasOwnProperty.call(SCENARIOS, id) && SCENARIOS[id].keys.test(t)) return id;
     return "plan";
   }
 
@@ -111,9 +111,10 @@
     }
 
     function start(input) {
-      var id = SCENARIOS[input] ? input : pick(input);
+      var known = Object.prototype.hasOwnProperty.call(SCENARIOS, input);
+      var id = known ? input : pick(input);
       var sc = SCENARIOS[id];
-      var custom = SCENARIOS[input] ? null : String(input).trim().slice(0, 80);
+      var custom = known ? null : String(input).trim().slice(0, 80);
       var queue = sc.steps.slice();
       s.task = { id: id, title: custom || sc.title, kind: sc.kind, stage: "working", done: 0,
         total: sc.steps.length + 1 + sc.after.length, queue: queue, afterQueued: false, asked: false };

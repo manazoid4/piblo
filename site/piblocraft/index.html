@@ -91,7 +91,8 @@
 
       <div class="ws-body">
         <div class="ws-main">
-          <article class="ws-task" id="mc-task" aria-live="polite">
+          <p class="pc-sr" id="mc-live" aria-live="polite"></p>
+          <article class="ws-task" id="mc-task" tabindex="-1" aria-label="Current task">
             <p class="ws-empty">No task yet. Choose one above to see the agents get to work.</p>
           </article>
           <section class="ws-approval" id="mc-approval" hidden aria-labelledby="ap-title">
@@ -147,7 +148,7 @@
       <li><span class="pc-step">1</span><h3>Give it a task</h3><p>Type what you want done. PibloCraft picks the agents for the job.</p></li>
       <li><span class="pc-step">2</span><h3>Watch the work</h3><p>Each agent says what it&rsquo;s doing in plain words, not terminal output.</p></li>
       <li class="is-you"><span class="pc-step">3</span><h3>Make the decisions</h3><p>Anything that changes things comes back to you: approve, change or deny.</p></li>
-      <li><span class="pc-step">4</span><h3>Pick up later</h3><p>Tomorrow, you&rsquo;re not starting over. A handoff says exactly where to resume.</p></li>
+      <li><span class="pc-step">4</span><h3>Pick up later</h3><p>Tomorrow, you&rsquo;re not starting over. Handoff summaries (coming soon) say where to resume.</p></li>
     </ol>
 
     <div class="pc-vs" aria-label="Scattered AI sessions compared with PibloCraft">
