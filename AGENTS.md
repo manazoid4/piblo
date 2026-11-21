@@ -25,3 +25,5 @@ python scripts/piblo_remote.py open settings        # open an app by id, prints 
 - The product is Piblo. Never show Nod, MAZ, Maz Core, Maz Pocket or Cardputer to users.
 - Never show Maz's location beyond "UK" in anything public.
 - Protocol contracts live in `docs/protocol/`. Change one only with the orchestrator, because Core, firmware, Android and the app all build against them.
+
+Test results and screenshots go in testing/ (see testing/README.md); update testing/areas/<area>.md, never scatter evidence elsewhere.
