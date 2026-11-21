@@ -16,6 +16,7 @@
 #include "../include/pair_connect.h"
 #include "../include/fw_version.h"
 #include "../include/upload_gate.h"
+#include "../../../src/audio/dictate_target.h"
 #include <map>
 #include <string>
 using namespace nod;
@@ -42,6 +43,8 @@ struct FakeFs {
 };
 
 int main() {
+    CHECK(maz::dictate::targetForPc(false) == maz::dictate::Target::Pc);
+    CHECK(maz::dictate::targetForPc(true) == maz::dictate::Target::Craft);
     // firmware version guard: only strictly newer staged images install
     CHECK(fwIsNewer("1.6.0", "1.5.1")); CHECK(fwIsNewer("1.10.0", "1.9.9")); CHECK(fwIsNewer("v2.0", "1.9.9"));
     CHECK(!fwIsNewer("1.5.1", "1.6.0")); CHECK(!fwIsNewer("1.6.0", "1.6.0")); CHECK(!fwIsNewer("1.6.0-beta", "1.6.0"));

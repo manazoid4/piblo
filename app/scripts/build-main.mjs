@@ -6,7 +6,7 @@ await build({
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  external: ['electron'],
+  external: ['electron', 'node-pty'],
   sourcemap: true,
   logLevel: 'info',
 });

@@ -429,13 +429,14 @@ public:
 
     const char* hints() const override {
         switch (dictate::state()) {
-            case dictate::State::Listening: return _toggle ? "tap SPACE: type  ESC cancel" : "release SPACE: type  ESC cancel";
-            case dictate::State::Working:   return "sending...  ESC cancel";
-            default: return "hold Y or SPACE to speak";
+            case dictate::State::Listening: return _toggle ? "tap SPACE: send  ESC cancel" : "release SPACE: send  ESC cancel";
+            case dictate::State::Working:   return "sending...  ESC stop waiting";
+            default: return "C: target  hold SPACE to speak";
         }
     }
 
     void onEnter() override {
+        _craft = false;
         // One gesture from Home: hold Y (this app's Home shortcut) or SPACE, speak, release.
         _talk = KB.held(KEY_Y) ? KEY_Y : KEY_SPACE;
         _held = KB.held(_talk);  // arrived by holding the key: start at once
@@ -449,6 +450,13 @@ public:
 
     bool onKey(const KeyEvent& e) override {
         const bool mine = dictate::active(this);
+        if (e.down && e.code == KEY_C && !mine) {
+            _craft = !_craft;
+            _status.clear();
+            _text.clear();
+            invalidate();
+            return true;
+        }
         if (e.code == KEY_SPACE || e.code == KEY_Y) {  // the hint promises both keys
             const bool listening = mine && dictate::state() == dictate::State::Listening;
             if (e.down && !mine) {
@@ -466,10 +474,11 @@ public:
             return true;
         }
         if (e.down && e.code == KEY_ESC && mine) {  // cancel, stay on the screen
+            const bool sending = dictate::state() == dictate::State::Working;
             dictate::cancel();
             sfx::recStop();
             _toggle = false;
-            _status = "Cancelled";
+            _status = sending ? "Stopped waiting - may still send" : "Cancelled";
             _text.clear();
             invalidate();
             return true;
@@ -482,8 +491,8 @@ public:
         if (dictate::take(this, out)) {
             const std::string pc = dictate::pcOutcome();
             _text   = out;
-            _ok     = pc == "pasted";
-            _status = _ok ? "Typed on PC" : (pc == "clipboard" ? "On PC clipboard - Ctrl+V" : "Sent");
+            _ok     = pc == "pasted" || pc == "craft";
+            _status = pc == "craft" ? "Sent to Craft draft" : (_ok ? "Typed on PC" : (pc == "clipboard" ? "On PC clipboard - Ctrl+V" : "Sent"));
             invalidate();
         } else if (_wasMine && !dictate::active(this) && dictate::state() == dictate::State::Failed) {
             _ok = false;
@@ -513,13 +522,13 @@ public:
             g.drawString("Sending...", SCREEN_W / 2, BODY_Y + 66);
             g.setFont(&fonts::Font0);
             g.setTextColor(DIM, BG);
-            g.drawString(("ESC cancels  " + std::to_string(dictate::sendingMs() / 1000) + "s").c_str(),
+            g.drawString(("ESC stops waiting  " + std::to_string(dictate::sendingMs() / 1000) + "s").c_str(),
                          SCREEN_W / 2, BODY_Y + 86);
             g.setTextDatum(top_left);
             return;
         }
         if (_status.empty()) {
-            ui::emptyState(g, "Hold SPACE", "speak, release: it types on your PC");
+            ui::emptyState(g, _craft ? "Craft draft" : "Type on PC", _craft ? "hold SPACE to send to Craft" : "hold SPACE to type on your PC");
             return;
         }
         g.setFont(&fonts::Font0);
@@ -542,12 +551,13 @@ private:
             _status = "Connect to your PC first";
             return;
         }
-        if (!dictate::start(this, true)) {
+        if (!dictate::start(this, true, _craft)) {
             _ok = false;
             _status = *dictate::error() ? dictate::error() : "Busy - try again";
         }
     }
 
+    bool        _craft   = false;
     bool        _held    = false;
     uint8_t     _talk    = KEY_SPACE;  // key held on arrival (Y from Home, or SPACE)
     bool        _toggle  = false;   // started by a tap: next tap ends it

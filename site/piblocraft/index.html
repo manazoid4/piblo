@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#fbfaf7">
+  <meta name="description" content="See which AI task needs a decision. Try a simulated approval and follow the work into a handoff.">
+  <meta property="og:title" content="PibloCraft. Mission control for your AI.">
+  <meta property="og:description" content="Follow a task from request to review, then see what the next person needs to pick it up.">
+  <meta property="og:type" content="website">
+  <link rel="canonical" href="https://piblo.co.uk/piblocraft/">
+  <meta property="og:url" content="https://piblo.co.uk/piblocraft/">
+  <meta property="og:image" content="https://piblo.co.uk/piblocraft/og.svg">
+  <meta property="og:image:alt" content="PibloCraft. Mission control for your AI. See what needs you.">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:site_name" content="Piblo">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="@Piblo_UK">
+  <meta name="twitter:title" content="PibloCraft. Mission control for your AI.">
+  <meta name="twitter:description" content="Give your agents a job and see what needs you. Early access.">
+  <meta name="twitter:image" content="https://piblo.co.uk/piblocraft/og.svg">
+  <meta name="twitter:image:alt" content="PibloCraft. Mission control for your AI. See what needs you.">
+  <title>PibloCraft. Mission control for your AI.</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/home-base.css"><link rel="stylesheet" href="/home.css"><link rel="stylesheet" href="/pages.css">
+  <link rel="stylesheet" href="/piblocraft/piblocraft.css">
+  <script defer src="/_vercel/insights/script.js"></script>
+  <script defer src="/piblocraft/mission.js"></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+<header class="header">
+  <div class="wrap header-inner">
+    <a class="logo" href="/" aria-label="Piblo home"><img src="/media/brand/piblo-wordmark.svg" alt="Piblo" width="61" height="26"></a>
+    <nav class="nav" aria-label="Site sections"><a href="#compare">Before and after</a><a href="#mission">Try it</a><a href="#access">Early access</a></nav>
+    <a class="btn btn-primary btn-small" href="#access" data-va="cta_click">Get early access</a>
+  </div>
+</header>
+<main id="main">
+  <section class="pc-hero">
+    <div class="container pc-hero-inner">
+      <span class="eyebrow"><span class="road-pulse" aria-hidden="true"></span> PIBLOCRAFT &middot; EARLY ACCESS</span>
+      <h1>See which task <em>needs you.</em></h1>
+      <p class="pc-lead">When several AI assistants are working, one may be waiting for an answer. PibloCraft brings that decision back to you.</p>
+      <div class="actions"><a class="btn btn-primary btn-big" href="#mission" data-va="cta_click">Try a task</a><a class="btn btn-quiet btn-big" href="#access">Get early access</a></div>
+    </div>
+  </section>
+
+  <section class="container pc-compare-wrap" id="compare" aria-labelledby="compare-title">
+    <h2 id="compare-title" class="pc-sr">Before and after PibloCraft</h2>
+    <div class="pc-compare" id="pc-compare">
+      <div class="pc-scene pc-before" aria-hidden="true">
+        <div class="pc-desk">
+          <div class="pc-win w1"><b>claude &mdash; tab 1</b><i>&gt; refactor auth&hellip;</i><i>&gt; still thinking</i></div>
+          <div class="pc-win w2"><b>codex</b><i>Waiting for your input&hellip;</i></div>
+          <div class="pc-win w3"><b>claude &mdash; tab 2</b><i class="pc-err">Usage limit reached</i></div>
+          <div class="pc-win w4"><b>hermes</b><i>&gt; researching&hellip;</i></div>
+          <div class="pc-win w5"><b>terminal (3)</b><i>which one was fixing the login?</i></div>
+          <div class="pc-win w6"><b>claude &mdash; tab 7</b><i>Allow this command? (y/n)</i></div>
+          <div class="pc-win w7"><b>notes.txt</b><i>todo: check codex??</i></div>
+          <div class="pc-win w8"><b>claude &mdash; tab 4</b><i>&gt; npm test</i><i class="pc-err">3 failing</i></div>
+          <div class="pc-win w9"><b>chrome &mdash; 23 tabs</b><i>usage dashboard</i></div>
+          <div class="pc-win w10"><b>codex &mdash; 2</b><i>Session expired. Sign in again.</i></div>
+          <span class="pc-toast t4">Claude needs you</span>
+          <span class="pc-toast t5">Rate limited</span>
+          <span class="pc-toast t1">5h limit hit</span>
+          <span class="pc-toast t2">Needs approval</span>
+          <span class="pc-toast t3">3 agents idle</span>
+          <span class="pc-tabs">+14 tabs</span>
+        </div>
+        <span class="pc-tag">Before</span>
+      </div>
+      <div class="pc-scene pc-after" aria-hidden="true">
+        <div class="pc-mc">
+          <div class="pc-mc-top"><b>PibloCraft</b><span>4 working &middot; 1 needs you &middot; 12 done today</span></div>
+          <div class="pc-mc-grid">
+            <div class="pc-tile is-work"><b>Claude 1</b><em>Working</em><i>Refactor auth</i><u class="u62"></u></div>
+            <div class="pc-tile is-done"><b>Claude 2</b><em>Done</em><i>Release notes</i><u class="u100"></u></div>
+            <div class="pc-tile is-work"><b>Codex</b><em>Working</em><i>Fix the login bug</i><u class="u38"></u></div>
+            <div class="pc-tile is-need"><b>Hermes</b><em>Needs you</em><i>Push to main?</i><span class="pc-mini">Allow &middot; Deny</span></div>
+            <div class="pc-tile is-work"><b>Research &times;3</b><em>Working</em><i>Competitor scan</i><u class="u80"></u></div>
+            <div class="pc-tile"><b>Ollama</b><em>Ready</em><i>Free, on this PC</i></div>
+          </div>
+        </div>
+        <span class="pc-tag">After</span>
+      </div>
+      <div class="pc-handle" aria-hidden="true"><span></span></div>
+      <label class="pc-sr" for="compare-range">Drag to compare before and after</label>
+      <input class="pc-range" id="compare-range" type="range" min="0" max="100" value="50">
+    </div>
+    <p class="pc-cap">Drag to compare the illustrated workspaces. On the right, Hermes is waiting for permission to push a change.</p>
+  </section>
+
+  <section class="section container" id="mission" aria-labelledby="mission-title">
+    <div class="section-top">
+      <span class="eyebrow">TRY IT</span>
+      <h2 id="mission-title">Give it a task. <span>Decide what happens.</span></h2>
+      <p>Try &ldquo;Push the fix to main&rdquo; in this simulation. Watch the agent pause for review. Allow it to finish, or deny the push and see the result in Activity.</p>
+    </div>
+    <div class="mc" id="mc">
+      <div class="mc-stats"><span><b id="mc-working">0</b> working</span><span><b id="mc-need">0</b> needs you</span><span><b id="mc-done">0</b> done</span></div>
+      <form class="mc-cmd" id="mc-form">
+        <label class="pc-sr" for="mc-input">Task for your agents</label>
+        <input id="mc-input" type="text" autocomplete="off" maxlength="80" placeholder="Tell your team what to do&hellip;">
+        <button class="btn btn-primary" type="submit">Go</button>
+      </form>
+      <div class="mc-chips" id="mc-chips">
+        <button type="button" data-task="Fix the login bug">Fix the login bug</button>
+        <button type="button" data-task="Research three competitors">Research three competitors</button>
+        <button type="button" data-task="Write the release notes">Write the release notes</button>
+        <button type="button" data-task="Push the fix to main" data-risky="1">Push the fix to main</button>
+      </div>
+      <div class="mc-grid" id="mc-grid"></div>
+      <div class="mc-feed"><h3>Activity</h3><ol id="mc-feed" aria-live="polite"></ol></div>
+      <p class="pc-cap">This demo runs in your browser with simulated agents. Your task stays on this page.</p>
+    </div>
+  </section>
+
+  <section class="section container" aria-labelledby="exp-title">
+    <div class="section-top">
+      <span class="eyebrow">Example handoff</span>
+      <h2 id="exp-title">Pick it up <span>tomorrow.</span></h2>
+      <p>A task name tells you what you started. A handoff tells you where to resume. Here is what one could look like after reviewing a login fix.</p>
+    </div>
+    <div class="pc-grid pc-grid-3">
+      <article class="pc-card"><h3>The request</h3><p>&ldquo;When my session expires, take me back to sign in.&rdquo;</p></article>
+      <article class="pc-card"><h3>The decision</h3><p>The agent prepared a fix. You chose to review it before publishing.</p></article>
+      <article class="pc-card"><h3>The next step</h3><p>&ldquo;The redirect is ready to try. Open an expired session and check that signing in returns you to the same page.&rdquo;</p></article>
+    </div>
+    <p class="fine pc-note">PibloCraft is in private testing on Windows. The device connection is also in testing.</p>
+  </section>
+
+  <section class="road-close container" id="access" aria-labelledby="access-title">
+    <span class="eyebrow">EARLY ACCESS</span>
+    <h2 id="access-title">PibloCraft is in <span>private testing.</span></h2>
+    <p>Join the Piblo list for news of the Windows beta. We will email you when early access opens.</p>
+    <div class="actions"><a class="btn btn-primary" href="/#waitlist" data-va="cta_click">Get early access</a><a class="btn btn-quiet" href="/">Back to Piblo</a></div>
+  </section>
+</main>
+<footer class="footer">
+  <div class="wrap footer-inner">
+    <a class="logo" href="/" aria-label="Piblo home"><img src="/media/brand/piblo-wordmark.svg" alt="Piblo" width="61" height="26"></a>
+    <nav class="footer-links" aria-label="Footer"><a href="https://discord.gg/DaxywF3SQf" target="_blank" rel="noopener noreferrer">Discord</a><a href="https://github.com/manazoid4/piblo" target="_blank" rel="noopener noreferrer">GitHub</a><a href="https://x.com/Piblo_UK" target="_blank" rel="noopener noreferrer">X</a><a href="/piblocraft/">PibloCraft</a><a href="/roadmap/">Roadmap</a><a href="/timeline/">Timeline</a><a href="mailto:info@piblo.co.uk">Contact</a><a href="/privacy/">Privacy</a></nav>
+    <p class="legal">Designed in the UK. PibloCraft is in private testing. Independent, not affiliated with any other brand.</p>
+  </div>
+</footer>
+</body>
+</html>
