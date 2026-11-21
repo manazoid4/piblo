@@ -10,15 +10,15 @@ import httpx
 import pytest
 from starlette.websockets import WebSocketDisconnect
 
-from mazhost import live_voice
+from mazhost import live_brain, live_voice
 from mazhost.config import Settings
-from mazhost.live_brain import LiveBrain, is_noise, split_sentences
+from mazhost.live_brain import DICTATE_OFF, DICTATE_ON, LiveBrain, is_noise, split_sentences, split_wake
 from test_live_voice import REPLY_SAMPLES_24K, TOKEN, FakeRealtime, make_client, speak, text
 
 
 class FakeBrain:
     """Scripted stand-in for LiveBrain: no network. Class attrs are set per test."""
-    text, chunks, hang, stream_closed = "tell me a joke", [], False, False
+    text, chunks, hang, stream_closed, dictate, delay = "tell me a joke", [], False, False, False, 0.0
     asked = threading.Event()
 
     def __init__(self, cfg, stt=None):
@@ -26,11 +26,15 @@ class FakeBrain:
 
     async def transcribe(self, pcm):
         assert len(pcm) > 0
+        await asyncio.sleep(type(self).delay)
         type(self).asked.set()
         return type(self).text
 
-    async def command(self, text):
+    async def command(self, text, strict=False):
         return None
+
+    def dictating(self):
+        return type(self).dictate
 
     async def stream(self, text):
         self.meta = {"model": "fake/model:free", "fallback": None, "brain_first_token_ms": 5}
@@ -156,6 +160,25 @@ def test_voice_command_switches_model_and_persists(tmp_path):
     assert "my dog is called Biscuit" in (tmp_path / "piblo-memory.md").read_text()
 
 
+@pytest.mark.parametrize("said", ["Switch to local model.", "Hey Piblo, switch to the local model.",
+                                  "Can you switch to the local model please?", "Use the local model."])
+def test_switch_command_survives_natural_phrasing(tmp_path, said):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    assert asyncio.run(brain.command(said)) == "Okay, I'm using the local model now."
+
+
+@pytest.mark.parametrize("said", ["What model are you?", "What's your model?", "What AI model are you?",
+                                  "Hey Piblo, what model is this?"])
+def test_what_model_question_survives_natural_phrasing(tmp_path, said):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    assert asyncio.run(brain.command(said)).startswith("I'm using ")
+
+
+def test_general_model_talk_still_reaches_the_brain(tmp_path):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    assert asyncio.run(brain.command("What's the best model for photos")) is None
+
+
 def sse(*pieces: str) -> httpx.Response:
     body = "".join(f"data: {json.dumps({'choices': [{'delta': {'content': p}}]})}\n\n" for p in pieces)
     return httpx.Response(200, content=(body + "data: [DONE]\n\n").encode(),
@@ -240,6 +263,139 @@ def test_asr_server_down_falls_back_to_local_stt(tmp_path):
     assert len(stt.paths) == 1 and not stt.paths[0].exists()  # temp wav cleaned up
 
 
+def test_dead_asr_server_is_skipped_on_the_next_turns(tmp_path, monkeypatch):
+    monkeypatch.setattr(live_brain, "_asr_down", {})
+    tries, stt = [], _FakeStt()
+
+    def handler(request):
+        tries.append(request)
+        return _asr_down(request)
+
+    brain = LiveBrain(Settings(data_dir=str(tmp_path)), transport=httpx.MockTransport(handler), stt=stt)
+    for _ in range(3):  # Windows takes ~2.4 s to refuse a dead localhost port: pay it once, not every turn
+        assert asyncio.run(brain.transcribe(b"\x00\x01" * 1600)) == "remind me to call mum"
+    assert len(tries) == 1 and len(stt.paths) == 3
+    live_brain._asr_down.clear()  # once the pause is over, LFM3 is tried again
+    asyncio.run(brain.transcribe(b"\x00\x01" * 1600))
+    assert len(tries) == 2
+
+
+def test_what_model_reply_is_short_to_speak(tmp_path):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    reply = asyncio.run(brain.command("what model are you using"))
+    assert reply.startswith("I'm using ") and "/" not in reply and ":free" not in reply
+
+
 def test_asr_server_down_without_local_stt_drops_turn(tmp_path):
     brain = LiveBrain(Settings(data_dir=str(tmp_path)), transport=httpx.MockTransport(_asr_down))
     assert asyncio.run(brain.transcribe(b"\x00\x01" * 1600)) == ""
+
+
+# ---- dictation mode: "Hey Piblo, <words>" is pasted on the PC ---------------------------------------
+
+@pytest.mark.parametrize("heard,woke,rest", [
+    ("Hey Piblo, buy milk.", True, "buy milk."), ("Hey, Pablo. Open my notes", True, "Open my notes"),
+    ("hey peeblo send the report", True, "send the report"), ("Piblo, stop", True, "stop"),
+    ("Hey Piblo.", True, ""), ("Hey Plu, the quick fox", True, "the quick fox"),
+    ("Hey Pebble", True, ""), ("Hey everyone, listen up", False, "Hey everyone, listen up"),
+    ("Hey people, listen up", False, "Hey people, listen up"),
+    ("Pick up the kids", False, "Pick up the kids"), ("Hey there, Piblo", False, "Hey there, Piblo"),
+    ("Hello Piblo, buy milk", True, "buy milk"), ("Okay Piblo, stop", True, "stop"),
+    # room talk and TV must never count: they would be pasted into the focused window
+    ("A bit of rain tomorrow", False, "A bit of rain tomorrow"), ("Ok but the TV is loud", False, "Ok but the TV is loud"),
+    ("A person walks into a bar", False, "A person walks into a bar"), ("Hey buddy, come here", False, "Hey buddy, come here"),
+    ("Hey please stop", False, "Hey please stop")])
+def test_split_wake_tolerates_how_speech_to_text_spells_piblo(heard, woke, rest):
+    assert split_wake(heard) == (woke, rest)
+
+
+def test_dictation_mode_is_switched_by_voice_and_persists(tmp_path):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    assert not brain.dictating()
+    assert asyncio.run(brain.command("Hey Piblo, dictation mode.")) == DICTATE_ON
+    assert LiveBrain(brain.cfg).dictating()  # survives a new Talk session
+    assert asyncio.run(brain.command("switch to talk mode")) == DICTATE_OFF
+    assert not LiveBrain(brain.cfg).dictating()
+    # while dictating only the mode switches are commands: everything else is pasted
+    for said in ("switch to the other branch", "Remember to call mum", "use the local model", "what model are you"):
+        assert asyncio.run(brain.command(said, strict=True)) is None
+    assert not (tmp_path / "piblo-memory.md").exists()
+    assert asyncio.run(brain.command("ok, back to talk mode", strict=True)) == DICTATE_OFF
+
+
+@pytest.mark.parametrize("said", ["What model of phone do you recommend?", "Which model of car should I buy for you"])
+def test_model_question_about_something_else_reaches_the_brain(tmp_path, said):
+    brain = brain_for(tmp_path, lambda req: httpx.Response(200, json=MODELS))
+    assert asyncio.run(brain.command(said)) is None
+
+
+def dictation_client(monkeypatch, tmp_path, heard):
+    fake, pasted = FakeRealtime(), []
+    brain = type("B", (FakeBrain,), {"text": heard, "chunks": ["Chat answer. "], "hang": False,
+                                     "stream_closed": False, "dictate": True, "asked": threading.Event()})
+    monkeypatch.setattr(live_voice, "LiveBrain", brain)
+    from mazhost import app as app_mod
+    monkeypatch.setattr(app_mod, "flow_foreground", lambda: 7)
+    monkeypatch.setattr(app_mod, "flow_safe_paste",
+                        lambda text, enter, armed, typer=None: pasted.append((text, enter, armed)) or "pasted")
+    return make_client(fake, live_brain="cloud", flow_dir=str(tmp_path / "flow")), brain, pasted
+
+
+def until_listening(ws):
+    """Play out one spoken reply like the device does; returns the states seen."""
+    states = []
+    while True:
+        m = text(ws)
+        if isinstance(m, bytes):
+            continue
+        if m.get("type") == "state":
+            states.append(m["state"])
+            if m["state"] == "speaking":
+                ws.send_text(json.dumps({"type": "playback_done"}))
+            elif m["state"] == "listening":
+                return states
+
+
+def test_dictation_pastes_the_words_after_hey_piblo(monkeypatch, tmp_path):
+    client, brain, pasted = dictation_client(monkeypatch, tmp_path, "Hey Piblo, um, buy milk and eggs")
+    with client.websocket_connect(f"/voice/live?token={TOKEN}") as ws:
+        assert text(ws)["state"] == "listening"
+        speak(ws)
+        assert until_listening(ws) == ["thinking", "speaking", "listening"]  # Piblo says "Pasted."
+        ws.send_text(json.dumps({"type": "bye"}))
+    assert pasted == [("Buy milk and eggs.", False, 7)]  # Flow cleanup ran, into the focused window
+    assert "dictate intent=paste" in (tmp_path / "flow" / "latency.log").read_text()
+
+
+def test_dictation_ignores_speech_without_the_wake_phrase(monkeypatch, tmp_path):
+    client, brain, pasted = dictation_client(monkeypatch, tmp_path, "and then the TV said something")
+    with client.websocket_connect(f"/voice/live?token={TOKEN}") as ws:
+        assert text(ws)["state"] == "listening"
+        speak(ws)
+        assert brain.asked.wait(3)
+        time.sleep(0.3)
+        ws.send_text(json.dumps({"type": "bye"}))
+        with pytest.raises(WebSocketDisconnect):
+            ws.receive_text()  # no thinking, no reply: still listening
+    assert pasted == []
+
+
+def test_mode_commands_are_recognised_without_the_wake_phrase():
+    from mazhost.live_brain import is_mode_command
+    assert is_mode_command("Talk mode.") and is_mode_command("Hey Piblo, dictation mode")
+    assert not is_mode_command("the talk mode button is broken")
+
+
+def test_bare_wake_phrase_makes_the_next_utterance_the_dictation(monkeypatch, tmp_path):
+    monkeypatch.setattr(live_voice, "WAKE_WINDOW_S", 0.5)  # shorter than the slow ASR below
+    client, brain, pasted = dictation_client(monkeypatch, tmp_path, "Hey Piblo.")
+    with client.websocket_connect(f"/voice/live?token={TOKEN}") as ws:
+        assert text(ws)["state"] == "listening"
+        speak(ws)
+        until_listening(ws)  # "Yes?"
+        assert pasted == []
+        brain.text, brain.delay = "Claude, fix the failing test", 1.0  # slow ASR must not close the window
+        speak(ws)
+        until_listening(ws)  # "Sent."
+        ws.send_text(json.dumps({"type": "bye"}))
+    assert pasted == [("fix the failing test.", True, 7)]  # "Claude ..." pastes and presses Enter

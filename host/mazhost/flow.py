@@ -137,18 +137,22 @@ class Flow:
             engine = "groq" if (self.s.groq_api_key or self.s.groq_key) else "whisper"
         else:
             raw, engine = self.speech.transcribe(wav), "whisper"
-        t1 = time.perf_counter()
+        stt = round((time.perf_counter() - t0) * 1000)
         if not raw.strip():
-            stt = round((t1 - t0) * 1000)
             return {"text": "", "intent": "paste", "raw": "", "ms": {"stt": stt, "clean": 0, "total": stt}}
+        return self.finish(raw, engine, stt, cancel, log)
+
+    def finish(self, raw: str, engine: str = "talk", stt_ms: int = 0, cancel=None, log: bool = False) -> dict:
+        """Transcript -> cleaned, dictionary-fixed, prefix-routed text; notes and reminders are saved here.
+        Talk's dictation mode calls this with the transcript it already has."""
+        t1 = time.perf_counter()
         cleaned, provider = self._cleanup(raw)
         cleaned = apply_dictionary(cleaned, self.lines)
         intent, body = parse_prefix(cleaned)
-        t2 = time.perf_counter()
-        ms = {"stt": round((t1 - t0) * 1000), "clean": round((t2 - t1) * 1000),
-              "total": round((t2 - t0) * 1000)}
+        clean = round((time.perf_counter() - t1) * 1000)
+        ms = {"stt": stt_ms, "clean": clean, "total": stt_ms + clean}
         result = {"text": body, "intent": intent, "raw": raw, "ms": ms, "via": provider, "stt_via": engine}
-        if not cancel.is_set():
+        if not (cancel and cancel.is_set()):
             if intent == "note":
                 self._append("inbox.md", f"- {time.strftime('%Y-%m-%d %H:%M')} {body}")
             elif intent == "remind":
