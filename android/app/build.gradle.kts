@@ -64,6 +64,8 @@ dependencies {
     ksp("androidx.room:room-compiler:2.7.2")
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    // Bundled on-device OCR: no paid vision API and no runtime model download.
+    implementation("com.google.mlkit:text-recognition:16.0.1")
 
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20250517")
