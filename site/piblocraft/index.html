@@ -34,7 +34,7 @@
 <header class="header">
   <div class="wrap header-inner">
     <a class="logo" href="/" aria-label="Piblo home"><img src="/media/brand/piblo-wordmark.svg" alt="Piblo" width="61" height="26"></a>
-    <nav class="nav" aria-label="Site sections"><a href="#compare">Before and after</a><a href="#mission">Try it</a><a href="#access">Early access</a></nav>
+    <nav class="nav" aria-label="Site sections"><a href="/#showcase">Showcase</a><a href="#mission">Try the demo</a><a href="#access">Early access</a></nav>
     <a class="btn btn-primary btn-small" href="#access" data-va="cta_click">Get early access</a>
   </div>
 </header>
@@ -44,7 +44,36 @@
       <span class="eyebrow"><span class="road-pulse" aria-hidden="true"></span> PIBLOCRAFT &middot; EARLY ACCESS</span>
       <h1>See which task <em>needs you.</em></h1>
       <p class="pc-lead">When several AI assistants are working, one may be waiting for an answer. PibloCraft brings that decision back to you.</p>
-      <div class="actions"><a class="btn btn-primary btn-big" href="#mission" data-va="cta_click">Try a task</a><a class="btn btn-quiet btn-big" href="#access">Get early access</a></div>
+      <div class="actions"><a class="btn btn-primary btn-big" href="#mission" data-va="cta_click">Try the demo</a><a class="btn btn-quiet btn-big" href="#access">Get early access</a></div>
+    </div>
+  </section>
+
+  <section class="section container" id="mission" aria-labelledby="mission-title">
+    <div class="section-top">
+      <h2 id="mission-title">Give it a task. <span>Decide what happens.</span></h2>
+      <p>Try &ldquo;Push the fix to main&rdquo; in this simulation. Watch the agent pause for review. Allow it to finish, or deny the push and see the result in Activity.</p>
+    </div>
+    <div class="mc" id="mc">
+      <div class="mc-heading">
+        <span class="mc-orb" aria-hidden="true"></span>
+        <h3>Today</h3>
+        <span class="mc-demo-label">Browser simulation</span>
+      </div>
+      <div class="mc-stats"><span><b id="mc-working">0</b> working</span><span><b id="mc-need">0</b> needs you</span><span><b id="mc-done">0</b> done</span></div>
+      <form class="mc-cmd" id="mc-form">
+        <label class="pc-sr" for="mc-input">Task for your agents</label>
+        <input id="mc-input" type="text" autocomplete="off" maxlength="80" placeholder="Tell your team what to do&hellip;">
+        <button class="btn btn-primary" type="submit">Go</button>
+      </form>
+      <div class="mc-chips" id="mc-chips">
+        <button type="button" data-task="Fix the login bug">Fix the login bug</button>
+        <button type="button" data-task="Research three competitors">Research three competitors</button>
+        <button type="button" data-task="Write the release notes">Write the release notes</button>
+        <button type="button" data-task="Push the fix to main" data-risky="1">Push the fix to main</button>
+      </div>
+      <div class="mc-grid" id="mc-grid"></div>
+      <div class="mc-feed"><h3>Activity</h3><ol id="mc-feed" aria-live="polite"></ol></div>
+      <p class="pc-cap">This demo runs in your browser with simulated agents. Your task stays on this page.</p>
     </div>
   </section>
 
@@ -91,31 +120,6 @@
       <input class="pc-range" id="compare-range" type="range" min="0" max="100" value="50">
     </div>
     <p class="pc-cap">Drag to compare the illustrated workspaces. On the right, Hermes is waiting for permission to push a change.</p>
-  </section>
-
-  <section class="section container" id="mission" aria-labelledby="mission-title">
-    <div class="section-top">
-      <span class="eyebrow">TRY IT</span>
-      <h2 id="mission-title">Give it a task. <span>Decide what happens.</span></h2>
-      <p>Try &ldquo;Push the fix to main&rdquo; in this simulation. Watch the agent pause for review. Allow it to finish, or deny the push and see the result in Activity.</p>
-    </div>
-    <div class="mc" id="mc">
-      <div class="mc-stats"><span><b id="mc-working">0</b> working</span><span><b id="mc-need">0</b> needs you</span><span><b id="mc-done">0</b> done</span></div>
-      <form class="mc-cmd" id="mc-form">
-        <label class="pc-sr" for="mc-input">Task for your agents</label>
-        <input id="mc-input" type="text" autocomplete="off" maxlength="80" placeholder="Tell your team what to do&hellip;">
-        <button class="btn btn-primary" type="submit">Go</button>
-      </form>
-      <div class="mc-chips" id="mc-chips">
-        <button type="button" data-task="Fix the login bug">Fix the login bug</button>
-        <button type="button" data-task="Research three competitors">Research three competitors</button>
-        <button type="button" data-task="Write the release notes">Write the release notes</button>
-        <button type="button" data-task="Push the fix to main" data-risky="1">Push the fix to main</button>
-      </div>
-      <div class="mc-grid" id="mc-grid"></div>
-      <div class="mc-feed"><h3>Activity</h3><ol id="mc-feed" aria-live="polite"></ol></div>
-      <p class="pc-cap">This demo runs in your browser with simulated agents. Your task stays on this page.</p>
-    </div>
   </section>
 
   <section class="section container" aria-labelledby="exp-title">

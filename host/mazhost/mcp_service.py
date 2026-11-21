@@ -7,6 +7,7 @@ import os
 import subprocess
 from pathlib import Path
 
+from . import private_mode
 from .config import Settings
 from .nowindow import no_window
 
@@ -32,7 +33,11 @@ class McpService:
             return
         env = dict(os.environ, PIBLO_TOKEN=cfg.token, PIBLO_URL=f"http://127.0.0.1:{cfg.port}",
                    PIBLO_MCP_PORT=str(cfg.mcp_port))
+        # Only this Core is reachable from the managed bridge, even if privacy changes later.
+        for name in ("PIBLO_DISPLAY_URL", "NODE_OPTIONS", "NODE_USE_ENV_PROXY"):
+            env.pop(name, None)
         try:
+            private_mode.guard_subprocess("Piblo MCP", local=True)
             self.process = subprocess.Popen(
                 ["node", str(entry), "--http"], env=env, cwd=entry.parent,
                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, **no_window(),

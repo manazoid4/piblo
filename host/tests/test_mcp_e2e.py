@@ -125,14 +125,14 @@ def _wait_until(pred, timeout=15.0, interval=0.2):
 class CoreHandle:
     """Core running on a real port (needed because the node MCP process and the sim both use HTTP)."""
 
-    def __init__(self, data_dir: Path, mcp_port: int = 0):
+    def __init__(self, data_dir: Path, mcp_port: int = 0, private_mode: bool = False):
         self.port = _free_port()
         self.data_dir = data_dir
         cfg = Settings(
             token=TOKEN, port=self.port, mcp_port=mcp_port, repo_dir=str(REPO),
             data_dir=str(data_dir), buddy_db=str(data_dir / "buddy.sqlite3"),
             work_dir=str(data_dir / "work"), discovery_port=0, remote_detect=False,
-            autoupdate=False, _env_file=None,
+            autoupdate=False, private_mode=private_mode, _env_file=None,
         )
         self.app = create_app(cfg)
         self.server = uvicorn.Server(uvicorn.Config(self.app, host="127.0.0.1", port=self.port, log_level="error"))
@@ -176,12 +176,13 @@ def core(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_core_manages_authenticated_http_mcp(tmp_path):
+def test_core_manages_authenticated_http_mcp(tmp_path, monkeypatch):
     if not NODE:
         pytest.skip("node unavailable, skipping piblo-mcp e2e")
     _build_mcp()
     mcp_port = _free_port()
-    handle = CoreHandle(tmp_path, mcp_port=mcp_port)
+    monkeypatch.setenv("PIBLO_DISPLAY_URL", "http://127.0.0.1:9")
+    handle = CoreHandle(tmp_path, mcp_port=mcp_port, private_mode=True)
     url = f"http://127.0.0.1:{mcp_port}/mcp"
     try:
         def rejected_without_token():
@@ -194,6 +195,8 @@ def test_core_manages_authenticated_http_mcp(tmp_path):
         assert httpx.post(url, headers={"Authorization": "Bearer wrong"}, timeout=2).status_code == 401
         result = mcp_call(url, "piblo_status", {}, timeout=10)
         assert result["ok"] is True and result["state"] == "disconnected"
+        devices = mcp_call(url, "piblo_devices", {}, timeout=10)
+        assert devices["devices"][1]["state"] == "unknown"
         assert httpx.get(handle.base + "/health", timeout=2).status_code == 200
     finally:
         handle.stop()

@@ -1,0 +1,8 @@
+Live isolated run | 2026-11-21 | Windows | actual Core + Node MCP
+Core 127.0.0.1:62597 | MCP 127.0.0.1:62598 | temp data | private mode on
+PASS Core /health = 200; MCP missing bearer = 401
+PASS bad bearer = 401; foreign Host and Origin = 403
+PASS tool list: piblo_device_state, piblo_devices, piblo_status
+PASS authenticated status: Core state disconnected, primary offline, display unknown
+PASS normal shutdown closed both listeners
+PASS throwaway Core data removed after the Core process exited

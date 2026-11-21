@@ -114,6 +114,10 @@ class Settings(BaseSettings):
     vault_remote_token: str = ""  # stays on this PC, never in a URL or device reply
     shortcuts_file: str = ""  # owner-configured fixed names and targets JSON
     max_upload_mb: int = Field(default=12, ge=1, le=64)
+    # Home Pulse: signed household webhook -> existing Buddy alert ring. Off until owner opts in.
+    home_pulse_enabled: bool = False
+    home_pulse_secret: str = ""   # MAZ_HOME_PULSE_SECRET; HMAC key, never logged or echoed
+    home_pulse_quiet: str = "22:00-07:00"
     max_audio_seconds: int = Field(default=900, ge=1, le=3600)
     session_ttl_minutes: int = Field(default=120, ge=1, le=1440)
     max_turns: int = Field(default=12, ge=1, le=100)

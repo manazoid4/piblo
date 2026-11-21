@@ -89,6 +89,20 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 .sec-head .label::before { content: ""; display: inline-block; width: 14px; height: 1px; margin-right: 10px; vertical-align: middle; background: var(--orange); }
 @media (max-width: 760px) { .sec { padding: 64px 0; } }
 
+/* showcase */
+#showcase, #asks, #batch { scroll-margin-top: 80px; }
+.showcase { padding-block: clamp(32px, 5vw, 72px); }
+.showcase .sec-head { margin-bottom: 24px; }
+.showcase-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) repeat(2, minmax(0, 1fr)); gap: 14px; margin-bottom: 18px; }
+.showcase-grid > * { min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--panel); }
+.showcase-grid article { display: flex; flex-direction: column; align-items: flex-start; gap: 12px; padding: 24px; }
+.showcase-grid article h3 { font-size: 24px; }
+.showcase-grid article p, .showcase-grid figcaption { color: var(--ink-2); }
+.showcase-grid article a { margin-top: auto; }
+.showcase-grid img { display: block; width: 100%; height: auto; border-radius: 8px; }
+.showcase-grid figcaption { margin-top: 10px; font-size: 15px; }
+@media (max-width: 760px) { .showcase-grid { grid-template-columns: 1fr; } }
+
 /* what it does */
 .tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
 .tiles--4 { grid-template-columns: repeat(4, 1fr); }
@@ -148,15 +162,13 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 @media (max-width: 900px) { .uses { grid-template-columns: 1fr; } }
 
 /* asks first */
-.ask { display: grid; grid-template-columns: .8fr 1.2fr; gap: 48px; align-items: center; padding: 56px; border-radius: var(--r); background: var(--white); box-shadow: inset 0 0 0 1px var(--line); }
-.yes { display: grid; place-items: center; aspect-ratio: 1; max-width: 300px; width: 100%; margin-inline: auto; border-radius: 44px; background: var(--panel); }
-.yes span { display: grid; place-items: center; width: 52%; aspect-ratio: 1; border-radius: 50%; background: var(--orange); color: var(--ink); font-weight: 800; font-size: clamp(22px, 3vw, 30px); letter-spacing: .02em; box-shadow: 0 10px 0 var(--orange-deep), 0 20px 30px -10px rgba(179, 56, 26, .5); }
+
 .points { display: grid; gap: 20px; margin-top: 8px; }
 .points li { display: grid; grid-template-columns: 28px 1fr; gap: 12px; }
 .points li::before { content: ""; width: 10px; height: 10px; margin-top: 8px; border-radius: 50%; background: var(--orange); }
 .points b { display: block; font-size: 17px; }
 .points span { color: var(--ink-2); font-size: 15.5px; }
-@media (max-width: 900px) { .ask { grid-template-columns: 1fr; padding: 32px 22px; gap: 28px; } .yes { max-width: 200px; } }
+
 
 /* voice path: the dot only ever travels to your PC; the internet is shown off */
 .voice-path { display: flex; flex-wrap: wrap; align-items: center; margin-top: 28px; padding-top: 22px; border-top: 1px solid var(--line); font-family: var(--font-mono); font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
@@ -222,8 +234,8 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 .js [data-reveal] { opacity: 0; transform: translateY(12px); }
 @media (prefers-reduced-motion: reduce) { .js [data-reveal] { opacity: 1; transform: none; transition: none; } html { scroll-behavior: auto; } }
 
-/* hero: one task, start to finish */
-.hero .flow { margin: 20px 0 0; padding: 0; list-style: none; counter-reset: f; display: grid; gap: 6px; max-width: 40ch; font-size: 15px; color: var(--ink-2); }
-.hero .flow li { counter-increment: f; display: flex; gap: 10px; align-items: baseline; }
-.hero .flow li::before { content: counter(f); flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); font-size: 12px; font-weight: 700; color: var(--ink); }
+/* approval walkthrough */
+.ask .flow { margin: 12px 0 24px; padding: 0; list-style: none; counter-reset: f; display: grid; gap: 6px; max-width: 40ch; font-size: 15px; color: var(--ink-2); }
+.ask .flow li { counter-increment: f; display: flex; gap: 10px; align-items: baseline; }
+.ask .flow li::before { content: counter(f); flex: none; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--paper); box-shadow: inset 0 0 0 1px var(--line); font-size: 12px; font-weight: 700; color: var(--ink); }
 .hero .note-needs { margin-top: 8px; color: var(--ink-2); }

@@ -85,7 +85,7 @@ export function urlAllowed(raw: string): boolean {
 }
 
 export class CoreClient {
-  constructor(private readonly cfg: CoreConfig) {}
+  constructor(private readonly cfg: CoreConfig, private readonly redirect: RequestRedirect = "follow") {}
 
   async displayStatus(): Promise<{ state: string; reason?: string }> {
     if (!this.cfg.displayUrl) return { state: "unknown", reason: "Display address not configured" };
@@ -133,6 +133,7 @@ export class CoreClient {
           "X-Piblo-Client": `mcp/${VERSION}`,
         },
         body: body === undefined ? undefined : JSON.stringify(body),
+        redirect: this.redirect,
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {

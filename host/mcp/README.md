@@ -44,6 +44,7 @@ are unavailable, a typical `piblo_devices` result is:
 Port binding stays on loopback. For later remote use, put a trusted HTTPS proxy
 such as Tailscale Serve in front of it, preserve bearer authentication and
 send a loopback Host upstream. If the Core is unreachable, tool calls return an error.
+The Core-managed process calls only the local Core and does not probe external displays.
 
 Kaggle's MCP endpoint (`https://www.kaggle.com/mcp`) is a separate client
 connection. Configure it with Kaggle credentials in the client. Core makes
