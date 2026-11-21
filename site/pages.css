@@ -76,3 +76,8 @@ h1 em, h2 span { font-style: normal; color: var(--accent-ink); }
   .container { padding-left: 24px; padding-right: 24px; }
 }
 @media (min-width: 900px) { .audit-questions { grid-template-columns: repeat(3, 1fr); } }
+
+/* readiness: proof before the open checks (21 Nov) */
+.audit-done { display: grid; gap: 8px; max-width: 34rem; margin: 20px auto 0; text-align: left; }
+.audit-done li { position: relative; padding-left: 24px; color: var(--ink-2); }
+.audit-done li::before { content: "¹3"; position: absolute; left: 0; color: var(--done-ink); font-weight: 800; }
