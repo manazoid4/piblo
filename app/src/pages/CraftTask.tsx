@@ -113,26 +113,26 @@ export function CraftTask() {
       if (mounted.current) setStatus(message(error));
     } finally { if (mounted.current) setBusy(false); }
   }
-  return <section aria-label="Local task">
-    <h2>Local task</h2>
-    {resume ? <button className="btn" onClick={() => setResume(false)}>Continue last task</button> :
-      <fieldset disabled={!loaded || busy} style={{ display: 'grid', gap: 8, border: 0, padding: 0 }}>
-        <label htmlFor="craft-prompt">Task draft</label>
-        <textarea id="craft-prompt" rows={3} maxLength={12000} value={draft.prompt} onChange={e => edit({ ...draft, prompt: e.target.value })} />
-        <label htmlFor="craft-model">Local model</label>
-        <select id="craft-model" value={models.includes(draft.model) ? draft.model : ''} onChange={e => edit({ ...draft, model: e.target.value })}>
+  return <section className="card stack" aria-labelledby="craft-task">
+    <h2 id="craft-task">Task</h2>
+    {resume ? <div><button className="btn sm" onClick={() => setResume(false)}>Continue last task</button></div> :
+      <fieldset disabled={!loaded || busy} className="stack" style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
+        <label htmlFor="craft-prompt" className="meta">What should be built?</label>
+        <textarea id="craft-prompt" className="input" rows={4} placeholder="Type, or press Dictate and speak to Piblo" maxLength={12000} value={draft.prompt} onChange={e => edit({ ...draft, prompt: e.target.value })} />
+        <label htmlFor="craft-model" className="meta">Local model</label>
+        <select id="craft-model" className="select" value={models.includes(draft.model) ? draft.model : ''} onChange={e => edit({ ...draft, model: e.target.value })}>
           <option value="">Select an installed model</option>
           {models.map(name => <option key={name}>{name}</option>)}
         </select>
-        <div><button className="btn" disabled={capture !== 'idle' || !draft.prompt.trim() || !models.includes(draft.model)} onClick={() => void run()}>Run locally</button>{' '}
+        <div className="row wrap"><button className="btn primary" disabled={capture !== 'idle' || !draft.prompt.trim() || !models.includes(draft.model)} onClick={() => void run()}>Run locally</button>
           {voice && (capture === 'idle'
             ? <button className="btn" onClick={() => void record()}>Dictate with Piblo</button>
-            : <button className="btn" onClick={cancelCapture}>Cancel capture</button>)}{' '}
-          <button className="btn" onClick={() => setRefresh(n => n + 1)}>Refresh models</button></div>
+            : <button className="btn" onClick={cancelCapture}>Cancel capture</button>)}
+          <button className="btn ghost" onClick={() => setRefresh(n => n + 1)}>Refresh models</button></div>
       </fieldset>}
     {busy && <button className="btn" onClick={() => void api.cancel().catch(error => setStatus(message(error)))}>Cancel task</button>}
-    {modelStatus && <p role="status">{modelStatus}</p>}
-    {status && <p role="status">{status}</p>}
-    {!resume && last && <section><h3>Last result</h3><p>{last.model} · {last.prompt}</p><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{last.result}</pre></section>}
+    {modelStatus && <p role="status" className="meta">{modelStatus}</p>}
+    {status && <p role="status" className="meta">{status}</p>}
+    {!resume && last && <section className="stack"><h3>Last result</h3><p className="meta">{last.model} · {last.prompt}</p><pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>{last.result}</pre></section>}
   </section>;
 }

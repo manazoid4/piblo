@@ -20,7 +20,8 @@
     "verify:ui": "node scripts/verify-ui.mjs",
     "verify:flow": "node scripts/verify-flow.mjs",
     "verify:craft-terminal": "node scripts/verify-craft-terminal.mjs",
-    "pack:craft-pilot": "node scripts/pack-craft-pilot.mjs"
+    "pack:craft-pilot": "node scripts/pack-craft-pilot.mjs",
+    "verify:craft-pilot": "node scripts/stage1-pilot.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.0",
