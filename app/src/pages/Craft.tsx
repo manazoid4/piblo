@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CraftTask } from './CraftTask';
+import { CraftMission } from './CraftMission';
 import { PageHead } from '../components/ui';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
@@ -95,6 +96,7 @@ export function Craft() {
   return <>
     <PageHead title="Craft" sub="Draft a task, dictate it from Piblo, and run it in a real terminal." />
     <div className="stack">
+      {window.piblo.craftMission && <CraftMission />}
       <CraftTask />
       <section className="card stack" aria-labelledby="craft-terminal">
         <div className="row">

@@ -68,6 +68,8 @@ try {
   await page.getByRole('button', { name: /^Settings/ }).click();
   await craft.click();
   await page.getByRole('button', { name: 'Open terminal' }).click();
+  // xterm only paints while on screen, and the Mission control card now pushes the terminal below the fold.
+  await page.getByLabel('PowerShell terminal').scrollIntoViewIfNeeded();
   await page.waitForFunction(() => document.querySelector('.xterm-rows')?.textContent.includes('PIBLO-PTY-WORKS'));
 
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setSize(1040, 680));

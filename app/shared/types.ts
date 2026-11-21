@@ -106,6 +106,7 @@ export interface CraftVoiceBridge {
 export interface PibloBridge {
   craftTask?: CraftTaskBridge;
   craftVoice?: CraftVoiceBridge;
+  craftMission?: { get(): Promise<import('../src/lib/mission').MissionData> };
   craftTerminal?: {
     open(cols: number, rows: number): Promise<{ id: number; data: string; end: number }>;
     read(id: number, offset: number): Promise<{ data: string; end: number; exited: boolean; truncated: boolean }>;
