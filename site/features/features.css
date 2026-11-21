@@ -176,11 +176,6 @@
 
 /* ---------- reel: piblo in action ---------- */
 .pf-action { padding: clamp(64px, 9vw, 112px) 0 0; scroll-margin-top: 64px; }
-.pf-work { display: grid; gap: 16px; margin: 24px 0 48px; }
-.pf-work > * { min-width: 0; margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: 20px; background: var(--card); }
-.pf-work img { display: block; width: 100%; height: auto; border-radius: 8px; }
-.pf-work figcaption { margin-top: 12px; }
-@media (min-width: 800px) { .pf-work { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 .pf-action-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; }
 .pf-action-head .pf-title { text-align: left; }
 .pf-action-head .pf-lead { margin: 10px 0 0; }

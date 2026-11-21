@@ -196,6 +196,18 @@ test("homepage structure: screen cards replace phone frames, every image has alt
   assert.doesNotMatch(html, /149|£280|counts towards/);
   assert.match(html, /Reserve your place/);
 });
+test("the homepage puts real app examples and the Craft simulation before product details", () => {
+  const html = contents["/"];
+  const sections = [...html.matchAll(/<section[^>]* id="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(sections.slice(0, 3), ["top", "showcase", "asks"]);
+  const hero = html.slice(html.indexOf('id="top"'), html.indexOf('id="showcase"'));
+  assert.match(hero, /class="btn btn-primary" href="#showcase"/);
+  const showcase = html.slice(html.indexOf('id="showcase"'), html.indexOf('id="asks"'));
+  assert.match(showcase, /href="\/piblocraft\/#mission"/);
+  for (const screen of ["home", "ask"]) {
+    assert.ok(showcase.includes(`src="/media/work/windows-${screen}.png"`));
+  }
+});
 test("no aluminium anywhere under site/ (case-insensitive)", () => {
   const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (["node_modules", "tests"].includes(e.name) ? [] : walk(join(dir, e.name))) : [join(dir, e.name)]);
   for (const file of walk(root)) {
