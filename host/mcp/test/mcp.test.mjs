@@ -95,7 +95,7 @@ describe("piblo-mcp", () => {
 
   test("piblo_task_update forwards progress", async () => {
     await call(client, "piblo_task_update", { task_id: "t1", title: "Index repo", status: "running", progress: 30 });
-    assert.deepEqual(core.seen.at(-1).body, { id: "t1", title: "Index repo", status: "running", progress: 30, detail: "", agent: "unit-client" });
+    assert.deepEqual(core.seen.at(-1).body, { id: "t1", title: "Index repo", status: "running", progress: 30, detail: "", proof: "", agent: "unit-client" });
     const bad = await client.callTool({ name: "piblo_task_update", arguments: { task_id: "t1", title: "x", status: "running", progress: 150 } });
     assert.equal(bad.isError, true);
   });

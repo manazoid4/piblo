@@ -150,6 +150,7 @@ class TaskIn(BaseModel):
     progress: int | None = Field(default=None, ge=0, le=100)
     detail: str = Field(default="", max_length=200)
     agent: str = Field(default="", max_length=60)
+    proof: str = Field(default="", max_length=300)   # URL or path to a screenshot / test log
 
 
 class DeviceStateIn(BaseModel):
@@ -733,7 +734,7 @@ class Buddy:
         """Upsert a task. The first done/failed also raises ONE alert so the device needs no new firmware."""
         agent = t.agent or "agent"
         prev = self._db("get_task", t.id)
-        row = self._db("upsert_task", t.id, agent, t.title, t.status, t.progress, t.detail)
+        row = self._db("upsert_task", t.id, agent, t.title, t.status, t.progress, t.detail, t.proof)
         if row is None:    # no store, or the disk failed: still tell the device
             row = {"id": t.id, "status": t.status, "progress": t.progress, "title": t.title}
         self._db("touch_agent", agent)
