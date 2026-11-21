@@ -88,4 +88,21 @@ def build_library_router(cfg: Settings, model_router) -> APIRouter:
     async def stats():
         return await run_in_threadpool(library.stats, root)
 
+    @router.get("/library/item/{item_id}")
+    async def item(item_id: str):
+        found = await run_in_threadpool(library.get_item, root, item_id)
+        if found is None:
+            raise HTTPException(404, "item_not_found")
+        return found
+
+    @router.delete("/library/item/{item_id}")
+    async def delete_item(item_id: str):
+        if not await run_in_threadpool(library.delete_item, root, item_id):
+            raise HTTPException(404, "item_not_found")
+        return {"ok": True, "id": item_id}
+
+    @router.get("/library/export")
+    async def export():
+        return {"items": await run_in_threadpool(library.export_items, root)}
+
     return router
