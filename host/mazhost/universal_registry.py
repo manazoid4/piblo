@@ -10,6 +10,7 @@ import asyncio
 import inspect
 import logging
 import time
+import uuid
 from dataclasses import dataclass, field
 from typing import Any, Callable, Coroutine
 
@@ -33,7 +34,7 @@ class Event:
     source: str
     payload: dict[str, Any]
     timestamp: float = field(default_factory=time.time)
-    id: str = field(default_factory=lambda: f"ev_{int(time.time()*1000)}")
+    id: str = field(default_factory=lambda: f"ev_{uuid.uuid4().hex[:12]}")
 
 class EventBus:
     def __init__(self) -> None:
@@ -52,9 +53,8 @@ class EventBus:
             self._history.pop(0)
 
         # Notify specific subscribers
-        subs = self._subscribers.get(event.type, [])
-        # Also notify wildcard subscribers
-        subs.extend(self._subscribers.get("*", []))
+        # Copy so wildcard subscribers are not appended to the stored list on every publish
+        subs = [*self._subscribers.get(event.type, []), *self._subscribers.get("*", [])]
 
         for sub in subs:
             try:

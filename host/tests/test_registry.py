@@ -1,9 +1,11 @@
 import asyncio
-import pytest
 from mazhost.universal_registry import EventBus, Event, UniversalCapabilityRegistry, Capability
 
-@pytest.mark.asyncio
-async def test_event_bus_pub_sub():
+def test_event_bus_pub_sub():
+    asyncio.run(_pub_sub())
+
+
+async def _pub_sub():
     bus = EventBus()
     events_received = []
 
@@ -16,8 +18,11 @@ async def test_event_bus_pub_sub():
     assert len(events_received) == 1
     assert events_received[0].payload["foo"] == "bar"
 
-@pytest.mark.asyncio
-async def test_capability_execution():
+def test_capability_execution():
+    asyncio.run(_capability_execution())
+
+
+async def _capability_execution():
     bus = EventBus()
     registry = UniversalCapabilityRegistry(bus)
 
@@ -37,3 +42,16 @@ async def test_capability_execution():
     res = await registry.execute("test.echo", {"input": "hello"})
     assert res["success"] is True
     assert res["result"]["echo"] == "hellohello"
+
+
+def test_wildcard_subscriber_called_once_per_publish():
+    async def run():
+        bus = EventBus()
+        seen = []
+        bus.subscribe("a", lambda ev: seen.append("a"))
+        bus.subscribe("*", lambda ev: seen.append("*"))
+        for _ in range(3):
+            await bus.publish(Event(type="a", source="t", payload={}))
+        assert seen == ["a", "*"] * 3
+        assert len({e.id for e in bus.get_history()}) == 3
+    asyncio.run(run())
