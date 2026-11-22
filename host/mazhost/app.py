@@ -71,6 +71,8 @@ from .llm import VOICE_MAX_TOKENS, Models, Route, _output_cap
 from .nudge import NudgeClient
 from .pairing import build_pairing_app
 from .pc import PCController
+from .registry_routes import install_registry_routes
+from .universal_registry import global_registry
 from .brain import maths_line, priorities_line, weather_line
 from .prompts import EXTRACT_PROMPTS, SYSTEM_PROMPT
 from .refine import FILLER, refine
@@ -1360,6 +1362,16 @@ def create_app(
             work_store=work_store,
             voices=speech_out.voices,
         )
+
+    # Universal capability registry: one discovery/execution contract for
+    # Tier 0 deterministic actions (PC controls, reminders, system status).
+    install_registry_routes(
+        api,
+        registry=global_registry,
+        pc_controller=pc_controller,
+        core_service=core_service,
+        buddy=buddy,
+    )
 
     return api
 
