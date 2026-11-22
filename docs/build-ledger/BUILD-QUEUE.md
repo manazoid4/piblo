@@ -1,7 +1,7 @@
 # Piblo Build Queue
 
-1. **Shared Event & Capability Architecture (Priority 1):** Done — UniversalCapabilityRegistry + lightweight EventBus under `host/mazhost/universal_registry.py`, exposed via Core REST (`GET /capabilities`, `POST /capabilities/{id}/execute`) in `host/mazhost/registry_routes.py` and wired into `host/mazhost/app.py`. Tier 0 deterministic handlers registered: `pc.*` (desktop, play_pause, mute, volume_down/up, previous/next_track, lock via PCController), `reminder.create` (via buddy.post_alert), `system.status` (via MazCore.status). 2 unit tests passing + route-wiring check passed. Committed `feat/core-event-bus-v2`, PR #215 open against `main`.
-2. **Tiny Command Model Routing (Priority 4):** Pending.
-3. **Screen Perception & OCR Integration (Priority 3):** Pending.
-4. **Enhanced Voice & Flow Integration (Priority 5):** Pending.
-5. **Physical Device Handlers & Power Awareness (Priority 6):** Pending.
+1. **Shared Event & Capability Architecture (Priority 1):** Done — UniversalCapabilityRegistry + lightweight EventBus exposed via Core REST (`GET /capabilities`, `POST /capabilities/{id}/execute`) in `host/mazhost/registry_routes.py`, wired into `host/mazhost/app.py`. Tier 0 handlers: `pc.*` (PCController), `reminder.create` (buddy), `system.status` (MazCore). 2 unit tests + route-wiring check passed. PR #215.
+2. **Screen Perception & OCR Integration (Priority 3):** Done (capture) / Partial (OCR). `host/mazhost/screen_perception.py` captures via PIL ImageGrab; `ocr_text` tries tesseract → rapidocr → paddleocr, degrades to `{available: false}` when none installed (no crash, no fabricated text). Capabilities `screen.read` + `screen.ocr` registered. OCR engine install is a TEST-BATCH environment task (not blocking).
+3. **Tiny Command Model Routing (Priority 4):** Pending — small-model intent/tool selection on top of Tier 0 handlers.
+4. **Enhanced Voice & Flow Integration (Priority 5):** Pending — connect Piblo Flow STT into the Core event loop + PibloCraft live activity.
+5. **Physical Device Handlers & Power Awareness (Priority 6):** Pending — ESP-NOW/USB link, low-power emergency reading.

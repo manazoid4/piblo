@@ -72,6 +72,7 @@ from .nudge import NudgeClient
 from .pairing import build_pairing_app
 from .pc import PCController
 from .registry_routes import install_registry_routes
+from . import screen_perception
 from .universal_registry import global_registry
 from .brain import maths_line, priorities_line, weather_line
 from .prompts import EXTRACT_PROMPTS, SYSTEM_PROMPT
@@ -1371,6 +1372,7 @@ def create_app(
         pc_controller=pc_controller,
         core_service=core_service,
         buddy=buddy,
+        perception=screen_perception,
     )
 
     return api

@@ -6,7 +6,11 @@
 
 ## Windows Piblo Core & PibloCraft
 - [ ] Verify `pc migrate` and active pane telemetry in PibloCraft 0.7.
-- [ ] Test local event bus and capability execution.
+- [ ] Test local event bus and capability execution (`GET /capabilities`, `POST /capabilities/{id}/execute`).
+
+## OCR and computer control
+- [ ] Install an OCR engine (tesseract or rapidocr_onnxruntime via `uv pip install`) so `screen.ocr` returns real text; verify on a sample screenshot.
+- [ ] Verify `screen.read` capture on the Windows host.
 
 ## Companion & OCR
 - [ ] Test Android companion pairing and handoff.

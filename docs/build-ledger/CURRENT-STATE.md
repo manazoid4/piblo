@@ -3,7 +3,7 @@
 ## Working Functionality
 - **Piblo site & pages (`/features/`, `/piblocraft/`):** Clean Kickstarter-style bento grid, swipeable cards, cream concept design default with smoke switch. (PR #195).
 - **PibloCraft 0.7:** Mission control environment with active agent support, provider list, cswap status, and fixed `pc board` UI. (manazoid4/piblocraft PR #48).
-- **Piblo Core event bus & capability registry:** `UniversalCapabilityRegistry` + lightweight `EventBus` under `host/mazhost/universal_registry.py`; exposed via Core REST (`GET /capabilities`, `POST /capabilities/{id}/execute`) in `host/mazhost/registry_routes.py`, wired into `host/mazhost/app.py`. Tier 0 handlers: `pc.*` (PCController), `reminder.create` (buddy), `system.status` (MazCore). Unit tests + route-wiring check passing. (commit `4600a3a` + registry-routes commit, PR #215).
+- **Piblo Core event bus & capability registry:** `UniversalCapabilityRegistry` + lightweight `EventBus` under `host/mazhost/universal_registry.py`; exposed via Core REST (`GET /capabilities`, `POST /capabilities/{id}/execute`) in `host/mazhost/registry_routes.py`, wired into `host/mazhost/app.py`. Tier 0 handlers: `pc.*` (PCController), `reminder.create` (buddy), `system.status` (MazCore). Screen perception: `screen.read` + `screen.ocr` via `host/mazhost/screen_perception.py` (PIL ImageGrab capture; OCR degrades gracefully when no engine installed). Unit tests + route-wiring + screen checks passing. PR #215.
 - **Firmware & Hardware baseline:** ESP32-S3 retro portrait retro-inspired design, Cardputer ADV support, Waveshare/ESP development baselines.
 
 ## Partial Implementation

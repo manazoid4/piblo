@@ -77,6 +77,26 @@ def _reminder_handler(buddy) -> Callable:
     return handler
 
 
+def _capture_handler(perception) -> Callable:
+    def handler(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        snap = perception.capture_screen()
+        return {"path": snap.path, "size": list(snap.size),
+                "captured_at": snap.captured_at, "source": snap.source,
+                "provider": "screen-local"}
+
+    return handler
+
+
+def _ocr_handler(perception) -> Callable:
+    def handler(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        image_path = args.get("image_path")
+        if not image_path:
+            raise ValueError("ocr_image_path_required")
+        return perception.ocr_text(image_path)
+
+    return handler
+
+
 def install_registry_routes(
     api: FastAPI,
     *,
@@ -84,6 +104,7 @@ def install_registry_routes(
     pc_controller: PCController,
     core_service,
     buddy,
+    perception=None,
 ) -> None:
     # Tier 0 PC controls (Windows media / desktop / lock), reusing PCController.
     for action in PC_ACTIONS:
@@ -132,6 +153,35 @@ def install_registry_routes(
             handler=_reminder_handler(buddy),
         )
     )
+
+    # Screen perception (capture always available; OCR depends on installed engine).
+    if perception is not None:
+        registry.register(
+            Capability(
+                id="screen.read",
+                name="Read screen",
+                description="Capture the primary monitor as an image.",
+                input_schema={"type": "object", "properties": {}},
+                output_schema={"type": "object"},
+                category="screen-perception",
+                handler=_capture_handler(perception),
+            )
+        )
+        registry.register(
+            Capability(
+                id="screen.ocr",
+                name="OCR screenshot",
+                description="Extract text from a captured image.",
+                input_schema={
+                    "type": "object",
+                    "properties": {"image_path": {"type": "string"}},
+                    "required": ["image_path"],
+                },
+                output_schema={"type": "object"},
+                category="screen-perception",
+                handler=_ocr_handler(perception),
+            )
+        )
 
     @api.get("/capabilities")
     def list_capabilities():
