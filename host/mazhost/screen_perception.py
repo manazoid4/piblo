@@ -16,6 +16,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from . import private_mode
+from .nowindow import no_window
+
 import tempfile
 
 SCREEN_DIR = Path(tempfile.gettempdir()) / "piblo-screenshots"
@@ -54,9 +57,10 @@ def ocr_text(image_path: str) -> dict[str, Any]:
     # Tesseract CLI (free, local, no network).
     if _engine_available("tesseract"):
         try:
+            private_mode.guard_subprocess("tesseract OCR", local=True)
             out = subprocess.run(
                 ["tesseract", str(path), "stdout", "-l", "eng"],
-                capture_output=True, text=True, timeout=60,
+                capture_output=True, text=True, timeout=60, **no_window(),
             )
             if out.returncode == 0:
                 return {"text": out.stdout.strip(), "engine": "tesseract",

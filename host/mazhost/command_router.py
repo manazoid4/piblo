@@ -20,8 +20,8 @@ import json
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
 
+from . import private_mode
 from .commands import parse_command
 
 SYSTEM_PROMPT = (
@@ -56,7 +56,7 @@ class CommandRouter:
     ) -> None:
         self.ollama_url = ollama_url.rstrip("/")
         self.model = model
-        self.client = client or httpx.Client(timeout=30)
+        self.client = client or private_mode.client(timeout=30)
         self.capabilities = list(capabilities or [])
         self.registry = registry
 
