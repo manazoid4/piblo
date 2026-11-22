@@ -278,3 +278,10 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 }
 .why-price { margin-top: 14px; font-size: 15px; color: var(--ink-2); }
 .why-price b { color: var(--ink); }
+
+/* Founder (22 Nov): photo and words from mazworks.uk/about */
+.founder-inner { display: grid; grid-template-columns: 140px minmax(0, 1fr); gap: 28px; align-items: start; max-width: 820px; }
+.founder-photo { width: 140px; height: 140px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 1px var(--line); }
+.founder h2 { margin: 6px 0 12px; }
+.founder p:not(.label) { color: var(--ink-2); max-width: 60ch; margin: 0 0 12px; }
+@media (max-width: 560px) { .founder-inner { grid-template-columns: minmax(0, 1fr); gap: 18px; } .founder-photo { width: 104px; height: 104px; } }
