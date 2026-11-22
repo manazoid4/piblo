@@ -1427,6 +1427,7 @@ def create_app(
         perception=screen_perception,
         device_monitor=device_monitor,
         device_store=device_store,
+        memory_notes=memory_notes,
     )
 
     # Command router: Tier 0 deterministic + Tier 1 small-model capability
