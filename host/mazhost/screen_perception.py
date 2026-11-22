@@ -16,11 +16,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from PIL import ImageGrab
+import tempfile
 
-SCREEN_DIR = Path(
-    "C:/Users/Maz/AppData/Local/hermes/cache/scratch"
-) / "screenshots"
+SCREEN_DIR = Path(tempfile.gettempdir()) / "piblo-screenshots"
 
 
 @dataclass
@@ -35,6 +33,8 @@ def capture_screen() -> ScreenCapture:
     """Grab the primary monitor and persist a PNG. Read-only; no pixels are
     sent anywhere unless a downstream capability explicitly uploads them."""
     SCREEN_DIR.mkdir(parents=True, exist_ok=True)
+    from PIL import ImageGrab  # lazy: Pillow is optional, CI and headless hosts lack it
+
     img = ImageGrab.grab()
     path = SCREEN_DIR / f"snap_{int(time.time() * 1000)}.png"
     img.save(path)
