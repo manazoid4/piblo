@@ -230,13 +230,14 @@ test("homepage makes no absolute claims and carries the new positioning and Batc
   assert.match(html, /&pound;129/);
   assert.match(html, /comes off the &pound;129/);
 });
-test("homepage tabs: each tab controls an existing tabpanel", () => {
+test("what-it-does bento: plain benefits, each honest about its status", () => {
   const html = contents["/"];
-  assert.match(html, /role="tablist"/);
-  const panels = new Set([...html.matchAll(/<[^>]*role="tabpanel"[^>]*>/g)].map(m => (m[0].match(/\sid="([^"]+)"/) || [])[1]));
-  const tabs = [...html.matchAll(/<[^>]*role="tab"[^>]*>/g)].map(m => m[0]);
-  assert.ok(tabs.length > 0);
-  for (const tab of tabs) assert.ok(panels.has((tab.match(/aria-controls="([^"]+)"/) || [])[1]), tab);
+  const life = html.slice(html.indexOf('id="life"'), html.indexOf('id="batch"'));
+  const tiles = life.match(/<article class="bt[\s\S]*?<\/article>/g) || [];
+  assert.ok(tiles.length >= 6);
+  for (const tile of tiles) { assert.match(tile, /<h3>/); if (!/&pound;0/.test(tile)) assert.match(tile, /class="chip/, tile); }
+  assert.doesNotMatch(life, /API|ms|LLM|AI|agent/i);
+  assert.match(life, /example screens/);
 });
 test("homepage images have alt attributes and existing files; Buddy images are under 300 KB", async () => {
   const { statSync } = await import("node:fs");
