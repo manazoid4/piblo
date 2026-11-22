@@ -69,8 +69,12 @@ from .live_voice import install_live_voice
 from .live_brain import scrub
 from .llm import VOICE_MAX_TOKENS, Models, Route, _output_cap
 from .nudge import NudgeClient
-from .pairing import build_pairing_app
+from .pairing import DevicePairingStore, build_pairing_app
 from .pc import PCController
+from .registry_routes import install_registry_routes
+from . import screen_perception
+from .command_router import CommandRouter
+from .universal_registry import Event, global_event_bus, global_registry
 from .brain import maths_line, priorities_line, weather_line
 from .prompts import EXTRACT_PROMPTS, SYSTEM_PROMPT
 from .refine import FILLER, refine
@@ -117,6 +121,10 @@ class TextTurn(BaseModel):
     session_id: str
     route: Route = "local"
     context: str = Field(default="", max_length=1_200)
+
+
+class RouteBody(BaseModel):
+    text: str = Field(min_length=1, max_length=8_000)
 
 
 class SpeaksFirstCheck(BaseModel):
@@ -1060,6 +1068,16 @@ def create_app(
     flow_service = Flow(cfg, speech, model_router)
     api.state._flow = flow_service  # test hook: tweak dictate_timeout, _cancel, etc.
 
+    # Command router: Tier 0 deterministic + Tier 1 small-model capability
+    # selection over the registry. Read capabilities lazily so this can be
+    # created before install_registry_routes populates them.
+    command_router = CommandRouter(
+        ollama_url=cfg.ollama_url,
+        model=cfg.ollama_model,
+        registry=global_registry,
+    )
+    api.state._command_router = command_router  # read by the dictate endpoint
+
     @api.post("/dictate")
     async def dictate(request: Request, target: str = "text"):
         """wav in -> cleaned text out. target=pc-paste also pastes on the PC."""
@@ -1083,6 +1101,33 @@ def create_app(
             except asyncio.TimeoutError:
                 flow_service._cancel.set()
                 raise HTTPException(504, "stt_timeout")
+
+            # Voice -> capability: route the cleaned text through the command
+            # router and publish a voice.command.routed event so PibloCraft live
+            # activity can show what voice mapped to. Additive: existing paste /
+            # log behaviour is unchanged and nothing is executed automatically.
+            router = getattr(api.state, "_command_router", None)
+            if router and result.get("text"):
+                route = await run_in_threadpool(router.route, result["text"])
+                result["command_route"] = {
+                    "tier": route.tier,
+                    "capability": route.capability,
+                    "args": route.args,
+                    "confidence": route.confidence,
+                }
+                await global_event_bus.publish(Event(
+                    type="voice.command.routed",
+                    source="flow",
+                    payload={
+                        "text": result["text"],
+                        "intent": result.get("intent"),
+                        "tier": route.tier,
+                        "capability": route.capability,
+                        "args": route.args,
+                        "confidence": route.confidence,
+                    },
+                ))
+
             insert_ms, pc = 0, ""
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
                 t_ins = time.perf_counter()
@@ -1236,7 +1281,17 @@ def create_app(
         temp.write_text(json.dumps(device_keys), encoding="utf-8")
         temp.replace(key_file)
 
-    api.mount("/pair", build_pairing_app(cfg, security, device_keys=device_keys, save_keys=save_device_keys, audit=authority.audit_action))
+    # One pairing store shared by /pair and the universal capability registry
+    # so device request state is single-sourced.
+    device_store = DevicePairingStore(device_keys, save_device_keys)
+
+    api.mount(
+        "/pair",
+        build_pairing_app(
+            cfg, security, device_store=device_store, device_keys=device_keys,
+            save_keys=save_device_keys, audit=authority.audit_action,
+        ),
+    )
     buddy_store = None if cfg.buddy_db == "off" else BuddyStore(
         cfg.buddy_db or resolve_data_dir(cfg) / "buddy.sqlite3")
     buddy = install_buddy_routes(api, Buddy(store=buddy_store, focus=focus, device_keys=device_keys))
@@ -1360,6 +1415,38 @@ def create_app(
             work_store=work_store,
             voices=speech_out.voices,
         )
+
+    # Universal capability registry: one discovery/execution contract for
+    # Tier 0 deterministic actions (PC controls, reminders, system status).
+    install_registry_routes(
+        api,
+        registry=global_registry,
+        pc_controller=pc_controller,
+        core_service=core_service,
+        buddy=buddy,
+        perception=screen_perception,
+        device_monitor=device_monitor,
+        device_store=device_store,
+    )
+
+    # Command router: Tier 0 deterministic + Tier 1 small-model capability
+    # selection over the registered capabilities.
+    command_router = CommandRouter(
+        ollama_url=cfg.ollama_url,
+        model=cfg.ollama_model,
+        capabilities=global_registry.list_all(),
+    )
+
+    @api.post("/command/route")
+    def route_command(body: RouteBody):
+        result = command_router.route(body.text)
+        return {
+            "tier": result.tier,
+            "capability": result.capability,
+            "args": result.args,
+            "confidence": result.confidence,
+            "reasoning": result.reasoning,
+        }
 
     return api
 
