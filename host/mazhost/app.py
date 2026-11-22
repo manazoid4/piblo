@@ -73,6 +73,7 @@ from .pairing import build_pairing_app
 from .pc import PCController
 from .registry_routes import install_registry_routes
 from . import screen_perception
+from .command_router import CommandRouter
 from .universal_registry import global_registry
 from .brain import maths_line, priorities_line, weather_line
 from .prompts import EXTRACT_PROMPTS, SYSTEM_PROMPT
@@ -120,6 +121,10 @@ class TextTurn(BaseModel):
     session_id: str
     route: Route = "local"
     context: str = Field(default="", max_length=1_200)
+
+
+class RouteBody(BaseModel):
+    text: str = Field(min_length=1, max_length=8_000)
 
 
 class SpeaksFirstCheck(BaseModel):
@@ -1374,6 +1379,25 @@ def create_app(
         buddy=buddy,
         perception=screen_perception,
     )
+
+    # Command router: Tier 0 deterministic + Tier 1 small-model capability
+    # selection over the registered capabilities.
+    command_router = CommandRouter(
+        ollama_url=cfg.ollama_url,
+        model=cfg.ollama_model,
+        capabilities=global_registry.list_all(),
+    )
+
+    @api.post("/command/route")
+    def route_command(body: RouteBody):
+        result = command_router.route(body.text)
+        return {
+            "tier": result.tier,
+            "capability": result.capability,
+            "args": result.args,
+            "confidence": result.confidence,
+            "reasoning": result.reasoning,
+        }
 
     return api
 
