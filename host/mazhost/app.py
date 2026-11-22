@@ -69,7 +69,7 @@ from .live_voice import install_live_voice
 from .live_brain import scrub
 from .llm import VOICE_MAX_TOKENS, Models, Route, _output_cap
 from .nudge import NudgeClient
-from .pairing import build_pairing_app
+from .pairing import DevicePairingStore, build_pairing_app
 from .pc import PCController
 from .registry_routes import install_registry_routes
 from . import screen_perception
@@ -1281,7 +1281,17 @@ def create_app(
         temp.write_text(json.dumps(device_keys), encoding="utf-8")
         temp.replace(key_file)
 
-    api.mount("/pair", build_pairing_app(cfg, security, device_keys=device_keys, save_keys=save_device_keys, audit=authority.audit_action))
+    # One pairing store shared by /pair and the universal capability registry
+    # so device request state is single-sourced.
+    device_store = DevicePairingStore(device_keys, save_device_keys)
+
+    api.mount(
+        "/pair",
+        build_pairing_app(
+            cfg, security, device_store=device_store, device_keys=device_keys,
+            save_keys=save_device_keys, audit=authority.audit_action,
+        ),
+    )
     buddy_store = None if cfg.buddy_db == "off" else BuddyStore(
         cfg.buddy_db or resolve_data_dir(cfg) / "buddy.sqlite3")
     buddy = install_buddy_routes(api, Buddy(store=buddy_store, focus=focus, device_keys=device_keys))
@@ -1415,6 +1425,8 @@ def create_app(
         core_service=core_service,
         buddy=buddy,
         perception=screen_perception,
+        device_monitor=device_monitor,
+        device_store=device_store,
     )
 
     # Command router: Tier 0 deterministic + Tier 1 small-model capability

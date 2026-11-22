@@ -15,6 +15,7 @@ from pydantic import BaseModel, Field
 
 from .buddy import AlertIn
 from .pc import ActionResult, PCController
+from .pairing import DevicePairingStore
 from .universal_registry import Capability, UniversalCapabilityRegistry
 
 PC_ACTIONS = (
@@ -97,6 +98,50 @@ def _ocr_handler(perception) -> Callable:
     return handler
 
 
+def _device_status_handler(monitor) -> Callable:
+    def handler(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        return monitor.status()
+
+    return handler
+
+
+def _device_monitor_handler(monitor, action: str) -> Callable:
+    def handler(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        if action == "start":
+            return monitor.start()
+        return monitor.stop()
+
+    return handler
+
+
+def _device_pairing_handlers(store: DevicePairingStore) -> dict[str, Callable]:
+    def pending(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        return {"requests": store.pending()}
+
+    def approve(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        request_id = str(args.get("request_id", "")).strip()
+        code = args.get("code")
+        if not request_id:
+            raise ValueError("device_pairing_request_id_required")
+        ok = store.decide(request_id, True, code)
+        if not ok:
+            raise ValueError("device_pairing_not_found_or_expired")
+        return {"ok": True, "request_id": request_id, "state": "approved"}
+
+    def deny(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        request_id = str(args.get("request_id", "")).strip()
+        if not request_id:
+            raise ValueError("device_pairing_request_id_required")
+        ok = store.decide(request_id, False)
+        if not ok:
+            raise ValueError("device_pairing_not_found_or_expired")
+        return {"ok": True, "request_id": request_id, "state": "denied"}
+
+    return {"device.pairing.pending": pending,
+            "device.pairing.approve": approve,
+            "device.pairing.deny": deny}
+
+
 def install_registry_routes(
     api: FastAPI,
     *,
@@ -105,6 +150,8 @@ def install_registry_routes(
     core_service,
     buddy,
     perception=None,
+    device_monitor=None,
+    device_store: DevicePairingStore | None = None,
 ) -> None:
     # Tier 0 PC controls (Windows media / desktop / lock), reusing PCController.
     for action in PC_ACTIONS:
@@ -182,6 +229,67 @@ def install_registry_routes(
                 handler=_ocr_handler(perception),
             )
         )
+
+    # Device connection handlers (no hardware is touched unless monitor.start is
+    # explicitly called — the serial port is only opened then).
+    if device_monitor is not None:
+        registry.register(
+            Capability(
+                id="device.status",
+                name="Device status",
+                description="Piblo handheld connection state (port, reconnects, last seen).",
+                input_schema={"type": "object", "properties": {}},
+                output_schema={"type": "object"},
+                category="connected-devices",
+                handler=_device_status_handler(device_monitor),
+            )
+        )
+        registry.register(
+            Capability(
+                id="device.monitor.start",
+                name="Start device monitor",
+                description="Open the handheld serial port and follow reconnects.",
+                input_schema={"type": "object", "properties": {}},
+                output_schema={"type": "object"},
+                category="connected-devices",
+                required_permissions=["device_control"],
+                handler=_device_monitor_handler(device_monitor, "start"),
+            )
+        )
+        registry.register(
+            Capability(
+                id="device.monitor.stop",
+                name="Stop device monitor",
+                description="Close the handheld serial port.",
+                input_schema={"type": "object", "properties": {}},
+                output_schema={"type": "object"},
+                category="connected-devices",
+                required_permissions=["device_control"],
+                handler=_device_monitor_handler(device_monitor, "stop"),
+            )
+        )
+
+    # Device pairing over the shared contract (approve/deny device requests
+    # from /pair; the store is shared with the pairing app so state is one).
+    if device_store is not None:
+        handlers = _device_pairing_handlers(device_store)
+        for cap_id, handler in handlers.items():
+            registry.register(
+                Capability(
+                    id=cap_id,
+                    name=cap_id.replace("_", " ").title(),
+                    description="Device pairing request handling.",
+                    input_schema={
+                        "type": "object",
+                        "properties": {"request_id": {"type": "string"}, "code": {"type": "string"}},
+                        "required": ["request_id"],
+                    },
+                    output_schema={"type": "object"},
+                    category="connected-devices",
+                    required_permissions=["device_control"],
+                    handler=handler,
+                )
+            )
 
     @api.get("/capabilities")
     def list_capabilities():
