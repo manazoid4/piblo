@@ -52,11 +52,13 @@ class CommandRouter:
         model: str,
         client: Any = None,
         capabilities: list[dict[str, Any]] | None = None,
+        registry=None,
     ) -> None:
         self.ollama_url = ollama_url.rstrip("/")
         self.model = model
         self.client = client or httpx.Client(timeout=30)
         self.capabilities = list(capabilities or [])
+        self.registry = registry
 
     # ---------------------------------------------------------------- public
     def route(self, text: str) -> RouteResult:
@@ -75,8 +77,12 @@ class CommandRouter:
 
     # ---------------------------------------------------------------- tier 1
     def _tier1(self, text: str) -> RouteResult:
+        if self.registry is not None:
+            caps_list = self.registry.list_all()
+        else:
+            caps_list = self.capabilities
         caps = "\n".join(
-            f"- {c['id']}: {c['description']}" for c in self.capabilities
+            f"- {c['id']}: {c['description']}" for c in caps_list
         ) or "(none registered)"
         system = SYSTEM_PROMPT + caps
         try:

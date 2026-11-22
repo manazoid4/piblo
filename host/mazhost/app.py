@@ -74,7 +74,7 @@ from .pc import PCController
 from .registry_routes import install_registry_routes
 from . import screen_perception
 from .command_router import CommandRouter
-from .universal_registry import global_registry
+from .universal_registry import Event, global_event_bus, global_registry
 from .brain import maths_line, priorities_line, weather_line
 from .prompts import EXTRACT_PROMPTS, SYSTEM_PROMPT
 from .refine import FILLER, refine
@@ -1068,6 +1068,16 @@ def create_app(
     flow_service = Flow(cfg, speech, model_router)
     api.state._flow = flow_service  # test hook: tweak dictate_timeout, _cancel, etc.
 
+    # Command router: Tier 0 deterministic + Tier 1 small-model capability
+    # selection over the registry. Read capabilities lazily so this can be
+    # created before install_registry_routes populates them.
+    command_router = CommandRouter(
+        ollama_url=cfg.ollama_url,
+        model=cfg.ollama_model,
+        registry=global_registry,
+    )
+    api.state._command_router = command_router  # read by the dictate endpoint
+
     @api.post("/dictate")
     async def dictate(request: Request, target: str = "text"):
         """wav in -> cleaned text out. target=pc-paste also pastes on the PC."""
@@ -1091,6 +1101,33 @@ def create_app(
             except asyncio.TimeoutError:
                 flow_service._cancel.set()
                 raise HTTPException(504, "stt_timeout")
+
+            # Voice -> capability: route the cleaned text through the command
+            # router and publish a voice.command.routed event so PibloCraft live
+            # activity can show what voice mapped to. Additive: existing paste /
+            # log behaviour is unchanged and nothing is executed automatically.
+            router = getattr(api.state, "_command_router", None)
+            if router and result.get("text"):
+                route = await run_in_threadpool(router.route, result["text"])
+                result["command_route"] = {
+                    "tier": route.tier,
+                    "capability": route.capability,
+                    "args": route.args,
+                    "confidence": route.confidence,
+                }
+                await global_event_bus.publish(Event(
+                    type="voice.command.routed",
+                    source="flow",
+                    payload={
+                        "text": result["text"],
+                        "intent": result.get("intent"),
+                        "tier": route.tier,
+                        "capability": route.capability,
+                        "args": route.args,
+                        "confidence": route.confidence,
+                    },
+                ))
+
             insert_ms, pc = 0, ""
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
                 t_ins = time.perf_counter()
