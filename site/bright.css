@@ -159,7 +159,17 @@ body { background: var(--paper); color: var(--ink); font-family: var(--font-sans
 .uses b { font-size: 18px; line-height: 1.25; letter-spacing: -.01em; }
 .uses span { flex: 1; color: var(--ink-2); font-size: 15px; }
 .uses .chip { margin-top: 10px; }
-@media (max-width: 900px) { .uses { grid-template-columns: 1fr; } }
+.life-note { margin: -8px 0 18px; color: var(--ink-3); font-size: 14px; }
+/* Each use shows what Piblo's screen says at that moment (22 Nov) */
+.pscreen { display: flex; flex-direction: column; gap: 6px; min-height: 128px; margin: -10px -10px 8px; padding: 16px 18px; border-radius: 16px; background: var(--screen); color: var(--screen-ink); box-shadow: 0 0 0 1px #3a342e, inset 0 0 0 1px rgba(255, 255, 255, .06); }
+.pscreen small { font-family: var(--font-mono); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--screen-dim); }
+.pscreen p { margin: 0; font-size: 19px; font-weight: 600; line-height: 1.25; letter-spacing: -.01em; }
+.pscreen i { align-self: flex-start; margin-top: auto; padding: 3px 12px; border-radius: 8px; background: var(--orange); color: var(--ink); font-family: var(--font-mono); font-size: 12px; font-style: normal; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+@media (max-width: 900px) {
+  .uses { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: 78%; overflow-x: auto; scroll-snap-type: x mandatory; scroll-padding-inline: 20px; scrollbar-width: none; margin-inline: -20px; padding: 0 20px 4px; }
+  .uses li { scroll-snap-align: start; padding: 18px; }
+  .pscreen { margin: -6px -6px 6px; }
+}
 
 /* asks first */
 

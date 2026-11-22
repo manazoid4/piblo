@@ -223,7 +223,8 @@
         <p class="label">Your life</p>
         <h2 id="life-title">Pick your life. Piblo fits in.</h2>
       </div>
-      <div class="life" data-tabs>
+      <p class="life-note">The dark boxes show example screens.</p>
+        <div class="life" data-tabs>
         <div class="life-tabs" role="tablist" aria-label="Pick your life">
           <button type="button" role="tab" id="tab-home" aria-controls="panel-home" aria-selected="true">Home</button>
           <button type="button" role="tab" id="tab-work" aria-controls="panel-work" aria-selected="false" tabindex="-1">Work</button>
@@ -233,33 +234,33 @@
         <div class="life-panel" role="tabpanel" id="panel-home" aria-labelledby="tab-home">
           <h3 class="life-title">Home</h3>
           <ul class="uses">
-            <li><b>Forgot the bins? Piblo reminds you.</b><span>Bin-day reminders the night before.</span><em class="chip">In testing</em></li>
-            <li><b>Holds you to it.</b><span>&ldquo;Remind me to call Mum on Sunday.&rdquo; Promises you make out loud, kept.</span><em class="chip chip--ok">Works on the prototype</em></li>
-            <li><b>Speaks up first.</b><span>Your train is late, so leave at 8:20 instead.</span><em class="chip">In testing</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>Sun &middot; 21:00</small><p>Bins out tonight. Recycling week.</p><i>Done</i></div><b>Forgot the bins? Piblo reminds you.</b><span>Bin-day reminders the night before.</span><em class="chip">In testing</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>Sun &middot; 11:00</small><p>You promised: call Mum today.</p><i>Done</i></div><b>Holds you to it.</b><span>&ldquo;Remind me to call Mum on Sunday.&rdquo; Promises you make out loud, kept.</span><em class="chip chip--ok">Works on the prototype</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>Mon &middot; 07:52</small><p>Your train is late. Leave at 8:20.</p></div><b>Speaks up first.</b><span>Your train is late, so leave at 8:20 instead.</span><em class="chip">In testing</em></li>
           </ul>
         </div>
         <div class="life-panel" role="tabpanel" id="panel-work" aria-labelledby="tab-work">
           <h3 class="life-title">Work</h3>
           <ul class="uses">
-            <li><b>One sentence, two jobs.</b><span>&ldquo;Save this and remind me to finish it tonight.&rdquo; One YES does both.</span><em class="chip">In testing</em></li>
-            <li><b>Types for you.</b><span>Hold a key, speak, and the words land wherever your cursor is.</span><em class="chip">In testing</em></li>
-            <li><b>Approves on a key.</b><span>Anything that changes your PC is designed to wait on Piblo for your YES.</span><em class="chip">In testing</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>18:04</small><p>Save this page and remind you at 21:00?</p><i>YES</i></div><b>One sentence, two jobs.</b><span>&ldquo;Save this and remind me to finish it tonight.&rdquo; One YES does both.</span><em class="chip">In testing</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>&#9679; Listening</small><p>&ldquo;&hellip;and send it to Sam by Friday.&rdquo;</p></div><b>Types for you.</b><span>Hold a key, speak, and the words land wherever your cursor is.</span><em class="chip">In testing</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>Agent asks</small><p>Delete 3 old files from Downloads?</p><i>YES</i></div><b>Approves on a key.</b><span>Anything that changes your PC is designed to wait on Piblo for your YES.</span><em class="chip">In testing</em></li>
           </ul>
         </div>
         <div class="life-panel" role="tabpanel" id="panel-study" aria-labelledby="tab-study">
           <h3 class="life-title">Study</h3>
           <ul class="uses">
-            <li><b>Focus sessions.</b><span>A timer you can see from across the room.</span><em class="chip">In testing</em></li>
-            <li><b>Body-double.</b><span>Piblo checks in while you work, so starting feels easier.</span><em class="chip">In testing</em></li>
-            <li><b>Tonight list.</b><span>What you said you&rsquo;d finish today, waiting on screen.</span><em class="chip">In testing</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>Focus</small><p>18:42 left</p></div><b>Focus sessions.</b><span>A timer you can see from across the room.</span><em class="chip">In testing</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>25 min in</small><p>Still going. Nice. Keep at it.</p></div><b>Body-double.</b><span>Piblo checks in while you work, so starting feels easier.</span><em class="chip">In testing</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>Tonight</small><p>Essay intro &middot; Reply to Jo</p></div><b>Tonight list.</b><span>What you said you&rsquo;d finish today, waiting on screen.</span><em class="chip">In testing</em></li>
           </ul>
         </div>
         <div class="life-panel" role="tabpanel" id="panel-make" aria-labelledby="tab-make">
           <h3 class="life-title">Making</h3>
           <ul class="uses">
-            <li><b>Source available.</b><span>The code is public and free for personal use. Read it, change it, make it yours.</span><em class="chip chip--ok">Public today</em></li>
-            <li><b>Set it up by talking.</b><span>New routines without menus or code.</span><em class="chip">In testing</em></li>
-            <li><b>Your own screens.</b><span>Make your own cards and tools for Piblo&rsquo;s screen.</span><em class="chip chip--plan">Planned</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>Source</small><p>Read it. Change it. Make it yours.</p></div><b>Source available.</b><span>The code is public and free for personal use. Read it, change it, make it yours.</span><em class="chip chip--ok">Public today</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>New routine</small><p>Every Friday: pay the window cleaner.</p><i>YES</i></div><b>Set it up by talking.</b><span>New routines without menus or code.</span><em class="chip">In testing</em></li>
+            <li><div class="pscreen" aria-hidden="true"><small>Your card</small><p>Water the fern. Last done 6 days ago.</p></div><b>Your own screens.</b><span>Make your own cards and tools for Piblo&rsquo;s screen.</span><em class="chip chip--plan">Planned</em></li>
           </ul>
         </div>
       </div>
