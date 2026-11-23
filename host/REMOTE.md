@@ -1,4 +1,14 @@
-# Remote access for nod (away from home)
+# Remote access to Piblo
+
+## Browser and Android over Tailscale
+
+Connect the computer and the device you're using to the same tailnet. With Core running, open `http://<tailscale-ip>:8787/control/` in a browser, or enter the Core address in the Android app.
+
+For a private HTTPS browser link, enable Tailscale Serve for the computer and run `tailscale serve --bg --https=443 http://127.0.0.1:8787` on it. Open `/control/` at the HTTPS address printed by Serve. The browser link works on devices that can reach the tailnet.
+
+On the computer, open **Piblo → Settings → Browser sign-in** and generate a code. Enter it on the browser sign-in page within five minutes. The browser receives a control session cookie scoped to `/control/`.
+
+## Standalone Piblo firmware (optional public HTTPS)
 
 Goal: the Cardputer (on a phone hotspot or any Wi-Fi) and your phone reach Core on your home PC, free, with the token still required.
 
@@ -33,7 +43,7 @@ Open `https://<your-url>/health` in the phone browser (mobile data, Wi-Fi off). 
 ## Approvals and Calls over remote
 
 - Cardputer requests (talk, WORK, agents, authority requests) are the same HTTPS calls with `Authorization: Bearer <token>`, sent to the remote URL when LAN is down.
-- Approvals: open `https://<your-url>/control/` on the phone, enter the MAZ token once (session cookie, `Secure`, `SameSite=Strict`, HttpOnly). Pending approvals, grants and revoke-all work exactly as on the LAN. Agents cannot approve themselves.
+- Approvals: use `/control/` over the LAN or your tailnet with a one-time browser code. Pending approvals, grants and revoke-all work with the browser session cookie.
 - Firmware update (`/fw/*`) is deliberately LAN-only on the device (1.4 MB over Funnel is slow and unreliable).
 - `/pair/*` (device pairing page) is blocked remotely except `/pair/start` with the token; pair at home.
 
