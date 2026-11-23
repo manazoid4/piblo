@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from .authority import AuthorityBroker, AuthorityError, Scope
 from .config import Settings
 from .pairing import PairingStore
-from .security import client_info
+from .security import FUNNEL_HEADER, client_info, is_lan_ip
 from .work_routes import install_work_routes
 from .work_service import WorkService
 from .work_store import WorkStore
@@ -128,23 +128,23 @@ loadWork(true);refreshAll();setInterval(()=>loadWork(false),4000);setInterval(re
 LOGIN = r"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#fbfaf7"><meta name="referrer" content="no-referrer">
+<meta name="theme-color" content="#fbfaf7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#2a1a12" media="(prefers-color-scheme: dark)"><meta name="referrer" content="no-referrer">
 <title>Sign in to Piblo</title><style>
 :root{color-scheme:light dark;--bg:#fbfaf7;--card:#fffaf0;--ink:#2a1a12;--muted:#5b4336;--line:#c9a877;--accent:#ee5a36;--error:#b3301a}
 @media(prefers-color-scheme:dark){:root{--bg:#2a1a12;--card:#352318;--ink:#fff4e0;--muted:#c8b8a8;--line:#7a624e;--error:#ff987d}}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,sans-serif;display:grid;min-height:100vh;min-height:100dvh;place-items:center;padding:20px}
 main{width:min(100%,420px);padding:clamp(22px,7vw,38px);background:var(--card);border:1px solid var(--line);border-radius:24px}
-.brand{margin:0;color:var(--muted);font-size:15px;font-weight:700}h1{margin:16px 0 8px;font-size:clamp(26px,7vw,36px);line-height:1.13;letter-spacing:-.035em}
+h1{margin:0 0 8px;font-size:clamp(26px,7vw,36px);line-height:1.13;letter-spacing:-.035em}
 p{color:var(--muted);margin:0 0 22px}label{display:block;font-weight:650;margin-bottom:6px}
 input,button{display:block;width:100%;min-height:48px;border:1px solid var(--line);border-radius:10px;font:inherit;padding:10px 12px}
 input{letter-spacing:.12em;text-transform:uppercase;background:var(--bg);color:var(--ink)}
 button{margin-top:12px;border-color:transparent;background:var(--accent);color:#2a1a12;font-weight:750;cursor:pointer}
 :focus-visible{outline:2px solid var(--ink);outline-offset:3px}#sign-in-error{color:var(--error);margin-top:12px}
 </style></head><body><main>
-<p class="brand">Piblo</p>
 <h1>Sign in to Piblo</h1>
-<p>On your computer, open <strong>Piblo ? Settings ? Browser sign-in</strong> and generate a one-time code.</p>
-<form method="post" action="session/code">
+<p>In the Piblo Windows app, go to <strong>Settings &rsaquo; Browser sign-in</strong> to generate a one-time code.</p>
+<form method="post" action="/control/session/code">
 <label for="code">Sign-in code</label>
 <input id="code" name="code" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="8" required>
 <p id="sign-in-error" hidden role="alert">This code is invalid or expired. Generate a new one on your computer.</p>
@@ -205,7 +205,10 @@ def build_phone_app(
 
     @phone.post("/session/code")
     def sign_in_with_code(request: Request, code: Annotated[str, Form(max_length=24)]):
-        if not browser_codes.claim(code.strip().upper(), client_info(request)[0]):
+        peer, _, _ = client_info(request)
+        if request.headers.get(FUNNEL_HEADER) or not is_lan_ip(peer):
+            raise HTTPException(403, "browser_sign_in_requires_local_network_or_tailnet")
+        if not browser_codes.claim(code.strip().upper(), peer):
             return HTMLResponse(LOGIN.replace('id="sign-in-error" hidden', 'id="sign-in-error"'),
                                 status_code=401, headers={"Cache-Control": "no-store"})
         return signed_session(request)

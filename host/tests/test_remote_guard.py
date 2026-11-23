@@ -96,9 +96,11 @@ def test_browser_code_grants_one_scoped_session_without_core_token(tmp_path):
     assert issue.status_code == 200 and issue.headers["cache-control"] == "no-store"
     code = issue.json()["code"]
     assert c.post("/pair/claim", json={"code": code}).status_code == 400
-    failed = c.post("/control/session/code", data={"code": "wrong"}, headers=FUNNEL)
-    assert failed.status_code == 401 and "set-cookie" not in failed.headers
     conn = {"X-Forwarded-For": "100.100.1.2", "X-Forwarded-Proto": "https", "User-Agent": "Browser"}
+    assert c.post("/control/session/code", data={"code": code}, headers=FUNNEL).status_code == 403
+    failed = c.post("/control/session/code", data={"code": "wrong"}, headers=conn)
+    assert failed.status_code == 401 and "set-cookie" not in failed.headers
+    assert 'action="/control/session/code"' in failed.text
     signed = c.post("https://testserver/control/session/code", data={"code": code.lower()}, headers=conn, follow_redirects=False)
     assert signed.status_code == 303 and TOKEN not in signed.text
     assert all(part in signed.headers["set-cookie"].lower() for part in ("httponly", "secure", "samesite=strict", "path=/control"))

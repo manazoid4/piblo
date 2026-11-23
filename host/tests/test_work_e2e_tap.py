@@ -22,6 +22,7 @@ from fastapi import FastAPI
 
 from mazhost.authority import AuthorityBroker
 from mazhost.config import Settings
+from mazhost.pairing import PairingStore
 from mazhost.phone_control import build_phone_app
 
 try:
@@ -66,8 +67,10 @@ def test_one_tap_quick_log_application_from_open_work_tab(tmp_path):
         project_roots=str(tmp_path),
     )
     broker = AuthorityBroker(settings)
+    codes = PairingStore()
+    code, _ = codes.start()
     root = FastAPI()
-    root.mount("/control", build_phone_app(settings, broker))
+    root.mount("/control", build_phone_app(settings, broker, browser_codes=codes))
 
     port = _free_port()
     config = uvicorn.Config(root, host="127.0.0.1", port=port, log_level="warning")
@@ -89,7 +92,10 @@ def test_one_tap_quick_log_application_from_open_work_tab(tmp_path):
             page.on("pageerror", lambda exc: console_errors.append(str(exc)))
             try:
                 page.goto(base)
-                page.fill('input[name="token"]', settings.token)
+                page.fill('input[name="code"]', "wrong")
+                page.click("form button")
+                page.wait_for_selector('#sign-in-error', state="visible")
+                page.fill('input[name="code"]', code)
                 page.click("form button")
                 page.wait_for_url(base)
 
