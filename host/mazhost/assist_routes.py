@@ -5,11 +5,14 @@
   POST /assist/runs/{id}/cancel      interrupt one run
   POST /assist/cancel                {"session"} interrupt everything in a session
   GET  /assist/metrics               success rate, p50/p95 per stage, by capability
+  GET  /events?after=&prefix=&wait=  long-poll the event bus (assist.*, craft.resume.requested...)
   GET  /permissions                  granted permissions + what each capability needs
   POST /permissions                  {"permission", "on"}  (user's own token only)
 """
 
 from __future__ import annotations
+
+import asyncio
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
@@ -76,6 +79,35 @@ def build_assist_router(pipeline: AssistPipeline, registry: UniversalCapabilityR
     @router.get("/assist/metrics")
     def metrics(last: int = 500):
         return {"ok": True, **pipeline.metrics.summary(min(max(last, 1), 2000))}
+
+    @router.get("/events")
+    async def events(after: str = "", prefix: str = "", wait: float = 0, limit: int = 50):
+        """Long-poll the Core event bus (assist.*, craft.resume.requested, capability.*, devices.*).
+
+        Pass the last event id you saw as `after`; `prefix` filters by type
+        ("assist." or "assist.,craft."). Returns at once when there is
+        something new, else after `wait` seconds (max 25).
+        """
+        bus = registry.event_bus
+        prefixes = tuple(x for x in prefix.split(",") if x)
+        limit = min(max(limit, 1), 200)
+        deadline = asyncio.get_running_loop().time() + min(max(wait, 0), 25)
+
+        def fresh() -> list:
+            history = bus.get_history(500)
+            ids = [e.id for e in history]
+            start = ids.index(after) + 1 if after in ids else (0 if not after else max(0, len(history) - limit))
+            rows = [e for e in history[start:] if not prefixes or e.type.startswith(prefixes)]
+            return rows[-limit:]
+
+        rows = fresh()
+        while not rows and asyncio.get_running_loop().time() < deadline:
+            await asyncio.sleep(0.2)
+            rows = fresh()
+        last = bus.get_history(1)
+        return {"ok": True, "events": [{"id": e.id, "type": e.type, "source": e.source, "at": e.timestamp,
+                                        "payload": e.payload} for e in rows],
+                "last_id": rows[-1].id if rows else (after or (last[0].id if last else ""))}
 
     @router.get("/permissions")
     def permissions():

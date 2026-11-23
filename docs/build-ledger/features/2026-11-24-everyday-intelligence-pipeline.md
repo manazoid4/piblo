@@ -43,7 +43,7 @@
 - `resume.continue` reopens the document (inside project roots only) and page on the PC and publishes `craft.resume.requested` with the task and its context for PibloCraft/agents.
 
 ## New endpoints (additive; no existing contract changed)
-`POST /assist`, `GET /assist/runs/{id}`, `POST /assist/runs/{id}/cancel`, `POST /assist/cancel`, `GET /assist/metrics`, `GET|POST /permissions`, `GET /finddevices`, `POST /finddevices/devices`, `GET|DELETE /finddevices/devices/{id}`, `POST /finddevices/devices/{id}/ring`, `POST /finddevices/sightings`, `POST /finddevices/scan`. Not yet written into `docs/protocol/` — needs the orchestrator (AGENTS.md rule).
+`POST /assist`, `GET /assist/runs/{id}`, `POST /assist/runs/{id}/cancel`, `POST /assist/cancel`, `GET /assist/metrics`, `GET /events` (long-poll the EventBus), `GET|POST /permissions`, `GET /finddevices`, `POST /finddevices/devices`, `GET|DELETE /finddevices/devices/{id}`, `POST /finddevices/devices/{id}/ring`, `POST /finddevices/sightings`, `POST /finddevices/scan`. Not yet written into `docs/protocol/` — needs the orchestrator (AGENTS.md rule).
 
 ## Evidence (cloud container, 24 Nov 2026)
 - Core: 47 new tests (`test_assist.py`, `test_assist_app.py`, `test_find_devices.py`, `test_troubleshoot.py`, `test_resume.py`) pass; full suite in 4 batches: 1086 passed, 3 failed — `test_authority::test_pc_full_grant…` and `test_work_upgrade::test_real_windows…` fail identically on the untouched baseline (need `pwsh`/Windows); the third (`test_private_mode` guard) was caused by this work and is fixed.

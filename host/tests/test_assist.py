@@ -242,3 +242,18 @@ def test_policy_persists_grants_and_revocations():
     pol.set("pc_fix", False)
     again = PermissionPolicy(path)
     assert "browser_history" in again.granted() and "pc_fix" not in again.granted()
+
+
+def test_events_long_poll_streams_assist_events():
+    p, _, _ = pipeline()
+    api = FastAPI()
+    api.include_router(build_assist_router(p, p.registry, p.registry.policy))
+    c = TestClient(api)
+    first = c.get("/events", params={"prefix": "assist."}).json()
+    c.post("/assist", json={"text": "find my phone", "wait": 2})
+    got = c.get("/events", params={"after": first["last_id"], "prefix": "assist.", "wait": 1}).json()
+    types = [e["type"] for e in got["events"]]
+    assert types[0] == "assist.ack" and "assist.done" in types
+    assert all(t.startswith("assist.") for t in types)
+    empty = c.get("/events", params={"after": got["last_id"], "prefix": "assist.", "wait": 0.3}).json()
+    assert empty["events"] == [] and empty["last_id"] == got["last_id"]
