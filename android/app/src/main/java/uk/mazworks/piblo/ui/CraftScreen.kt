@@ -44,11 +44,12 @@ fun CraftScreen(onClose: () -> Unit, onConnect: () -> Unit) {
     val connected = connection.hasComputer && connection.mode == Prefs.Mode.COMPUTER
     var tasks by remember(connection.coreUrl, connection.tokenBlob, connected) { mutableStateOf<List<CraftTask>?>(null) }
     var error by remember(connection.coreUrl, connection.tokenBlob, connected) { mutableStateOf<String?>(null) }
+    var needsPairing by remember(connection.coreUrl, connection.tokenBlob, connected) { mutableStateOf(false) }
 
     LaunchedEffect(lifecycle, connection.coreUrl, connection.tokenBlob, connected) {
         if (!connected) return@LaunchedEffect
         lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
-            while (true) {
+            while (!needsPairing) {
                 val transport = app.transport
                 try {
                     if (transport == null) {
@@ -66,7 +67,11 @@ fun CraftScreen(onClose: () -> Unit, onConnect: () -> Unit) {
                         404 -> "This version of Piblo Core does not expose the task board."
                         else -> "Couldn't refresh tasks. Check your connection to Piblo Core."
                     }
-                    if (status == 401 || status == 403) tasks = null
+                    if (status == 401 || status == 403) {
+                        tasks = null
+                        needsPairing = true
+                        break
+                    }
                 }
                 delay(8_000)
             }
@@ -90,7 +95,7 @@ fun CraftScreen(onClose: () -> Unit, onConnect: () -> Unit) {
                 problem != null -> {
                     Text(problem, color = MaterialTheme.colorScheme.error)
                     if (current != null) Text("Showing the last update.")
-                    if (hub.link == LinkState.AUTH_FAILED) Button(onConnect) { Text("Connect again") }
+                    if (needsPairing || hub.link == LinkState.AUTH_FAILED) Button(onConnect) { Text("Connect again") }
                 }
                 current == null -> Text("Loading tasks…")
                 current.isEmpty() -> Text("No tasks have been reported to Piblo Core yet.")
