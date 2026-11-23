@@ -30,6 +30,7 @@ import uk.mazworks.piblo.data.Prefs
 import uk.mazworks.piblo.ui.ActionsScreen
 import uk.mazworks.piblo.ui.AskScreen
 import uk.mazworks.piblo.ui.CraftScreen
+import uk.mazworks.piblo.ui.FindDevicesScreen
 import uk.mazworks.piblo.ui.HomeScreen
 import uk.mazworks.piblo.ui.LiveViewScreen
 import uk.mazworks.piblo.ui.MemoryScreen
@@ -69,8 +70,16 @@ class MainActivity : ComponentActivity() {
                 var tab by rememberSaveable { mutableIntStateOf(0) }
                 var live by rememberSaveable { mutableStateOf(false) }
                 var craft by rememberSaveable { mutableStateOf(false) }
+                var find by rememberSaveable { mutableStateOf(false) }
                 if (live) {
                     Surface(Modifier.fillMaxSize()) { LiveViewScreen(onClose = { live = false }) }
+                    return@MaterialTheme
+                }
+                if (find) {
+                    BackHandler { find = false }
+                    Surface(Modifier.fillMaxSize()) {
+                        FindDevicesScreen(onClose = { find = false }, onConnect = { find = false; tab = 4 })
+                    }
                     return@MaterialTheme
                 }
                 if (craft) {
@@ -99,7 +108,7 @@ class MainActivity : ComponentActivity() {
                 ) { pad ->
                     Surface(Modifier.fillMaxSize().padding(pad), color = MaterialTheme.colorScheme.background) {
                         when (tab) {
-                            0 -> HomeScreen(openLive = { live = true }, onConnect = { tab = 4 }, openCraft = { craft = true })
+                            0 -> HomeScreen(openLive = { live = true }, onConnect = { tab = 4 }, openCraft = { craft = true }, openFind = { find = true })
                             1 -> AskScreen()
                             2 -> ActionsScreen(openLive = { live = true })
                             3 -> MemoryScreen()
