@@ -112,7 +112,12 @@ def create_relay(path: Path, origin: str, *, insecure_local: bool = False) -> Fa
     @app.middleware("http")
     async def protect(request: Request, call_next):
         if request.method == "POST":
-            length = request.headers.get("content-length", "")
+            length = request.headers.get("content-length")
+            path_without_body = request.url.path in {"/pair", "/logout"} or re.fullmatch(r"/hosts/[^/]+/revoke", request.url.path)
+            if length is None and path_without_body:
+                # Reverse proxies can omit Content-Length on an empty POST.
+                length = "0"
+            length = length or ""
             if not length.isascii() or not length.isdigit() or len(length) > 5 or int(length) > 16000:
                 return JSONResponse({"detail": "Invalid request size"}, status_code=413)
         response = await call_next(request)

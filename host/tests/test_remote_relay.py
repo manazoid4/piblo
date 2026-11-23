@@ -25,7 +25,9 @@ def test_pair_publish_isolate_and_revoke(tmp_path):
         response = browser.post("/login", headers=FORM, data={"key": key}, follow_redirects=False)
         assert response.status_code == 303
         assert {"secure", "httponly", "samesite=strict"} <= set(response.headers["set-cookie"].lower().split("; "))
-    page = alice.post("/pair", headers=FORM)
+    pair_request = alice.build_request("POST", "/pair", headers=FORM)
+    del pair_request.headers["content-length"]
+    page = alice.send(pair_request)
     code = re.search(r'id="pairing-code">([^<]+)', page.text)[1]
     assert alice.post("/api/pair/preview", json={"code": code}).json() == {"account": "alice"}
     claim = {"code": code, "account": "alice", "host": "Alice PC"}
