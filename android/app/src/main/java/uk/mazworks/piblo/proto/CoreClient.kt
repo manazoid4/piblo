@@ -67,6 +67,7 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
     companion object {
         const val DEFAULT_PORT = 8787
         private const val MAX_BODY = 64 * 1024
+        private const val MAX_TASK_BOARD = 256 * 1024
         private const val MAX_SCREEN = 512 * 1024
 
         /**
@@ -103,10 +104,10 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
         fun claim(baseUrl: String, code: String, clientVersion: String): String =
             Proto.parseToken(request(baseUrl.trimEnd('/'), "POST", "/pair/claim", """{"code":"${code.trim().uppercase().filter { it.isLetterOrDigit() }}"}""", null, clientVersion))
 
-        private fun readCapped(s: java.io.InputStream): String {
+        private fun readCapped(s: java.io.InputStream, maxBytes: Int = MAX_BODY): String {
             val out = java.io.ByteArrayOutputStream()
             val buf = ByteArray(4096)
-            while (out.size() < MAX_BODY) {
+            while (out.size() < maxBytes) {
                 val n = s.read(buf)
                 if (n < 0) break
                 out.write(buf, 0, n)
@@ -166,7 +167,9 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
                 }
                 val status = c.responseCode
                 val stream = if (status in 200..299) c.inputStream else c.errorStream
-                val text = stream?.use { readCapped(it) } ?: ""
+                // A full task board can exceed the normal cap with 100 multilingual rows.
+                val maxBytes = if (path == "/buddy/tasks" && status in 200..299) MAX_TASK_BOARD else MAX_BODY
+                val text = stream?.use { readCapped(it, maxBytes) } ?: ""
                 if (status !in 200..299) throw CoreHttpException(status, Proto.parseError(text))
                 return text
             } finally { c.disconnect() }
