@@ -95,6 +95,8 @@ def build_where_router(cfg: Settings, buddy: Buddy, focus: Focus) -> APIRouter:
             rows.append(doc)
         return sorted(rows, key=lambda row: _timestamp(row["when"]), reverse=True)
 
+    router.items = items  # read-only view reused by "carry on where I left off"
+
     @router.post("/park")
     def park(body: Park):
         text = re.sub(r"^Park:\s*", "", body.text.strip(), flags=re.I).strip()
