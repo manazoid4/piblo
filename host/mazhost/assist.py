@@ -244,6 +244,8 @@ class AssistPipeline:
                 run["verify"] = pending.get("verify")
             elif "carry on" in run["text"].lower():
                 cap_id, args = "resume.packet", {}
+            elif intents.SORT_OUT.match(" ".join(run["text"].split())):
+                cap_id, args = "troubleshoot.diagnose", {}
             else:
                 return await self._finish(run, "done", "There's nothing waiting for a yes.")
         if cap_id == "devices.ring" and not args.get("device_id"):

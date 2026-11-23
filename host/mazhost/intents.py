@@ -10,9 +10,12 @@ import re
 
 _LEAD = r"^(?:hey\s+)?(?:piblo[,!.]?\s+)?(?:please\s+|can you\s+|could you\s+)*"
 
+# A bare "continue" / "carry on" mid-conversation means "keep talking", so a
+# resume needs "left off", "where was I" or "my work"; bare "carry on" is only a
+# follow-up to something Piblo just offered.
 RESUME = re.compile(
-    _LEAD + r"(?:carry on|pick (?:it |things )?(?:back )?up|continue|resume)(?: (?:from )?where (?:i|we) left off)?"
-    r"(?: (?:my|the) (?:work|task))?[.!?]*$"
+    _LEAD + r"(?:carry on|pick (?:it |things )?(?:back )?up|continue|resume|get back to)"
+    r"(?: (?:from )?where (?:i|we) left off| (?:my|the) (?:work|task|last task))[.!?]*$"
     r"|" + _LEAD + r"(?:where was i|where did (?:i|we) leave off|what was i (?:doing|working on))[.!?]*$",
     re.I)
 SORT_OUT = re.compile(
@@ -23,6 +26,9 @@ RING = re.compile(_LEAD + r"(?:ring|beep|buzz|make (?:my |the )?(?P<q2>.+?) (?:r
 FIND = re.compile(
     _LEAD + r"(?:find|locate|where (?:is|are|'s)|where'?s|where did i (?:put|leave)|i can'?t find|i'?ve lost|i lost|have you seen)"
     r"\s+(?:my\s+|the\s+)?(?P<q>.+?)[.!?]*$", re.I)
+DEVICE_WORDS = re.compile(
+    r"\b(?:airpods|earbuds|buds|earphones|headphones|headset|beats|phone|iphone|pixel|mobile|ipad|tablet|"
+    r"laptop|macbook|watch|airtag|tile|tag|keys|wallet|remote|piblo|handheld)\b", re.I)
 CONFIRM = re.compile(_LEAD + r"(?:yes|yeah|yep|ok(?:ay)?|sure|go ahead|do it|go on|carry on|ring it|open it|fix it)"
                      r"(?: please)?[.!?]*$", re.I)
 CANCEL = re.compile(_LEAD + r"(?:stop|cancel|never ?mind|no|leave it|forget it)[.!?]*$", re.I)
@@ -48,7 +54,9 @@ def match(text: str) -> dict | None:
     m = FIND.match(t)
     if m:
         q = m.group("q").strip()
-        # "find a recipe" / "find out" are not lost devices.
-        if not re.match(r"^(?:out|a|an|some|me|how|what|why|when)\b", q, re.I):
+        # Only the user's own things: "where is my ..." or a device word.
+        # "where is the Eiffel Tower" and "find a recipe" stay ordinary chat.
+        mine = re.search(r"\b(?:my|i (?:put|leave|lost)|i can'?t find|i'?ve lost|i lost)\b", t, re.I)
+        if mine or DEVICE_WORDS.search(q):
             return {"capability": "devices.find", "args": {"query": q}, "reason": "find phrase"}
     return None

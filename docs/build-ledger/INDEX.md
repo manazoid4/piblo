@@ -11,3 +11,4 @@
 
 ## Feature Records
 - *(Initialized with ledger setup — see `features/` directory)*
+- [2026-11-24 Everyday intelligence pipeline](./features/2026-11-24-everyday-intelligence-pipeline.md)

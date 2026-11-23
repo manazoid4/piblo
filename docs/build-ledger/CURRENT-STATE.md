@@ -1,4 +1,4 @@
-# Piblo Current State (As of 22 Nov 2026)
+# Piblo Current State (As of 24 Nov 2026)
 
 ## Working Functionality
 - **Piblo site & pages (`/features/`, `/piblocraft/`):** Clean Kickstarter-style bento grid, swipeable cards, cream concept design default with smoke switch. (PR #195).
@@ -7,6 +7,8 @@
 - **Live voice:** `/dictate` (Piblo Flow STT) routes cleaned speech through `command_router` and publishes `voice.command.routed` events (tier/capability/args/confidence) for PibloCraft live activity. Existing paste-to-PC and logging behaviour unchanged; nothing executed automatically from voice. PR #215.
 - **Device connection & pairing:** `device.*` capabilities over the universal registry — `device.status`, `device.monitor.start/stop` (DeviceMonitor serial follow), `device.pairing.pending/approve/deny` (shared DevicePairingStore with `/pair`). Nothing opens a serial port unless `device.monitor.start` is explicitly called. PR #215.
 - **Firmware & Hardware baseline:** ESP32-S3 retro portrait retro-inspired design, Cardputer ADV support, Waveshare/ESP development baselines.
+
+- **Everyday intelligence pipeline (24 Nov):** `POST /assist` — instant ack, Tier 0 intents, command router, enforced permissions + single-use device approvals, verify, cancel, measured latency/success (`GET /assist/metrics`). Capabilities: Find My Devices (`devices.*`, Android BLE scan + hotter/colder, ring, Find My / Find Hub hand-off), "sort this out" (`troubleshoot.*` + approved `fix.*`), "carry on" (`resume.*`). Software-tested; hardware not yet. [Record](features/2026-11-24-everyday-intelligence-pipeline.md).
 
 ## Partial Implementation
 - **Piblo Core & Event Architecture:** Initial local orchestration structures; unified event bus and shared capability contracts in design phase.

@@ -83,6 +83,12 @@ def test_intents():
     assert intents.match("yes do it") is None or intents.match("do it")["followup"] == "confirm"
     assert intents.match("find out the weather") is None
     assert intents.match("what's the capital of France") is None
+    assert intents.match("where is the Eiffel Tower?") is None
+    assert intents.match("where are the best restaurants") is None
+    assert intents.match("where is the remote")["capability"] == "devices.find"
+    assert intents.match("I can't find my wallet")["args"] == {"query": "wallet"}
+    assert intents.match("continue")["followup"] == "confirm" if intents.match("continue") else True
+    assert intents.match("resume my work")["capability"] == "resume.packet"
 
 
 def test_ack_is_first_and_find_runs_without_model():
