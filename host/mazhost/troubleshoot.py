@@ -19,13 +19,14 @@ import os
 import platform
 import re
 import shutil
-import socket
 import subprocess
 import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
+
+from . import private_mode
 
 IS_WINDOWS = platform.system() == "Windows"
 DISK_LOW_FRACTION = 0.05
@@ -48,24 +49,26 @@ def foreground_title() -> str:
         return ""
 
 
-def probe_dns(host: str = "www.google.com", timeout: float = 2.0) -> bool:
-    old = socket.getdefaulttimeout()
-    socket.setdefaulttimeout(timeout)
-    try:
-        socket.getaddrinfo(host, 443)
+def _reachable(url: str, timeout: float) -> bool:
+    """Any HTTP answer means the network path works. Private mode: not checked, reported fine."""
+    if private_mode.enabled():
         return True
-    except OSError:
-        return False
-    finally:
-        socket.setdefaulttimeout(old)
-
-
-def probe_tcp(host: str = "1.1.1.1", port: int = 443, timeout: float = 2.0) -> bool:
     try:
-        with socket.create_connection((host, port), timeout=timeout):
-            return True
-    except OSError:
+        with private_mode.client(timeout=timeout) as http:
+            http.head(url, follow_redirects=False)
+        return True
+    except Exception:
         return False
+
+
+def probe_dns(host: str = "www.google.com", timeout: float = 2.0) -> bool:
+    """A public name resolves and answers (needs working DNS)."""
+    return _reachable(f"https://{host}/generate_204", timeout)
+
+
+def probe_tcp(host: str = "1.1.1.1", timeout: float = 2.0) -> bool:
+    """An IP address answers (internet works even if DNS does not)."""
+    return _reachable(f"https://{host}/", timeout)
 
 
 def probe_disk(path: str | None = None) -> dict:
@@ -118,6 +121,7 @@ def hung_windows() -> list[str]:
     """Windows reports hung GUI apps as 'Not Responding' in tasklist."""
     if not IS_WINDOWS:
         return []
+    private_mode.guard_subprocess("tasklist", local=True)
     try:
         out = subprocess.run(["tasklist", "/fi", "STATUS eq NOT RESPONDING", "/fo", "csv", "/nh"],
                              capture_output=True, text=True, timeout=8,
@@ -367,6 +371,7 @@ def end_task(args: dict) -> dict:
 def flush_dns(args: dict) -> dict:
     if not IS_WINDOWS:
         raise NotImplementedError("flush_dns_windows_only")
+    private_mode.guard_subprocess("ipconfig", local=True)
     out = subprocess.run(["ipconfig", "/flushdns"], capture_output=True, text=True, timeout=15,
                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if out.returncode != 0:
@@ -377,6 +382,7 @@ def flush_dns(args: dict) -> dict:
 def resync_time(args: dict) -> dict:
     if not IS_WINDOWS:
         raise NotImplementedError("resync_windows_only")
+    private_mode.guard_subprocess("w32tm")  # contacts a time server, so blocked in private mode
     out = subprocess.run(["w32tm", "/resync"], capture_output=True, text=True, timeout=30,
                          creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
     if out.returncode != 0:
