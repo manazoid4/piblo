@@ -42,7 +42,7 @@ private data class ChatMsg(val question: String, val answer: String, val provide
 
 /** Ask: send a question to Core's brain and read the answer. */
 @Composable
-fun AskScreen() {
+fun AskScreen(onConnect: () -> Unit = {}) {
     val a = app(LocalContext.current)
     val scope = rememberCoroutineScope()
     var history by remember { mutableStateOf<List<ChatMsg>>(emptyList()) }
@@ -93,6 +93,7 @@ fun AskScreen() {
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        ComputerOffline(onConnect)
         Section("Ask Piblo") {
             if (history.isEmpty()) {
                 EmptyState("Ask anything", "Questions go to the brain on your computer. It can read your projects and the web, and the answer appears here.")
@@ -128,7 +129,7 @@ fun AskScreen() {
 
         Section("Brain") {
             val m = models
-            if (m == null) Text("Reading what this computer can use…", color = Muted, style = MaterialTheme.typography.bodySmall)
+            if (m == null) Loading("Reading what this computer can use…")
             else {
                 Labeled("Local model", when {
                     m.localModel == null -> "none configured"

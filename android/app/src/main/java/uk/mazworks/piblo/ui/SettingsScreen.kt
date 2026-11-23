@@ -294,8 +294,10 @@ private fun DictationSection(
 ) {
     Section("Dictation") {
         val s = settings
+        val reachable = computerReachable()
         Text(
             when {
+                status == null && !reachable -> "Needs your computer. It can't be reached right now."
                 status == null -> "Reading dictation history…"
                 status.count == 0 -> "No dictations yet."
                 else -> "${status.count} dictations · average ${status.avgMs} ms${status.errors.lastOrNull()?.let { " · last problem: $it" } ?: ""}"
