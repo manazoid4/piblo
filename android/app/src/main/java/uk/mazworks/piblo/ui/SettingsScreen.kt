@@ -123,6 +123,7 @@ fun SettingsScreen(openLive: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         ConnectSection(openLive)
+        AppUpdateCard(alwaysShow = true)
 
         Section("Notifications") {
             Text("Forward other apps' notifications to your computer, and keep Piblo watching when the app is closed.", style = MaterialTheme.typography.bodySmall, color = Muted)

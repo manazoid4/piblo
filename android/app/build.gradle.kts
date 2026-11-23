@@ -13,8 +13,10 @@ android {
         applicationId = "uk.mazworks.piblo"
         minSdk = 26
         targetSdk = 36
-        versionCode = 3
-        versionName = "0.2.0-beta"
+        // CI numbers every build (100 + run number) so a newer build installs over an older one via Settings > App update.
+        val ciRun = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+        versionCode = if (ciRun != null) 100 + ciRun else 3
+        versionName = "0.2.0-beta" + (if (ciRun != null) "+ci$ciRun" else "")
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 

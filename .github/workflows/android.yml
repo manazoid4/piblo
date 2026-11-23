@@ -1,6 +1,11 @@
 name: Android companion
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "android/**"
+      - ".github/workflows/android.yml"
   pull_request:
     paths:
       - "android/**"
@@ -45,9 +50,16 @@ jobs:
         run: |
           "$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)/apksigner" verify --print-certs android/app/build/outputs/apk/debug/app-debug.apk | grep -i "SHA-256"
 
+      - name: Build info for one-tap phone updates (scripts/stage_phone_apk.py)
+        run: |
+          printf '{"version_code": %d, "version_name": "0.2.0-beta+ci%s", "sha": "%s"}
+' "$((100 + GITHUB_RUN_NUMBER))" "$GITHUB_RUN_NUMBER" "$GITHUB_SHA" > android/app/build/outputs/apk/debug/piblo-build.json
+
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: piblo-companion-debug
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: |
+            android/app/build/outputs/apk/debug/app-debug.apk
+            android/app/build/outputs/apk/debug/piblo-build.json
           if-no-files-found: error

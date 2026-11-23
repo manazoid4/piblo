@@ -99,6 +99,7 @@ fun HomeScreen(openLive: () -> Unit, onConnect: () -> Unit, openCraft: () -> Uni
             )
         }
 
+        AppUpdateCard(alwaysShow = false)
         if (online) {
             DeviceCard(device, deviceErr, busy, onUpdate = { updateConfirm = true })
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {

@@ -19,3 +19,6 @@ host/Microsoft/
 
 # Playwright screenshots from verify scripts
 app/artifacts/
+
+# Phone app build staged for one-tap updates (scripts/stage_phone_apk.py)
+host/phone/

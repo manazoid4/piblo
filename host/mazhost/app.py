@@ -47,7 +47,7 @@ from .device import DeviceMonitor
 from .dev_centre import build_dev_router
 from .features import build_features_router
 from .discovery import DiscoveryResponder
-from . import fw, kokoro_pcm
+from . import fw, kokoro_pcm, phone_apk
 from . import private_mode
 from .errors import ErrorCode, RouteError
 from .bodydouble import BodyDouble, build_bodydouble_router
@@ -691,6 +691,19 @@ def create_app(
         if not fw.manifest():
             raise HTTPException(404, "no_firmware")
         return FileResponse(fw.fw_dir() / "latest.bin", media_type="application/octet-stream")
+
+    @api.get("/phone/apk/manifest")
+    def phone_apk_manifest():
+        m = phone_apk.manifest()
+        if not m:
+            raise HTTPException(404, "no_phone_build")
+        return m
+
+    @api.get("/phone/apk/latest.apk")
+    def phone_apk_latest():
+        if not phone_apk.manifest():
+            raise HTTPException(404, "no_phone_build")
+        return FileResponse(phone_apk.phone_dir() / "piblo.apk", media_type="application/vnd.android.package-archive", filename="piblo.apk")
 
     @api.get("/models")
     def models_status():

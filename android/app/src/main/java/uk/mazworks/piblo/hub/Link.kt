@@ -32,6 +32,8 @@ interface Transport {
     fun postSlow(path: String, body: String? = null): String
     fun patch(path: String, body: String? = null): String
     fun delete(path: String): String
+    /** Stream a file from Core to [dest] (app update). Only the Core link can. */
+    fun download(path: String, dest: java.io.File): Unit = throw UnsupportedOperationException("download needs Piblo Core")
 }
 
 class CoreTransport(private val c: CoreClient) : Transport {
@@ -53,6 +55,7 @@ class CoreTransport(private val c: CoreClient) : Transport {
     override fun postSlow(path: String, body: String?) = c.postSlow(path, body)
     override fun patch(path: String, body: String?) = c.patch(path, body)
     override fun delete(path: String) = c.delete(path)
+    override fun download(path: String, dest: java.io.File) = c.download(path, dest)
 }
 
 /** Clearly a stub: the current firmware has no BLE GATT service. See android/README.md for the proposed framing. */
