@@ -1,0 +1,3 @@
+# Test-only: the Hermes Gadget SDK's real gateway hub, used as the protocol-faithful test double
+# in host/tests/test_hermes_*.py (MIT). Pinned to the commit the integration was built against.
+hermes-gadget @ git+https://github.com/Adolanium/hermes-gadget-sdk@35dbae77f21c54519dde7fcd90ef5a92192c6f60

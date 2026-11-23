@@ -35,6 +35,7 @@ from .bridge import BridgeWorker
 from .buddy import AlertIn, Buddy, install_buddy_routes
 from .buddy_companion import install_companion_routes
 from .buddy_store import BuddyStore
+from .hermes_routes import HermesAgent, build_hermes_router
 from .needs_routes import build_needs_router
 from .commands import parse_command
 from .compound import parse_compound
@@ -563,6 +564,10 @@ def create_app(
             sessions.add_turn(session_id, refined.text, reminder_reply)
             return {"text": refined.text, "reply": reminder_reply, "provider": "promises-local",
                     "actions": [], "timings": {"llm_ms": 0}}
+        if hermes_agent.selected():  # the owner chose Hermes: Piblo's local commands above still run first
+            result = hermes_agent.model_command(refined.text) or hermes_agent.answer(refined.text)
+            sessions.add_turn(session_id, refined.text, result["reply"])
+            return {"text": refined.text, "actions": refined.actions, **result}
         started = time.perf_counter()
         try:
             token = _output_cap.set(max_tokens) if max_tokens else None  # spoken path only
@@ -609,6 +614,20 @@ def create_app(
             return getattr(speech, "transcribe_turn", speech.transcribe)(path)
         except Exception as error:
             raise HTTPException(503, "local_stt_unavailable" if local_turn(route) else "stt_unavailable") from error
+
+    def hermes_voice_turn(session_id: str, path: Path) -> dict | None:
+        """MAZ_HERMES_STT=hermes: send the utterance itself; Hermes transcribes and answers."""
+        if not (hermes_agent.selected() and cfg.hermes_stt == "hermes"):
+            return None
+        if not sessions.has(session_id):
+            raise HTTPException(404, "session_not_found")
+        pcm = hermes_agent.wav_pcm(path)
+        if pcm is None:
+            return None  # not 16 kHz mono PCM16: Core's own STT takes the turn
+        result = hermes_agent.answer_audio(pcm)
+        heard = result["hermes"].get("transcript", "")
+        sessions.add_turn(session_id, heard, result["reply"])
+        return {"text": heard, "actions": [], **result}
 
     def finish_turn(result: dict, upload_ms: int, stt_ms: int, speak: str, route: Route) -> dict:
         """Attach per-stage timing_ms, log one line, and (if the device asked) start TTS now."""
@@ -1005,6 +1024,8 @@ def create_app(
         try:
             security.validate_upload(path, size)
             upload_ms = round((time.perf_counter() - upload_started) * 1000)
+            if (hermes := await run_in_threadpool(hermes_voice_turn, session_id, path)) is not None:
+                return await run_in_threadpool(finish_turn, hermes, upload_ms, 0, x_maz_speak, route)
             stt_started = time.perf_counter()
             text = await run_in_threadpool(turn_stt, path, route)  # STT, brain and TTS block: keep /health answering
             stt_ms = round((time.perf_counter() - stt_started) * 1000)
@@ -1036,6 +1057,8 @@ def create_app(
         try:
             security.validate_upload(path, size)
             upload_ms = round((time.perf_counter() - upload_started) * 1000)
+            if (hermes := await run_in_threadpool(hermes_voice_turn, x_maz_session, path)) is not None:
+                return await run_in_threadpool(finish_turn, hermes, upload_ms, 0, x_maz_speak, x_maz_route)
             stt_started = time.perf_counter()
             text = await run_in_threadpool(turn_stt, path, x_maz_route)  # STT, brain and TTS block: keep /health answering
             stt_ms = round((time.perf_counter() - stt_started) * 1000)
@@ -1295,6 +1318,17 @@ def create_app(
     buddy_store = None if cfg.buddy_db == "off" else BuddyStore(
         cfg.buddy_db or resolve_data_dir(cfg) / "buddy.sqlite3")
     buddy = install_buddy_routes(api, Buddy(store=buddy_store, focus=focus, device_keys=device_keys))
+    hermes_agent = HermesAgent(cfg, buddy, resolve_data_dir(cfg))
+    api.include_router(build_hermes_router(hermes_agent))
+
+    @api.on_event("startup")
+    def start_hermes() -> None:
+        hermes_agent.start()
+
+    @api.on_event("shutdown")
+    def stop_hermes() -> None:
+        hermes_agent.stop()
+
     promises_engine = Promises(buddy, model_router=model_router, settings=cfg)
     promises_engine.start()
     buddy.on_ack = promises_engine.on_alert_acked
@@ -1395,7 +1429,7 @@ def create_app(
         return await run_in_threadpool(feature_commands.handle, text)
 
     install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command,
-                      stt=speech if isinstance(speech, SpeechToText) else None)
+                      stt=speech if isinstance(speech, SpeechToText) else None, hermes=hermes_agent)
     # ------------------------------------------------------------ SUBTITLES
     install_subtitle_routes(api, subtitle_jobs)
 
