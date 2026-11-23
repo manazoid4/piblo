@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 from .authority import AuthorityBroker, AuthorityError, Scope
 from .config import Settings
+from .pairing import PairingStore
+from .security import client_info
 from .work_routes import install_work_routes
 from .work_service import WorkService
 from .work_store import WorkStore
@@ -28,10 +30,10 @@ class ManualGrantRequest(BaseModel):
 
 PAGE = r"""<!doctype html>
 <html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#080b0e"><title>MAZ Control</title><style>
+<meta name="theme-color" content="#080b0e"><title>Piblo Control</title><style>
 :root{color-scheme:dark;--b:#080b0e;--p:#11171c;--p2:#0c1115;--l:#27323b;--t:#f2f4f5;--d:#91a0aa;--a:#ff7a18;--g:#42d58a;--r:#ff676d;--w:#ffc04d}*{box-sizing:border-box}body{margin:0;background:var(--b);color:var(--t);font:14px ui-monospace,SFMono-Regular,Consolas,monospace;overflow-x:hidden}main{max-width:760px;margin:auto;padding:12px}.top{position:sticky;top:0;z-index:4;background:#080b0ef3;border-bottom:1px solid var(--l);padding:10px 0;display:flex;justify-content:space-between;align-items:center;gap:8px}.brand{font-size:20px;font-weight:900}.brand b{color:var(--a)}.token{font-size:11px;color:var(--d);border:1px solid var(--l);border-radius:999px;padding:5px 8px}.tabs{display:flex;gap:6px;margin:10px 0 0}.tabbtn{flex:1;text-align:center;padding:9px;border:1px solid var(--l);border-radius:8px;background:#080c0f;color:var(--d);cursor:pointer;font-weight:900;font-size:12px;letter-spacing:.08em}.tabbtn.active{background:var(--a);border-color:var(--a);color:#08090a}.pane{display:none}.pane.active{display:block}.hero{padding:17px 0 7px}.hero h1{font-size:24px;margin:0 0 5px}.hero p{color:var(--d);line-height:1.45;margin:0}.sec{margin-top:15px}.sec h2{font-size:10px;letter-spacing:.14em;color:var(--d)}.card{border:1px solid var(--l);border-radius:10px;background:var(--p);padding:12px;margin:7px 0;max-width:100%}.req{border-left:3px solid var(--w)}.grant{border-left:3px solid var(--g)}.kv{display:grid;grid-template-columns:1fr auto;gap:7px 10px}.kv span{color:var(--d)}.row{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}.row>*{flex:1 1 140px}button,input,select{font:inherit;border:1px solid var(--l);border-radius:7px;background:#080c0f;color:var(--t);padding:9px;min-width:0;max-width:100%}button{cursor:pointer;min-width:110px;min-height:44px}.yes{background:var(--a);border-color:var(--a);color:#08090a;font-weight:900}.danger{border-color:#6a3438;color:var(--r)}.muted{color:var(--d);font-size:12px;line-height:1.4}.bad{color:var(--r)}.good{color:var(--g)}.warn{color:var(--w)}pre{white-space:pre-wrap;word-break:break-word;background:var(--p2);border-radius:7px;padding:9px;font-size:11px;color:var(--d);max-height:220px;overflow:auto}.empty{padding:16px;text-align:center;color:var(--d);border:1px dashed var(--l);border-radius:9px}.stale{color:var(--w);font-weight:900}.quickgrid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}.histgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px;margin-top:8px;font-size:10px;text-align:center}.histday{background:var(--p2);border-radius:6px;padding:6px 2px;min-width:0}.eventedit{display:grid;grid-template-columns:1fr;gap:6px;margin-top:9px}.eventrow{display:grid;grid-template-columns:minmax(120px,1fr) auto auto auto;gap:6px;align-items:center;padding:7px;border:1px solid var(--l);border-radius:7px}.eventrow.inactive{opacity:.58}.eventrow button{min-width:84px}.check{display:flex;gap:7px;align-items:center;color:var(--d)}.check input{flex:0 0 auto}.pipelinegrid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.pipelinegrid .card{margin:0}.pipeline-item{border-left:3px solid var(--a)}.pipeline-item a{color:var(--g);word-break:break-all}.pipeline-item summary{cursor:pointer;font-weight:900}.today-action{border-left:3px solid var(--g)}@media(max-width:520px){main{padding:9px}.hero h1{font-size:20px}.kv{grid-template-columns:1fr}.kv b{text-align:left}.top{align-items:flex-start;flex-direction:column}.quickgrid,.pipelinegrid{grid-template-columns:1fr}.eventrow{grid-template-columns:1fr 1fr}.eventrow [data-field=event-label]{grid-column:1/-1}}
 </style></head><body><main>
-<div class="top"><div class="brand"><b>MAZ</b> CONTROL</div><div class="token">TOKEN ID <b id="tokenId">-</b></div></div>
+<div class="top"><div class="brand"><b>Piblo</b> Control</div><div class="token">CORE ID <b id="tokenId">-</b></div></div>
 <div class="tabs"><button class="tabbtn active" id="tabbtn-work" onclick="showTab('work')">WORK</button><button class="tabbtn" id="tabbtn-authority" onclick="showTab('authority')">AUTHORITY</button><button class="tabbtn" id="tabbtn-voice" data-testid="tab-voice" onclick="showTab('voice')">VOICE</button></div>
 
 <div class="pane active" id="pane-work">
@@ -60,9 +62,9 @@ PAGE = r"""<!doctype html>
 <div class="sec"><h2>EMERGENCY</h2><div class="card"><div class="row"><button class="danger" onclick="revokeAll()">REVOKE ALL CONTROL</button><button onclick="refreshAll()">REFRESH</button></div><div id="status" class="muted" style="margin-top:8px">Loading...</div></div></div>
 <div class="sec"><h2>PENDING APPROVALS</h2><div id="pending"></div></div>
 <div class="sec"><h2>ACTIVE GRANTS</h2><div id="grants"></div></div>
-<div class="sec"><h2>MANUAL SESSION</h2><div class="card"><p class="muted">Use this when you intentionally want MAZ to have broad control before an agent asks.</p><div class="row"><select id="manualScope"><option value="project_full">PROJECT FULL</option><option value="pc_full" selected>PC FULL</option><option value="admin">PC FULL + ADMIN GRANT</option></select><select id="manualSeconds"><option value="300">5 min</option><option value="600" selected>10 min</option><option value="900">15 min</option><option value="1800">30 min</option></select><button class="yes" onclick="manualGrant()">CONFIRM GRANT</button></div></div></div>
+<div class="sec"><h2>MANUAL SESSION</h2><div class="card"><p class="muted">Use this when you intentionally want Piblo to have broad control before an agent asks.</p><div class="row"><select id="manualScope"><option value="project_full">PROJECT FULL</option><option value="pc_full" selected>PC FULL</option><option value="admin">PC FULL + ADMIN GRANT</option></select><select id="manualSeconds"><option value="300">5 min</option><option value="600" selected>10 min</option><option value="900">15 min</option><option value="1800">30 min</option></select><button class="yes" onclick="manualGrant()">CONFIRM GRANT</button></div></div></div>
 <div class="sec"><h2>ACTION FEED</h2><div class="card"><pre id="audit">No actions yet.</pre></div></div>
-<div class="sec"><h2>SESSION</h2><div class="card"><div class="row"><button onclick="logout()">LOG OUT THIS PHONE</button></div><p class="muted">The pairing token is never displayed here. TOKEN ID is a non-secret fingerprint so you can tell which MAZ installation you are authorising.</p></div></div>
+<div class="sec"><h2>SESSION</h2><div class="card"><div class="row"><button onclick="logout()">LOG OUT THIS PHONE</button></div><p class="muted">Core ID identifies the Piblo installation you are controlling.</p></div></div>
 </div>
 
 <div class="pane" id="pane-voice">
@@ -123,13 +125,39 @@ loadWork(true);refreshAll();setInterval(()=>loadWork(false),4000);setInterval(re
 </script></main></body></html>"""
 
 
-LOGIN = r"""<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#080b0e"><title>MAZ Control Login</title><style>:root{color-scheme:dark}body{margin:0;background:#080b0e;color:#f2f4f5;font:14px ui-monospace,Consolas,monospace;display:grid;min-height:100vh;place-items:center}.c{width:min(92vw,420px);border:1px solid #27323b;background:#11171c;border-radius:12px;padding:18px}b{color:#ff7a18}p{color:#91a0aa;line-height:1.45}input,button{width:100%;font:inherit;padding:11px;border-radius:8px;border:1px solid #27323b;background:#080c0f;color:#f2f4f5;margin-top:8px}button{background:#ff7a18;color:#08090a;font-weight:900}</style></head><body><form class="c" method="post" action="session/login"><h1><b>MAZ</b> CONTROL</h1><p>Enter the MAZ pairing token once on this phone. A short-lived device-bound session cookie is used afterwards.</p><input name="token" type="password" autocomplete="current-password" placeholder="MAZ pairing token" required><button>UNLOCK PHONE APPROVALS</button></form></body></html>"""
+LOGIN = r"""<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#fbfaf7"><meta name="referrer" content="no-referrer">
+<title>Sign in to Piblo</title><style>
+:root{color-scheme:light dark;--bg:#fbfaf7;--card:#fffaf0;--ink:#2a1a12;--muted:#5b4336;--line:#c9a877;--accent:#ee5a36;--error:#b3301a}
+@media(prefers-color-scheme:dark){:root{--bg:#2a1a12;--card:#352318;--ink:#fff4e0;--muted:#c8b8a8;--line:#7a624e;--error:#ff987d}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 system-ui,sans-serif;display:grid;min-height:100vh;min-height:100dvh;place-items:center;padding:20px}
+main{width:min(100%,420px);padding:clamp(22px,7vw,38px);background:var(--card);border:1px solid var(--line);border-radius:24px}
+.brand{margin:0;color:var(--muted);font-size:15px;font-weight:700}h1{margin:16px 0 8px;font-size:clamp(26px,7vw,36px);line-height:1.13;letter-spacing:-.035em}
+p{color:var(--muted);margin:0 0 22px}label{display:block;font-weight:650;margin-bottom:6px}
+input,button{display:block;width:100%;min-height:48px;border:1px solid var(--line);border-radius:10px;font:inherit;padding:10px 12px}
+input{letter-spacing:.12em;text-transform:uppercase;background:var(--bg);color:var(--ink)}
+button{margin-top:12px;border-color:transparent;background:var(--accent);color:#2a1a12;font-weight:750;cursor:pointer}
+:focus-visible{outline:2px solid var(--ink);outline-offset:3px}#sign-in-error{color:var(--error);margin-top:12px}
+</style></head><body><main>
+<p class="brand">Piblo</p>
+<h1>Sign in to Piblo</h1>
+<p>On your computer, open <strong>Piblo ? Settings ? Browser sign-in</strong> and generate a one-time code.</p>
+<form method="post" action="session/code">
+<label for="code">Sign-in code</label>
+<input id="code" name="code" type="text" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" maxlength="8" required>
+<p id="sign-in-error" hidden role="alert">This code is invalid or expired. Generate a new one on your computer.</p>
+<button>Sign in</button>
+</form></main></body></html>"""
 
 
 def build_phone_app(
-    settings: Settings, broker: AuthorityBroker, *, work_store: WorkStore | None = None, voices=None
+    settings: Settings, broker: AuthorityBroker, *, work_store: WorkStore | None = None, voices=None,
+    browser_codes: PairingStore | None = None,
 ) -> FastAPI:
-    phone = FastAPI(title="MAZ Phone Control", docs_url=None, redoc_url=None, openapi_url=None)
+    phone = FastAPI(title="Piblo Control", docs_url=None, redoc_url=None, openapi_url=None)
+    browser_codes = browser_codes if browser_codes is not None else PairingStore()
     install_validation_exception_handler(phone)
     if work_store is None:
         work_store = WorkStore(settings.work_dir)
@@ -156,19 +184,14 @@ def build_phone_app(
                 broker.verify_phone_session(
                     maz_control_session, request.headers.get("user-agent", "")
                 )
-                return HTMLResponse(PAGE)
+                return HTMLResponse(PAGE, headers={"Cache-Control": "no-store"})
             except AuthorityError:
                 pass
-        return HTMLResponse(LOGIN)
+        return HTMLResponse(LOGIN, headers={"Cache-Control": "no-store"})
 
-    @phone.post("/session/login")
-    def login(request: Request, token: Annotated[str, Form()]):
-        if not settings.token_configured:
-            raise HTTPException(503, "MAZ_TOKEN_not_configured")
-        if not hmac.compare_digest(token, settings.token):
-            raise HTTPException(401, "invalid_pairing_token")
+    def signed_session(request: Request):
         signed = broker.issue_phone_session(request.headers.get("user-agent", ""))
-        response = RedirectResponse(url="/control/", status_code=303)
+        response = RedirectResponse(url="/control/", status_code=303, headers={"Cache-Control": "no-store"})
         response.set_cookie(
             COOKIE,
             signed,
@@ -179,6 +202,22 @@ def build_phone_app(
             path="/control",
         )
         return response
+
+    @phone.post("/session/code")
+    def sign_in_with_code(request: Request, code: Annotated[str, Form(max_length=24)]):
+        if not browser_codes.claim(code.strip().upper(), client_info(request)[0]):
+            return HTMLResponse(LOGIN.replace('id="sign-in-error" hidden', 'id="sign-in-error"'),
+                                status_code=401, headers={"Cache-Control": "no-store"})
+        return signed_session(request)
+
+    @phone.post("/session/login")
+    def login(request: Request, token: Annotated[str, Form()]):
+        # The existing /pair browser flow still posts a Core credential here.
+        if not settings.token_configured:
+            raise HTTPException(503, "MAZ_TOKEN_not_configured")
+        if not hmac.compare_digest(token.encode(), settings.token.encode()):
+            raise HTTPException(401, "invalid_pairing_token")
+        return signed_session(request)
 
     @phone.get("/api/state")
     def state(request: Request, maz_control_session: Annotated[str | None, Cookie()] = None):

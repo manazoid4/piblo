@@ -82,3 +82,26 @@ def test_secure_cookie_over_funnel_https(tmp_path):
     c = _client(tmp_path)
     r = c.post("/control/session/login", data={"token": TOKEN}, headers=FUNNEL, follow_redirects=False)
     assert r.status_code == 303 and "secure" in r.headers["set-cookie"].lower()
+
+
+def test_browser_code_grants_one_scoped_session_without_core_token(tmp_path):
+    c = _client(tmp_path)
+    auth = {"Authorization": f"Bearer {TOKEN}"}
+    assert c.post("/authority/browser-code").status_code == 401
+    assert c.post("/authority/browser-code", headers={**auth, **FUNNEL}).status_code == 403
+    assert c.post("/authority/browser-code", headers={**auth, "X-Forwarded-For": "100.100.1.2"}).status_code == 403
+    page = c.get("/control/")
+    assert "Sign in to Piblo" in page.text and 'name="token"' not in page.text
+    issue = c.post("/authority/browser-code", headers=auth)
+    assert issue.status_code == 200 and issue.headers["cache-control"] == "no-store"
+    code = issue.json()["code"]
+    assert c.post("/pair/claim", json={"code": code}).status_code == 400
+    failed = c.post("/control/session/code", data={"code": "wrong"}, headers=FUNNEL)
+    assert failed.status_code == 401 and "set-cookie" not in failed.headers
+    conn = {"X-Forwarded-For": "100.100.1.2", "X-Forwarded-Proto": "https", "User-Agent": "Browser"}
+    signed = c.post("https://testserver/control/session/code", data={"code": code.lower()}, headers=conn, follow_redirects=False)
+    assert signed.status_code == 303 and TOKEN not in signed.text
+    assert all(part in signed.headers["set-cookie"].lower() for part in ("httponly", "secure", "samesite=strict", "path=/control"))
+    assert c.get("https://testserver/control/api/state", headers={**conn, "X-MAZ-Control": "1"}).status_code == 200
+    assert c.get("https://testserver/authority/grants", headers=conn).status_code == 401
+    assert c.post("https://testserver/control/session/code", data={"code": code}, headers=conn).status_code == 401
