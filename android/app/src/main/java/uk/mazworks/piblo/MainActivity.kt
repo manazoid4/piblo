@@ -2,6 +2,7 @@ package uk.mazworks.piblo
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
@@ -27,6 +28,7 @@ import kotlinx.coroutines.launch
 import uk.mazworks.piblo.data.Prefs
 import uk.mazworks.piblo.ui.ActionsScreen
 import uk.mazworks.piblo.ui.AskScreen
+import uk.mazworks.piblo.ui.CraftScreen
 import uk.mazworks.piblo.ui.HomeScreen
 import uk.mazworks.piblo.ui.LiveViewScreen
 import uk.mazworks.piblo.ui.MemoryScreen
@@ -52,8 +54,16 @@ class MainActivity : ComponentActivity() {
                 }
                 var tab by rememberSaveable { mutableIntStateOf(0) }
                 var live by rememberSaveable { mutableStateOf(false) }
+                var craft by rememberSaveable { mutableStateOf(false) }
                 if (live) {
                     Surface(Modifier.fillMaxSize()) { LiveViewScreen(onClose = { live = false }) }
+                    return@MaterialTheme
+                }
+                if (craft) {
+                    BackHandler { craft = false }
+                    Surface(Modifier.fillMaxSize()) {
+                        CraftScreen(onClose = { craft = false }, onConnect = { craft = false; tab = 4 })
+                    }
                     return@MaterialTheme
                 }
                 Scaffold(
@@ -71,7 +81,7 @@ class MainActivity : ComponentActivity() {
                 ) { pad ->
                     Surface(Modifier.padding(pad)) {
                         when (tab) {
-                            0 -> HomeScreen(openLive = { live = true }, onConnect = { tab = 4 })
+                            0 -> HomeScreen(openLive = { live = true }, onConnect = { tab = 4 }, openCraft = { craft = true })
                             1 -> AskScreen()
                             2 -> ActionsScreen(openLive = { live = true })
                             3 -> MemoryScreen()

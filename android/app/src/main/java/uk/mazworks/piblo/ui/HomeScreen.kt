@@ -51,7 +51,7 @@ private fun app(ctx: Context) = ctx.applicationContext as PibloApp
  * today's promises and the latest results. No demo content.
  */
 @Composable
-fun HomeScreen(openLive: () -> Unit, onConnect: () -> Unit = {}) {
+fun HomeScreen(openLive: () -> Unit, onConnect: () -> Unit, openCraft: () -> Unit) {
     val a = app(LocalContext.current)
     val scope = rememberCoroutineScope()
     val state by a.hub.state.collectAsStateWithLifecycle()
@@ -91,6 +91,8 @@ fun HomeScreen(openLive: () -> Unit, onConnect: () -> Unit = {}) {
         }
 
         DeviceCard(device, deviceErr, busy, onUpdate = { updateConfirm = true })
+
+        OutlinedButton(openCraft, modifier = Modifier.testTag("open_craft")) { Text("Open PibloCraft") }
 
         Section("Waiting for you") {
             val head = state.head
