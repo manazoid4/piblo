@@ -52,8 +52,7 @@ jobs:
 
       - name: Build info for one-tap phone updates (scripts/stage_phone_apk.py)
         run: |
-          printf '{"version_code": %d, "version_name": "0.2.0-beta+ci%s", "sha": "%s"}
-' "$((100 + GITHUB_RUN_NUMBER))" "$GITHUB_RUN_NUMBER" "$GITHUB_SHA" > android/app/build/outputs/apk/debug/piblo-build.json
+          echo "{\"version_code\": $((100 + GITHUB_RUN_NUMBER)), \"version_name\": \"0.2.0-beta+ci$GITHUB_RUN_NUMBER\", \"sha\": \"$GITHUB_SHA\"}" > android/app/build/outputs/apk/debug/piblo-build.json
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
