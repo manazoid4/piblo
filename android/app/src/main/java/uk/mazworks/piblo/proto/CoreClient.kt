@@ -77,14 +77,24 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
          */
         private fun permitsLocalHttp(host: String): Boolean {
             val h = host.lowercase().removePrefix("[").removeSuffix("]")
-            if (h == "localhost" || h == "::1" || h.endsWith(".local") || h.endsWith(".ts.net")) return true
+            if (h == "localhost" || h == "::1" || h.endsWith(".local") || isTailnetHost(h)) return true
             if ('.' !in h && ':' !in h) return true  // a short local machine name
             val octets = h.split('.').map { it.toIntOrNull() }
             if (octets.size != 4 || octets.any { it == null || it !in 0..255 }) return false
             val a = octets[0]!!; val b = octets[1]!!
             return a == 10 || a == 127 || (a == 172 && b in 16..31) ||
-                (a == 192 && b == 168) || (a == 169 && b == 254) ||
-                (a == 100 && b in 64..127) // Tailscale / RFC6598 private overlay
+                (a == 192 && b == 168) || (a == 169 && b == 254)
+        }
+
+        fun isTailnetAddress(base: String): Boolean = try {
+            isTailnetHost(URL(base).host.lowercase().trimEnd('.').removeSurrounding("[", "]"))
+        } catch (_: java.net.MalformedURLException) { false }
+
+        private fun isTailnetHost(host: String): Boolean {
+            if (host.endsWith(".ts.net") || host.startsWith("fd7a:115c:a1e0:")) return true
+            val octets = host.split('.').map { it.toIntOrNull() }
+            return octets.size == 4 && octets.all { it != null && it in 0..255 } &&
+                octets[0] == 100 && (octets[1] ?: -1) in 64..127
         }
 
         /** "192.168.1.20" / "pc:8787" / "http://pc:8787/" -> "http://host:port". Returns null if it is not a usable address. */

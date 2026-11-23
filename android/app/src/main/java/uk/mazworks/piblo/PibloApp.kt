@@ -110,8 +110,10 @@ class PibloApp : Application() {
 
     /** Called when the app transitions from background to foreground. Resets backoff and reconnects immediately. */
     private fun onAppForegrounded() {
-        link?.requestReconnect()
+        reconnect()
     }
+
+    fun reconnect() { link?.requestReconnect() }
 
     /** Registers a ConnectivityManager callback so we reconnect when Wi-Fi / mobile comes back. */
     private fun registerNetworkCallback() {
