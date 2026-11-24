@@ -7,21 +7,16 @@ import getpass
 import json
 import os
 import re
-import socket
 import time
 from pathlib import Path
-from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
-from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
 
+from httpx import HTTPStatusError, RequestError
+
+from . import private_mode
 from .remote_relay import MAX_TASKS, digest
 
 LOOPBACK = {"127.0.0.1", "localhost", "::1"}
-
-
-class NoRedirect(HTTPRedirectHandler):
-    def redirect_request(self, *_args, **_kwargs):
-        return None
 
 
 def origin(value: str, *, local: bool = False, insecure_local: bool = False) -> str:
@@ -37,20 +32,29 @@ def origin(value: str, *, local: bool = False, insecure_local: bool = False) -> 
 
 
 def request_json(url: str, *, body: dict | None = None, token: str = "") -> dict:
-    headers = {"Accept": "application/json"}
+    headers = {"Accept": "application/json", "Accept-Encoding": "identity"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    if body is not None:
-        headers["Content-Type"] = "application/json"
-    request = Request(url, data=json.dumps(body).encode() if body is not None else None, headers=headers)
-    with build_opener(ProxyHandler({}), NoRedirect()).open(request, timeout=8) as response:
-        raw = response.read(262145)
-    if len(raw) > 262144:
-        raise ValueError("Response exceeded the board size limit.")
+    method = "GET" if body is None else "POST"
+    raw = bytearray()
+    with private_mode.client(trust_env=False, follow_redirects=False, timeout=8) as client:
+        with client.stream(method, url, json=body, headers=headers) as response:
+            response.raise_for_status()
+            for chunk in response.iter_raw(chunk_size=16384):
+                raw.extend(chunk)
+                if len(raw) > 262144:
+                    raise ValueError("Response exceeded the board size limit.")
     result = json.loads(raw)
     if not isinstance(result, dict):
         raise ValueError("Unexpected response.")
     return result
+
+
+def require_remote_permission(core: str, token: str, relay: str) -> None:
+    if private_mode.is_local_url(relay):
+        return
+    if request_json(core + "/privacy", token=token).get("private_mode") is not False:
+        raise private_mode.PrivateModeError("Core must have private mode off to use a public relay.")
 
 
 def filtered_tasks(board: dict) -> list[dict]:
@@ -75,6 +79,7 @@ def filtered_tasks(board: dict) -> list[dict]:
 
 def publish(relay: str, core: str, token: str, key: str) -> int:
     tasks = filtered_tasks(request_json(core + "/buddy/tasks", token=token))
+    require_remote_permission(core, token, relay)
     request_json(relay + "/api/snapshot", body={"tasks": tasks}, token=key)
     return len(tasks)
 
@@ -86,21 +91,28 @@ def main() -> None:
     actions = parser.add_subparsers(dest="action", required=True)
     pair = actions.add_parser("pair")
     pair.add_argument("relay")
-    pair.add_argument("--host", default=socket.gethostname())
+    pair.add_argument("--host", default=os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "Piblo Core")
     run = actions.add_parser("run")
-    run.add_argument("--core", default="http://127.0.0.1:8787")
+    for action in (pair, run):
+        action.add_argument("--core", default="http://127.0.0.1:8787")
     run.add_argument("--once", action="store_true")
     args = parser.parse_args()
     try:
+        core = origin(args.core, local=True)
+        token = os.environ.get("PIBLO_CORE_TOKEN") or os.environ.get("MAZ_TOKEN")
+        if not token:
+            raise ValueError("Set PIBLO_CORE_TOKEN to this Core's local credential.")
         if args.action == "pair":
             relay = origin(args.relay, insecure_local=args.insecure_local)
             if args.state.exists():
                 raise ValueError("State file already exists. Choose a new file to re-pair.")
             code = getpass.getpass("Browser pairing code: ").strip()
+            require_remote_permission(core, token, relay)
             owner = request_json(relay + "/api/pair/preview", body={"code": code})["account"]
             if input(f"Pair {args.host!r} with {owner!r} at {relay}? [y/N] ").strip().lower() != "y":
                 return
             args.state.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
+            require_remote_permission(core, token, relay)
             response = request_json(relay + "/api/pair/claim", body={"code": code, "account": owner, "host": args.host})
             fd = os.open(args.state, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
@@ -109,10 +121,6 @@ def main() -> None:
             return
         saved = json.loads(args.state.read_text(encoding="utf-8"))
         relay = origin(saved["relay"], insecure_local=args.insecure_local)
-        core = origin(args.core, local=True)
-        token = os.environ.get("PIBLO_CORE_TOKEN") or os.environ.get("MAZ_TOKEN")
-        if not token:
-            raise ValueError("Set PIBLO_CORE_TOKEN to this Core's local credential.")
         if not re.fullmatch(r"[A-Za-z0-9_-]{43}", saved["key"]):
             raise ValueError("Device credential is invalid. Pair this computer again.")
         delay = 5
@@ -123,19 +131,20 @@ def main() -> None:
                     print(f"Published {count} Craft tasks.")
                     return
                 delay = 5
-            except HTTPError as error:
-                if error.code == 401:
+            except HTTPStatusError as error:
+                if error.response.status_code == 401:
                     raise ValueError("Core or relay rejected its credential. Check the local token and pairing.") from None
                 if args.once:
                     raise
                 delay = min(delay * 2, 30)
-            except (URLError, OSError, ValueError, KeyError):
+            except (RequestError, OSError, ValueError, KeyError):
                 if args.once:
                     raise
                 delay = min(delay * 2, 30)
             time.sleep(delay)
-    except (ValueError, OSError, KeyError) as error:
-        raise SystemExit(str(error) if isinstance(error, ValueError) else "Could not read configuration or complete the connection.") from None
+    except (ValueError, OSError, KeyError, RequestError, HTTPStatusError, private_mode.PrivateModeError) as error:
+        message = str(error) if isinstance(error, (ValueError, private_mode.PrivateModeError)) else "Could not read configuration or complete the connection."
+        raise SystemExit(message) from None
 
 
 if __name__ == "__main__":

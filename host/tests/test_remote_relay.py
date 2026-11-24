@@ -5,6 +5,7 @@ import time
 import pytest
 from fastapi.testclient import TestClient
 
+from mazhost import private_mode, remote_connector
 from mazhost.remote_connector import filtered_tasks, origin
 from mazhost.remote_relay import SESSION_COOKIE, add_account, create_relay, database
 
@@ -87,3 +88,29 @@ def test_pair_expiry_and_transport_guards(tmp_path):
     assert client.post("/api/pair/preview", json={"code": code}).status_code == 404
     assert client.post("/api/pair/claim", json={"code": code, "account": "alice", "host": "PC"}).status_code == 404
     assert client.post("/api/snapshot", content=b"x" * 16001).status_code == 413
+
+
+def test_connector_rechecks_core_before_publishing_outside_lan(monkeypatch):
+    calls = []
+    current_privacy = {"private_mode": True}
+
+    def request(url, **kwargs):
+        calls.append((url, kwargs))
+        if url.endswith("/buddy/tasks"):
+            return {"tasks": []}
+        if url.endswith("/privacy"):
+            return current_privacy
+        return {"ok": True}
+
+    monkeypatch.setattr(remote_connector, "request_json", request)
+    relay = "https://relay.example"
+    core = "http://127.0.0.1:8787"
+    for mode in (True, None, False, True):
+        current_privacy["private_mode"] = mode
+        if mode is False:
+            assert remote_connector.publish(relay, core, "core-secret", "device-key") == 0
+        else:
+            with pytest.raises(private_mode.PrivateModeError):
+                remote_connector.publish(relay, core, "core-secret", "device-key")
+    outside = [(url, kwargs) for url, kwargs in calls if url.startswith(relay)]
+    assert outside == [(relay + "/api/snapshot", {"body": {"tasks": []}, "token": "device-key"})]
