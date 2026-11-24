@@ -152,7 +152,14 @@ def test_email_code_sign_in_rules(tmp_path):
         assert bad.status_code == 401 and SESSION_COOKIE not in bad.cookies
     assert browser.post("/login/code", headers=FORM, data={"email": ALICE, "code": code}).status_code == 401
 
-    # A fresh code works once; replay fails.
+    # Asking for a new code while the locked one is live does not reset the cap.
+    browser.post("/login", headers=FORM, data={"email": ALICE})
+    assert browser.post("/login/code", headers=FORM, data={"email": ALICE, "code": inbox.pop(ALICE)}).status_code == 401
+
+    # Once the locked code has expired, a fresh code works once; replay fails.
+    with database(path) as db:
+        db.execute("UPDATE login_codes SET expires=0")
+        db.execute("DELETE FROM limits")
     sign_in(browser, inbox, ALICE)
     browser.post("/logout", headers=FORM)
     browser.post("/login", headers=FORM, data={"email": ALICE})
@@ -184,6 +191,9 @@ def test_request_limits_follow_proxy_address(tmp_path):
     statuses = [browser.post("/login", headers=first, data={"email": f"user{n}@example.com"}).status_code
                 for n in range(remote_relay.LIMITS["code-ip"] + 1)]
     assert statuses[-1] == 429 and set(statuses[:-1]) == {200}
+    six = [browser.post("/login", headers={**FORM, "x-forwarded-for": f"2001:db8::{n}"}, data={"email": f"v{n}@example.com"}).status_code
+           for n in range(1, remote_relay.LIMITS["code-ip"] + 2)]
+    assert six[-1] == 429  # addresses in one IPv6 /64 share a limit
     other = {**FORM, "x-forwarded-for": "spoofed, 203.0.113.9"}
     assert browser.post("/login", headers=other, data={"email": "user0@example.com"}).status_code == 200
     claims = [browser.post("/api/pair/claim", headers={"x-forwarded-for": "198.51.100.7"},
@@ -201,8 +211,11 @@ def test_mail_failure_and_private_mode(tmp_path, monkeypatch):
     app = create_relay(path, ORIGIN, mailer=broken)
     add_account(path, ALICE)
     browser = TestClient(app, base_url=ORIGIN)
+    unknown = browser.post("/login", headers=FORM, data={"email": "eve@example.com"})
     response = browser.post("/login", headers=FORM, data={"email": ALICE})
-    assert response.status_code == 503 and "provider" not in response.text
+    # Failed mail still gives the same page, so it cannot reveal who is allowed.
+    assert response.status_code == 200 and "provider" not in response.text
+    assert response.text == unknown.text.replace("eve@example.com", ALICE)
     with database(path) as db:
         assert db.execute("SELECT COUNT(*) FROM login_codes").fetchone()[0] == 0
 
@@ -219,3 +232,21 @@ def test_old_access_key_database_is_refused(tmp_path):
         db.execute("CREATE TABLE accounts (name TEXT PRIMARY KEY, access_hash TEXT UNIQUE NOT NULL)")
     with pytest.raises(ValueError, match="new --db"):
         create_relay(path, ORIGIN)
+
+
+def test_parallel_guesses_cannot_pass_the_try_cap(tmp_path, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+    monkeypatch.setitem(remote_relay.LIMITS, "verify-ip", 1000)
+    path = tmp_path / "relay.sqlite3"
+    app, inbox = relay(path)
+    add_account(path, ALICE)
+    browser = TestClient(app, base_url=ORIGIN)
+    browser.post("/login", headers=FORM, data={"email": ALICE})
+    code = inbox.pop(ALICE)
+    wrong = "000000" if code != "000000" else "111111"
+    compared = []
+    real = remote_relay.hmac.compare_digest
+    monkeypatch.setattr(remote_relay.hmac, "compare_digest", lambda a, b: compared.append(1) or real(a, b))
+    with ThreadPoolExecutor(16) as pool:
+        list(pool.map(lambda _: browser.post("/login/code", headers=FORM, data={"email": ALICE, "code": wrong}), range(60)))
+    assert len(compared) <= remote_relay.CODE_TRIES

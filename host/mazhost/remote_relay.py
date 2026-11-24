@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import hmac
+import ipaddress
 import json
 import logging
 import os
@@ -18,7 +19,7 @@ from pathlib import Path
 from typing import Callable, Literal
 from urllib.parse import urlsplit
 
-from fastapi import FastAPI, Form, HTTPException, Request
+from fastapi import BackgroundTasks, FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -128,15 +129,12 @@ def add_account(path: Path, email: str) -> str:
 
 def allow(db, bucket: str, kind: str) -> bool:
     """Fixed-window request limit; True while the bucket is under its limit."""
-    now = int(time.time())
-    row = db.execute("SELECT start, count FROM limits WHERE bucket=?", (bucket,)).fetchone()
-    if row is None or row["start"] <= now - RATE_WINDOW:
-        db.execute("INSERT OR REPLACE INTO limits VALUES (?, ?, 1)", (bucket, now))
-        return True
-    if row["count"] >= LIMITS[kind]:
-        return False
-    db.execute("UPDATE limits SET count=count+1 WHERE bucket=?", (bucket,))
-    return True
+    now, old = int(time.time()), int(time.time()) - RATE_WINDOW
+    # One write statement, so concurrent requests cannot both read a stale count.
+    db.execute("""INSERT INTO limits VALUES (?, ?, 1) ON CONFLICT(bucket) DO UPDATE SET
+                  start = CASE WHEN start <= ? THEN ? ELSE start END,
+                  count = CASE WHEN start <= ? THEN 1 ELSE count + 1 END""", (bucket, now, old, now, old))
+    return db.execute("SELECT count FROM limits WHERE bucket=?", (bucket,)).fetchone()["count"] <= LIMITS[kind]
 
 
 def view(title: str, content: str, *, refresh: bool = False, status: int = 200) -> HTMLResponse:
@@ -184,7 +182,13 @@ def create_relay(path: Path, origin: str, *, insecure_local: bool = False,
     def client_ip(request: Request) -> str:
         # Tailscale Funnel and other local proxies append the caller's address last.
         forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip() if behind_proxy else ""
-        return forwarded or (request.client.host if request.client else "unknown")
+        address = forwarded or (request.client.host if request.client else "unknown")
+        try:
+            ip = ipaddress.ip_address(address)
+        except ValueError:
+            return address
+        # One IPv6 customer usually owns a whole /64; count it as one address.
+        return str(ipaddress.ip_network(f"{ip}/64", strict=False)) if ip.version == 6 else address
 
     def limited(request: Request, kind: str, key: str = "") -> bool:
         with database(path) as db:
@@ -247,8 +251,16 @@ def create_relay(path: Path, origin: str, *, insecure_local: bool = False,
 <form method="post" action="/pair"><button>Pair a computer</button></form>
 <form method="post" action="/logout"><button>Sign out</button></form>''', refresh=bool(hosts))
 
+    def send_code(address: str, code: str) -> None:
+        try:
+            mailer(address, code)
+        except Exception as error:  # noqa: BLE001 - never echo provider detail anywhere
+            log.warning("sign-in email failed: %s", type(error).__name__)
+            with database(path) as db:
+                db.execute("DELETE FROM login_codes WHERE email=? AND code_hash=?", (address, digest(f"{address}:{code}")))
+
     @app.post("/login")
-    def login(request: Request, email: str = Form(max_length=254)):
+    def login(request: Request, background: BackgroundTasks, email: str = Form(max_length=254)):
         same_origin(request)
         address = normal_email(email)
         if address is None:
@@ -259,16 +271,14 @@ def create_relay(path: Path, origin: str, *, insecure_local: bool = False,
         with database(path) as db:
             allowed = db.execute("SELECT 1 FROM accounts WHERE name=?", (address,)).fetchone()
             if allowed:
-                db.execute("INSERT OR REPLACE INTO login_codes VALUES (?, ?, ?, 0)",
-                           (address, digest(f"{address}:{code}"), int(time.time()) + CODE_TTL))
-        if allowed:
-            try:
-                mailer(address, code)
-            except Exception as error:  # noqa: BLE001 - never echo provider detail to the browser
-                log.warning("sign-in email failed: %s", type(error).__name__)
-                with database(path) as db:
-                    db.execute("DELETE FROM login_codes WHERE email=?", (address,))
-                return sign_in("We could not send the email just now. Try again shortly.", 503)
+                now = int(time.time())
+                # A new code keeps the wrong-try count of a still-live one, so asking again never resets the cap.
+                db.execute("""INSERT INTO login_codes VALUES (?, ?, ?, 0) ON CONFLICT(email) DO UPDATE SET
+                              code_hash=excluded.code_hash, expires=excluded.expires,
+                              tries=CASE WHEN login_codes.expires > ? THEN login_codes.tries ELSE 0 END""",
+                           (address, digest(f"{address}:{code}"), now + CODE_TTL, now))
+                # Mail goes out after the reply, so response time never reveals who is allowed.
+                background.add_task(send_code, address, code)
         # Same reply either way, so the page never reveals who is allowed.
         return code_form(address, "If this email can use Piblo away from home, a 6-digit code is on its way. "
                                   "It works once, for 10 minutes.")
@@ -282,14 +292,15 @@ def create_relay(path: Path, origin: str, *, insecure_local: bool = False,
         now = int(time.time())
         session = secrets.token_urlsafe(32)
         with database(path) as db:
-            row = db.execute("SELECT * FROM login_codes WHERE email=?", (address,)).fetchone()
-            good = (row is not None and row["expires"] > now and row["tries"] < CODE_TRIES
-                    and hmac.compare_digest(row["code_hash"], digest(f"{address}:{code}")))
-            if not good:
-                if row is not None:
-                    db.execute("UPDATE login_codes SET tries=tries+1 WHERE email=?", (address,))
+            # Take a try before comparing, in one write, so parallel guesses cannot pass the cap.
+            took_try = db.execute("UPDATE login_codes SET tries=tries+1 WHERE email=? AND tries<? AND expires>?",
+                                  (address, CODE_TRIES, now)).rowcount == 1
+            row = db.execute("SELECT code_hash FROM login_codes WHERE email=?", (address,)).fetchone()
+            good = took_try and hmac.compare_digest(row["code_hash"], digest(f"{address}:{code}"))
+            # Deleting first means two parallel correct submissions cannot both get a session.
+            if not good or db.execute("DELETE FROM login_codes WHERE email=? AND code_hash=?",
+                                      (address, row["code_hash"])).rowcount != 1:
                 return code_form(address, "That code did not work. Check it, or ask for a new one.", 401)
-            db.execute("DELETE FROM login_codes WHERE email=?", (address,))
             db.execute("DELETE FROM sessions WHERE expires<=?", (now,))
             db.execute("INSERT INTO sessions VALUES(?,?,?)", (digest(session), address, now + SESSION_TTL))
         response = RedirectResponse("/", status_code=303)
