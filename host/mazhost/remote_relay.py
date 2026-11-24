@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import hmac
 import json
+import logging
+import os
 import re
 import secrets
 import sqlite3
@@ -12,19 +15,29 @@ import time
 from contextlib import closing, contextmanager
 from html import escape
 from pathlib import Path
-from typing import Literal
+from typing import Callable, Literal
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from . import private_mode
 from .validation import install_validation_exception_handler
+
+log = logging.getLogger(__name__)
 
 SESSION_COOKIE = "piblo_remote"
 SESSION_TTL = 8 * 3600
 PAIR_TTL = 300
 STALE_AFTER = 30
+CODE_TTL = 600
+CODE_TRIES = 5
+RATE_WINDOW = 900
+# Requests allowed per RATE_WINDOW for each bucket.
+LIMITS = {"code-email": 3, "code-ip": 10, "verify-ip": 30, "pair-ip": 20}
+EMAIL = re.compile(r"[a-z0-9.!#$%&'*+/=?^_`{|}~-]{1,64}@[a-z0-9-]{1,63}(\.[a-z0-9-]{1,63})+")
+MAIL_FROM = "Piblo <piblo@mazworks.uk>"
 MAX_TASKS = 32
 WORKERS = Literal["Claude", "Codex", "Gemini", "OpenCode", "Hermes", "Other", "Unassigned"]
 STATUSES = Literal["waiting", "running", "done", "failed"]
@@ -36,7 +49,7 @@ class PairCode(BaseModel):
 
 
 class Claim(PairCode):
-    account: str = Field(min_length=1, max_length=48)
+    account: str = Field(min_length=3, max_length=254)
     host: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9 ._-]{0,47}$")
 
 
@@ -57,6 +70,26 @@ def digest(value: str) -> str:
     return hashlib.sha256(value.encode()).hexdigest()
 
 
+def normal_email(value: str) -> str | None:
+    email = value.strip().lower()
+    return email if len(email) <= 254 and EMAIL.fullmatch(email) else None
+
+
+def resend_mailer(email: str, code: str) -> None:
+    """Send a sign-in code through Resend; the key stays in the relay's environment."""
+    key = os.environ.get("RESEND_API_KEY", "")
+    if not key:
+        raise RuntimeError("RESEND_API_KEY is not set")
+    text = (f"Your Piblo sign-in code is {code}\n\nIt works once, for 10 minutes. "
+            "If you did not ask for it, ignore this email.")
+    with private_mode.client(timeout=10, trust_env=False, follow_redirects=False) as client:
+        response = client.post("https://api.resend.com/emails", headers={"Authorization": f"Bearer {key}"}, json={
+            "from": os.environ.get("PIBLO_REMOTE_MAIL_FROM", MAIL_FROM), "to": [email],
+            "subject": f"{code} is your Piblo sign-in code", "text": text})
+    if response.status_code >= 300:
+        raise RuntimeError(f"Resend returned {response.status_code}")
+
+
 @contextmanager
 def database(path: Path):
     with closing(sqlite3.connect(path, timeout=5)) as db, db:
@@ -70,21 +103,40 @@ def init_db(path: Path) -> None:
     path.touch(mode=0o600, exist_ok=True)
     with database(path) as db:
         db.executescript("""
-            CREATE TABLE IF NOT EXISTS accounts (name TEXT PRIMARY KEY, access_hash TEXT UNIQUE NOT NULL);
+            CREATE TABLE IF NOT EXISTS accounts (name TEXT PRIMARY KEY);
+            CREATE TABLE IF NOT EXISTS login_codes (email TEXT PRIMARY KEY REFERENCES accounts(name) ON DELETE CASCADE,
+                code_hash TEXT NOT NULL, expires INTEGER NOT NULL, tries INTEGER NOT NULL DEFAULT 0);
+            CREATE TABLE IF NOT EXISTS limits (bucket TEXT PRIMARY KEY, start INTEGER NOT NULL, count INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS sessions (key_hash TEXT PRIMARY KEY, account TEXT NOT NULL REFERENCES accounts(name), expires INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS pairing (key_hash TEXT PRIMARY KEY, account TEXT UNIQUE NOT NULL REFERENCES accounts(name), expires INTEGER NOT NULL);
             CREATE TABLE IF NOT EXISTS hosts (id TEXT PRIMARY KEY, account TEXT NOT NULL REFERENCES accounts(name),
                 name TEXT NOT NULL, key_hash TEXT UNIQUE NOT NULL, seen INTEGER, tasks TEXT NOT NULL DEFAULT '[]');
         """)
+        if "access_hash" in {row["name"] for row in db.execute("PRAGMA table_info(accounts)")}:
+            raise ValueError("This database uses the old access-key sign-in. Start the relay with a new --db file.")
 
 
-def add_account(path: Path, name: str) -> str:
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.@-]{0,47}", name):
-        raise ValueError("Account names use 1–48 letters, numbers or _.@-.")
-    key = secrets.token_urlsafe(32)
+def add_account(path: Path, email: str) -> str:
+    """Allow one email address to sign in (beta allowlist)."""
+    name = normal_email(email)
+    if name is None:
+        raise ValueError("Use a valid email address.")
     with database(path) as db:
-        db.execute("INSERT INTO accounts VALUES (?, ?)", (name, digest(key)))
-    return key
+        db.execute("INSERT OR IGNORE INTO accounts VALUES (?)", (name,))
+    return name
+
+
+def allow(db, bucket: str, kind: str) -> bool:
+    """Fixed-window request limit; True while the bucket is under its limit."""
+    now = int(time.time())
+    row = db.execute("SELECT start, count FROM limits WHERE bucket=?", (bucket,)).fetchone()
+    if row is None or row["start"] <= now - RATE_WINDOW:
+        db.execute("INSERT OR REPLACE INTO limits VALUES (?, ?, 1)", (bucket, now))
+        return True
+    if row["count"] >= LIMITS[kind]:
+        return False
+    db.execute("UPDATE limits SET count=count+1 WHERE bucket=?", (bucket,))
+    return True
 
 
 def view(title: str, content: str, *, refresh: bool = False, status: int = 200) -> HTMLResponse:
@@ -99,7 +151,8 @@ input{{width:100%;margin-block:.3rem .9rem;background:#fff}}button{{background:#
 <h1>{title}</h1>{content}</main></body></html>''', status_code=status)
 
 
-def create_relay(path: Path, origin: str, *, insecure_local: bool = False) -> FastAPI:
+def create_relay(path: Path, origin: str, *, insecure_local: bool = False,
+                 mailer: Callable[[str, str], None] = resend_mailer, behind_proxy: bool = False) -> FastAPI:
     url = urlsplit(origin)
     if not url.hostname or url.username or url.password or url.path or url.query or url.fragment:
         raise ValueError("Use an origin without a path, for example https://piblo.example")
@@ -128,6 +181,15 @@ def create_relay(path: Path, origin: str, *, insecure_local: bool = False) -> Fa
         response.headers["Content-Security-Policy"] = "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'; form-action 'self'; base-uri 'none'"
         return response
 
+    def client_ip(request: Request) -> str:
+        # Tailscale Funnel and other local proxies append the caller's address last.
+        forwarded = request.headers.get("x-forwarded-for", "").split(",")[-1].strip() if behind_proxy else ""
+        return forwarded or (request.client.host if request.client else "unknown")
+
+    def limited(request: Request, kind: str, key: str = "") -> bool:
+        with database(path) as db:
+            return not allow(db, f"{kind}:{digest(key or client_ip(request))}", kind)
+
     def same_origin(request: Request) -> None:
         if request.headers.get("origin") != origin:
             raise HTTPException(403, "Invalid form origin")
@@ -152,11 +214,17 @@ def create_relay(path: Path, origin: str, *, insecure_local: bool = False) -> Fa
                 "online": seen is not None and time.time() - seen <= STALE_AFTER,
                 "tasks": json.loads(row["tasks"])}
 
-    def sign_in(*, failed: bool = False):
-        notice = '<p role="alert">That access key could not be used.</p>' if failed else ""
-        return view("Piblo away from home", notice + '''<form method="post" action="/login">
-<label for="key">Staging access key</label><input type="password" id="key" name="key" maxlength="43" required autocomplete="current-password">
-<button>Sign in</button></form>''', status=401 if failed else 200)
+    def sign_in(notice: str = "", status: int = 200):
+        alert = f'<p role="alert">{notice}</p>' if notice else ""
+        return view("Piblo away from home", alert + '''<form method="post" action="/login">
+<label for="email">Your email</label><input type="email" id="email" name="email" maxlength="254" required autocomplete="email">
+<button>Email me a sign-in code</button></form>''', status=status)
+
+    def code_form(email: str, notice: str, status: int = 200):
+        return view("Check your email", f'''<p role="status">{notice}</p><form method="post" action="/login/code">
+<input type="hidden" name="email" value="{escape(email)}">
+<label for="code">6-digit code</label><input id="code" name="code" inputmode="numeric" pattern="[0-9]{{6}}" maxlength="6" required autocomplete="one-time-code">
+<button>Sign in</button></form><p><a href="/">Use a different email</a></p>''', status=status)
 
     @app.get("/", response_class=HTMLResponse)
     def home(request: Request):
@@ -180,16 +248,50 @@ def create_relay(path: Path, origin: str, *, insecure_local: bool = False) -> Fa
 <form method="post" action="/logout"><button>Sign out</button></form>''', refresh=bool(hosts))
 
     @app.post("/login")
-    def login(request: Request, key: str = Form(max_length=43)):
+    def login(request: Request, email: str = Form(max_length=254)):
         same_origin(request)
+        address = normal_email(email)
+        if address is None:
+            return sign_in("Enter a valid email address.", 400)
+        if limited(request, "code-ip") or limited(request, "code-email", address):
+            return sign_in("Too many codes asked for. Wait 15 minutes and try again.", 429)
+        code = f"{secrets.randbelow(10**6):06d}"
+        with database(path) as db:
+            allowed = db.execute("SELECT 1 FROM accounts WHERE name=?", (address,)).fetchone()
+            if allowed:
+                db.execute("INSERT OR REPLACE INTO login_codes VALUES (?, ?, ?, 0)",
+                           (address, digest(f"{address}:{code}"), int(time.time()) + CODE_TTL))
+        if allowed:
+            try:
+                mailer(address, code)
+            except Exception as error:  # noqa: BLE001 - never echo provider detail to the browser
+                log.warning("sign-in email failed: %s", type(error).__name__)
+                with database(path) as db:
+                    db.execute("DELETE FROM login_codes WHERE email=?", (address,))
+                return sign_in("We could not send the email just now. Try again shortly.", 503)
+        # Same reply either way, so the page never reveals who is allowed.
+        return code_form(address, "If this email can use Piblo away from home, a 6-digit code is on its way. "
+                                  "It works once, for 10 minutes.")
+
+    @app.post("/login/code")
+    def verify(request: Request, email: str = Form(max_length=254), code: str = Form(max_length=6)):
+        same_origin(request)
+        address = normal_email(email) or ""
+        if limited(request, "verify-ip"):
+            return sign_in("Too many tries. Wait 15 minutes and try again.", 429)
         now = int(time.time())
         session = secrets.token_urlsafe(32)
         with database(path) as db:
-            row = db.execute("SELECT name FROM accounts WHERE access_hash=?", (digest(key),)).fetchone()
-            if not row:
-                return sign_in(failed=True)
+            row = db.execute("SELECT * FROM login_codes WHERE email=?", (address,)).fetchone()
+            good = (row is not None and row["expires"] > now and row["tries"] < CODE_TRIES
+                    and hmac.compare_digest(row["code_hash"], digest(f"{address}:{code}")))
+            if not good:
+                if row is not None:
+                    db.execute("UPDATE login_codes SET tries=tries+1 WHERE email=?", (address,))
+                return code_form(address, "That code did not work. Check it, or ask for a new one.", 401)
+            db.execute("DELETE FROM login_codes WHERE email=?", (address,))
             db.execute("DELETE FROM sessions WHERE expires<=?", (now,))
-            db.execute("INSERT INTO sessions VALUES(?,?,?)", (digest(session), row["name"], now + SESSION_TTL))
+            db.execute("INSERT INTO sessions VALUES(?,?,?)", (digest(session), address, now + SESSION_TTL))
         response = RedirectResponse("/", status_code=303)
         response.set_cookie(SESSION_COOKIE, session, max_age=SESSION_TTL, httponly=True,
                             secure=url.scheme == "https", samesite="strict")
@@ -216,7 +318,9 @@ def create_relay(path: Path, origin: str, *, insecure_local: bool = False) -> Fa
 <p><code id="pairing-code">{code}</code></p><a href="/">Back to tasks</a>''')
 
     @app.post("/api/pair/preview")
-    def preview(body: PairCode):
+    def preview(body: PairCode, request: Request):
+        if limited(request, "pair-ip"):
+            raise HTTPException(429, "Too many tries")
         with database(path) as db:
             row = db.execute("SELECT account FROM pairing WHERE key_hash=? AND expires>?", (digest(body.code), int(time.time()))).fetchone()
         if row is None:
@@ -224,7 +328,9 @@ def create_relay(path: Path, origin: str, *, insecure_local: bool = False) -> Fa
         return {"account": row["account"]}
 
     @app.post("/api/pair/claim", status_code=201)
-    def claim(body: Claim):
+    def claim(body: Claim, request: Request):
+        if limited(request, "pair-ip"):
+            raise HTTPException(429, "Too many tries")
         key, host_id = secrets.token_urlsafe(32), secrets.token_hex(12)
         with database(path) as db:
             deleted = db.execute("DELETE FROM pairing WHERE key_hash=? AND account=? AND expires>?",
@@ -275,19 +381,27 @@ def main() -> None:
     parser.add_argument("--db", type=Path, required=True)
     actions = parser.add_subparsers(dest="action", required=True)
     provision = actions.add_parser("add-account")
-    provision.add_argument("name")
+    provision.add_argument("email")
     server = actions.add_parser("serve")
     server.add_argument("--origin", required=True)
     server.add_argument("--port", type=int, default=8790)
     server.add_argument("--insecure-local", action="store_true")
+    server.add_argument("--behind-proxy", action="store_true", help="trust the last X-Forwarded-For entry (Tailscale Funnel)")
+    server.add_argument("--print-codes", action="store_true", help="local testing only: print codes instead of emailing")
     args = parser.parse_args()
     if args.action == "add-account":
         init_db(args.db)
-        print(add_account(args.db, args.name))
+        print(f"Allowed to sign in: {add_account(args.db, args.email)}")
     else:
         import uvicorn
 
-        uvicorn.run(create_relay(args.db, args.origin, insecure_local=args.insecure_local),
+        if args.print_codes and not args.insecure_local:
+            parser.error("--print-codes needs --insecure-local")
+        if not args.print_codes and not os.environ.get("RESEND_API_KEY"):
+            parser.error("Set RESEND_API_KEY so the relay can email sign-in codes.")
+        mailer = (lambda email, code: print(f"Sign-in code for {email}: {code}", flush=True)) if args.print_codes else resend_mailer
+        uvicorn.run(create_relay(args.db, args.origin, insecure_local=args.insecure_local,
+                                 mailer=mailer, behind_proxy=args.behind_proxy),
                     host="127.0.0.1", port=args.port, access_log=False)
 
 
