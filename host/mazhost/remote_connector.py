@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from httpx import HTTPStatusError, RequestError
+import httpx
 
 from . import private_mode
 from .remote_relay import MAX_TASKS, digest
@@ -131,18 +131,18 @@ def main() -> None:
                     print(f"Published {count} Craft tasks.")
                     return
                 delay = 5
-            except HTTPStatusError as error:
+            except httpx.HTTPStatusError as error:
                 if error.response.status_code == 401:
                     raise ValueError("Core or relay rejected its credential. Check the local token and pairing.") from None
                 if args.once:
                     raise
                 delay = min(delay * 2, 30)
-            except (RequestError, OSError, ValueError, KeyError):
+            except (httpx.RequestError, OSError, ValueError, KeyError):
                 if args.once:
                     raise
                 delay = min(delay * 2, 30)
             time.sleep(delay)
-    except (ValueError, OSError, KeyError, RequestError, HTTPStatusError, private_mode.PrivateModeError) as error:
+    except (ValueError, OSError, KeyError, httpx.RequestError, httpx.HTTPStatusError, private_mode.PrivateModeError) as error:
         message = str(error) if isinstance(error, (ValueError, private_mode.PrivateModeError)) else "Could not read configuration or complete the connection."
         raise SystemExit(message) from None
 
