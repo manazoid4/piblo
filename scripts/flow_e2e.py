@@ -105,7 +105,8 @@ def main() -> int:
         other.geometry("200x80+700+200")
         other.attributes("-topmost", True)
         other.update()
-        u.SetCursorPos(780, 230)  # click into the thief: our own window, so focus is allowed
+        # click into the thief's own client area: fixed coords hit the test box on scaled displays
+        u.SetCursorPos(other.winfo_rootx() + 20, other.winfo_rooty() + 20)
         u.mouse_event(0x0002, 0, 0, 0, 0)
         u.mouse_event(0x0004, 0, 0, 0, 0)
     while th.is_alive():
