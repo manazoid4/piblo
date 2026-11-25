@@ -35,8 +35,10 @@ _INTENT = {"note": "note", "remind me": "remind"}
 
 # "at 1500" / "before 1730" / "0300 UTC": Parakeet writes clock times as bare 4-digit numbers.
 # Only after a time word, or with a leading zero, so "500 requests" and "in 2026" stay as they are.
-_CLOCK = re.compile(r"(?i)\b(at|before|after|by|until|till|from|around|about)\s+([01]\d|2[0-3])([0-5]\d)\b")
-_CLOCK0 = re.compile(r"\b(0\d)([0-5]\d)\b(?=\s*(?:UTC|GMT|BST|hours|h\b|[.,!?]|$))")
+# Not after about/around/from/by: "about 1500 people", "800 by 1200" are amounts, not times.
+_UNITS = r"%|percent|rpm|feet|ft|metres|meters|miles|km|kg|users|people|requests|items|rows|pixels|px|words|tokens|pounds|dollars|ms|mb|gb|kb"
+_CLOCK = re.compile(rf"(?i)\b(at|before|after|until|till)\s+([01]\d|2[0-3])([0-5]\d)\b(?!\s*(?:{_UNITS})\b)(?!%)")
+_CLOCK0 = re.compile(r"\b(0\d)([0-5]\d)\b(?=\s*(?:UTC|GMT|BST|hours)\b)")
 
 # Parakeet spells the American way; Piblo is UK-first. Whole common words only, so code
 # identifiers like "initialize()" and CSS words (color, center, gray) are untouched. Setting: Flow spelling "uk" | "us".
@@ -133,7 +135,9 @@ def parse_prefix(text: str) -> tuple[str, str]:
     intent, body = _INTENT.get(m.group(1).lower(), "claude"), m.group(2).strip()
     if intent == "remind":
         body = re.sub(r"(?i)^(?:i'm\s+)?to\s+", "", body)  # "remind me, um, to" is heard as "I'm to"
-    return intent, body[:1].upper() + body[1:]  # "Claude, fix it" types "Fix it", not "fix it"
+    if re.match(r"[a-z]+\b", body):  # "Claude, fix it" types "Fix it"; mixed-case words like "iOS" stay as said
+        body = body[:1].upper() + body[1:]
+    return intent, body
 
 
 class Flow:

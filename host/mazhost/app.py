@@ -1118,7 +1118,7 @@ def create_app(
 
     async def publish_voice_route(router, text: str, intent) -> None:
         try:
-            route = await run_in_threadpool(router.route, text)
+            route = await run_in_threadpool(router.route, text, False)  # rules only: no local model per dictation
             await global_event_bus.publish(Event(
                 type="voice.command.routed",
                 source="flow",

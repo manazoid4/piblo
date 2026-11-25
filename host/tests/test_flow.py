@@ -528,7 +528,8 @@ def test_command_routing_never_delays_dictation(tmp_path, monkeypatch):
     routed = []
 
     class SlowRouter:
-        def route(self, text):
+        def route(self, text, model=True):
+            assert model is False  # dictation never asks the local model
             time.sleep(1.5)
             routed.append(text)
             from mazhost.command_router import RouteResult
@@ -592,3 +593,16 @@ def test_builtin_aliases_for_tools_and_piblocraft():
 def test_glued_note_and_misheard_remind(text, want):
     from mazhost.flow import split_glued_note
     assert parse_prefix(split_glued_note(text)) == want
+
+
+@pytest.mark.parametrize("text", [
+    "About 1500 people signed up.", "Around 2000 users.", "Make it 800 by 1200.", "Cap it at 1500 requests.",
+    "Spin at 1200 rpm.", "From 1000 to 2000.", "Growth at 1200%.",
+])
+def test_amounts_are_not_turned_into_times(text):
+    from mazhost.flow import tidy
+    assert tidy(text) == text
+
+
+def test_mixed_case_first_word_after_prefix_is_kept():
+    assert parse_prefix("Claude, iOS build crashes.") == ("claude", "iOS build crashes.")

@@ -79,3 +79,11 @@ def test_tier1_null_capability_is_unclear():
     )
     res = router.route("hello there")
     assert res.tier == "unclear"
+
+
+def test_route_without_model_never_calls_local_model():
+    client = FakeClient()
+    router = CommandRouter(ollama_url="http://localhost:11434", model="m", client=client)
+    result = router.route("write the quarterly summary", model=False)
+    assert result.tier == "unclear" and client.calls == []
+    assert router.route("volume up", model=False).tier == "tier-0"

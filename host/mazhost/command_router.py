@@ -61,7 +61,8 @@ class CommandRouter:
         self.registry = registry
 
     # ---------------------------------------------------------------- public
-    def route(self, text: str) -> RouteResult:
+    def route(self, text: str, model: bool = True) -> RouteResult:
+        """model=False: deterministic tier 0 only, never calls the local model (dictation uses this)."""
         command = parse_command(text)
         if command:
             if command["type"] == "pc.action":
@@ -73,6 +74,8 @@ class CommandRouter:
                     "tier-0", "reminder.create",
                     {"title": command["title"], "delay_seconds": command["delay_seconds"]},
                     1.0, "deterministic reminder")
+        if not model:
+            return RouteResult("unclear", None, {}, 0.0, "no deterministic match")
         return self._tier1(text)
 
     # ---------------------------------------------------------------- tier 1
