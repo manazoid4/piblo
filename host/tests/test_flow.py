@@ -32,10 +32,10 @@ def test_rule_cleanup(raw, want):
 
 
 @pytest.mark.parametrize("text,want", [
-    ("Note: buy cables", ("note", "buy cables")),
-    ("note, buy cables.", ("note", "buy cables.")),
-    ("Remind me to call Sam in 20 minutes", ("remind", "call Sam in 20 minutes")),
-    ("Claude, fix the failing test.", ("claude", "fix the failing test.")),
+    ("Note: buy cables", ("note", "Buy cables")),
+    ("note, buy cables.", ("note", "Buy cables.")),
+    ("Remind me to call Sam in 20 minutes", ("remind", "Call Sam in 20 minutes")),
+    ("Claude, fix the failing test.", ("claude", "Fix the failing test.")),
     ("notebook sizes are odd", ("paste", "notebook sizes are odd")),
     ("Claudette said hi", ("paste", "Claudette said hi")),
 ])
@@ -45,7 +45,7 @@ def test_parse_prefix(text, want):
 
 def test_dictionary_default(tmp_path):
     words = load_dictionary(tmp_path / "dict.txt")
-    assert "MAZos" in words and "Groq" in words and (tmp_path / "dict.txt").exists()
+    assert any(w.startswith("MAZos") for w in words) and "Groq" in words and (tmp_path / "dict.txt").exists()
 
 
 class Stt:
@@ -73,10 +73,10 @@ def test_dictate_endpoint(tmp_path):
                     headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
     assert r.status_code == 200, r.text
     j = r.json()
-    assert j["intent"] == "note" and j["text"] == "buy the cables for Cardputer."
+    assert j["intent"] == "note" and j["text"] == "Buy the cables for Cardputer."
     assert "Cardputer" in Stt.prompts[0] and "nod" in Stt.prompts[0]
     assert j["ms"]["total"] >= 0
-    assert "buy the cables" in (tmp_path / "inbox.md").read_text()
+    assert "Buy the cables" in (tmp_path / "inbox.md").read_text()
     assert "dictate" in (tmp_path / "latency.log").read_text()
 
 
@@ -512,3 +512,98 @@ def test_timeout_does_not_silence_later_dictations(tmp_path, monkeypatch):
     app.state._flow._cancel.set()  # what the 504 path does
     out = app.state._flow.dictate(__import__("pathlib").Path("x.wav"))
     assert out["text"] and "dictate" in (tmp_path / "latency.log").read_text()
+
+
+def test_command_routing_never_delays_dictation(tmp_path, monkeypatch):
+    """The voice->capability router may call a local model (seconds). Typing must not wait for it."""
+    from mazhost import app as app_module
+    from mazhost.flow import Flow
+
+    monkeypatch.setattr(Flow, "dictate", lambda self, path, **kw: {"intent": "paste", "text": "Hello.", "ms": {"stt": 5, "clean": 1, "total": 6}})
+    monkeypatch.setattr(app_module, "flow_foreground", lambda: 42)
+    monkeypatch.setattr(app_module, "flow_safe_paste", lambda text, enter, armed, paste_fn: "pasted")
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path), groq_api_key="",
+                   flow_cleanup_llm=False, stt_provider="whisper", flow_cloud=False)
+    app = create_app(cfg, stt=Stt(), models=Models())
+    routed = []
+
+    class SlowRouter:
+        def route(self, text, model=True):
+            assert model is False  # dictation never asks the local model
+            time.sleep(1.5)
+            routed.append(text)
+            from mazhost.command_router import RouteResult
+            return RouteResult("unclear", None, {}, 0.0, "slow")
+
+    app.state._command_router = SlowRouter()
+    with TestClient(app) as client:
+        t0 = time.perf_counter()
+        r = client.post("/dictate?target=pc-paste", content=_wav(),
+                        headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
+        took = time.perf_counter() - t0
+        assert r.status_code == 200 and r.json()["pc"] == "pasted"
+        assert took < 1.0, f"dictation waited {took:.2f}s for the command router"
+        deadline = time.time() + 5
+        while not routed and time.time() < deadline:
+            time.sleep(0.05)
+    assert routed == ["Hello."]  # still routed, just afterwards
+
+
+@pytest.mark.parametrize("text,want", [
+    ("Meeting at 1500 tomorrow.", "Meeting at 15:00 tomorrow."),
+    ("Merge it before 1730.", "Merge it before 17:30."),
+    ("Backup done at 0300 UTC.", "Backup done at 03:00 UTC."),
+    ("Raise it to 1500 requests per minute.", "Raise it to 1500 requests per minute."),
+    ("We launched in 2026.", "We launched in 2026."),
+    ("We optimized the Organization flow.", "We optimised the Organisation flow."),
+    ("Set color to gray and initialize() it.", "Set color to gray and initialize() it."),
+    ("Call optimize() then self.organize and summarize.", "Call optimize() then self.organize and summarise."),
+])
+def test_tidy_times_and_uk_spelling(text, want):
+    from mazhost.flow import tidy
+    assert tidy(text) == want
+
+
+def test_tidy_us_spelling_leaves_words():
+    from mazhost.flow import tidy
+    assert tidy("We optimized it at 1500.", "us") == "We optimized it at 15:00."
+
+
+@pytest.mark.parametrize("text,want", [
+    ("Claw Debug the timeout.", ("claude", "Debug the timeout.")),
+    ("Claudum optimise the prompt.", ("claude", "Optimise the prompt.")),
+    ("Clawson said hi.", ("paste", "Clawson said hi.")),
+    ("The cat's claw is sharp.", ("paste", "The cat's claw is sharp.")),
+])
+def test_misheard_claude_prefix(text, want):
+    assert parse_prefix(text) == want
+
+
+def test_builtin_aliases_for_tools_and_piblocraft():
+    from mazhost.flow import apply_dictionary
+    out = apply_dictionary("Peblocraft on Versal over tail scale, Peblo Craft and PBLO Flow.", [])
+    assert out == "PibloCraft on Vercel over Tailscale, PibloCraft and Piblo Flow."
+
+
+@pytest.mark.parametrize("text,want", [
+    ("Noteversal deploy hooks need updating.", ("note", "Versal deploy hooks need updating.")),
+    ("Notebook sizes are odd.", ("paste", "Notebook sizes are odd.")),
+    ("Noted, thanks.", ("paste", "Noted, thanks.")),
+    ("Remind me I'm to update the rules.", ("remind", "Update the rules.")),
+])
+def test_glued_note_and_misheard_remind(text, want):
+    from mazhost.flow import split_glued_note
+    assert parse_prefix(split_glued_note(text)) == want
+
+
+@pytest.mark.parametrize("text", [
+    "About 1500 people signed up.", "Around 2000 users.", "Make it 800 by 1200.", "Cap it at 1500 requests.",
+    "Spin at 1200 rpm.", "From 1000 to 2000.", "Growth at 1200%.",
+])
+def test_amounts_are_not_turned_into_times(text):
+    from mazhost.flow import tidy
+    assert tidy(text) == text
+
+
+def test_mixed_case_first_word_after_prefix_is_kept():
+    assert parse_prefix("Claude, iOS build crashes.") == ("claude", "iOS build crashes.")

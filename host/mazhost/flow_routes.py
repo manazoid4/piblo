@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 INPUT_MODES = ("paste", "type")
 CLEANUPS = ("auto", "rules", "groq", "local")
 STT_CHOICES = ("auto", "parakeet", "whisper")
-DEFAULTS = {"input_mode": "paste", "press_enter": False, "cleanup": "auto", "stt": "auto"}
+DEFAULTS = {"input_mode": "paste", "press_enter": False, "cleanup": "auto", "stt": "auto", "spelling": "uk"}
 LATENCY_KEEP = 50
 TARGET_MS = 1500  # first audio byte -> text typed, CPU
 DICTIONARY_MAX = 500
@@ -87,6 +87,7 @@ def apply_settings(flow, data: dict) -> None:
         s.flow_cloud, s.flow_cleanup_llm = False, True
     stt = data.get("stt", "auto")
     s.stt_provider = stt_default if stt == "auto" else stt
+    s.flow_spelling = data.get("spelling", "uk")
 
 
 def effective_cleanup(flow) -> str:
@@ -294,6 +295,7 @@ class FlowSettingsIn(BaseModel):
     press_enter: bool | None = None
     cleanup: Literal["auto", "rules", "groq", "local"] | None = None
     stt: Literal["auto", "parakeet", "whisper"] | None = None
+    spelling: Literal["uk", "us"] | None = None
 
 
 class WordIn(BaseModel):

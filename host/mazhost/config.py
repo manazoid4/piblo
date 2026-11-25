@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     remote_url: str = ""  # MAZ_REMOTE_URL; empty = auto-detect the Tailscale Funnel URL
     remote_detect: bool = True  # MAZ_REMOTE_DETECT=0 disables the background tailscale probe
     flow_cleanup_llm: bool = False  # MAZ_FLOW_CLEANUP_LLM=1: opt in to LLM cleanup of dictation (network/route)
+    flow_spelling: str = "uk"  # MAZ_FLOW_SPELLING: uk (optimise, organisation) | us (leave STT spelling)
     flow_cloud: bool = False  # MAZ_FLOW_CLOUD=1: opt in to sending dictation audio/text to Groq
     stt_provider: str = "parakeet"  # MAZ_STT_PROVIDER: parakeet (onnx-asr) | vosk (small, fast CPU) | whisper
     vosk_model_dir: str = ""  # empty = %LOCALAPPDATA%\Piblo\vosk-model (scripts/setup-vosk.py)
@@ -74,6 +75,10 @@ class Settings(BaseSettings):
 
     # Dictation flow directory (PR #43)
     flow_dir: str = "~/.maz-pocket/flow"
+
+    # Piblo device -> PibloCraft job queue (empty = approved jobs are logged but not sent)
+    live_stream_stt: bool = False  # MAZ_LIVE_STREAM_STT=1: Talk decodes speech while you talk (faster, less accurate)
+    piblocraft_bridge_url: str = ""  # MAZ_PIBLOCRAFT_BRIDGE_URL
 
     cloud_url: str = "https://openrouter.ai/api/v1"
     cloud_key: str = ""

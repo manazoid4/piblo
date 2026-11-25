@@ -33,6 +33,7 @@ from .onboarding import Onboarding, build_onboarding_router
 from .library_routes import build_library_router
 from .bridge import BridgeWorker
 from .buddy import AlertIn, Buddy, install_buddy_routes
+from .piblocraft_bridge import JobBridge, build_router as build_bridge_router
 from .buddy_companion import install_companion_routes
 from .buddy_store import BuddyStore
 from .needs_routes import build_needs_router
@@ -371,10 +372,11 @@ def create_app(
     @api.on_event("startup")
     def start_bridge() -> None:
         logging.getLogger("uvicorn.error").info("Piblo Core v%s starting", CORE_VERSION)
+        # Local model load (no download in private mode): the first dictation must not pay 5-8 s.
+        threading.Thread(target=getattr(speech, "warm", lambda: None), daemon=True).start()
         if private_mode.enabled():
             return  # no GitHub bridge in private mode
         bridge_worker.start()
-        threading.Thread(target=getattr(speech, "warm", lambda: None), daemon=True).start()
 
     @api.on_event("shutdown")
     def stop_bridge() -> None:
@@ -1068,6 +1070,41 @@ def create_app(
     flow_service = Flow(cfg, speech, model_router)
     api.state._flow = flow_service  # test hook: tweak dictate_timeout, _cancel, etc.
 
+    async def paste_on_pc(result: dict, armed: int) -> tuple[int, bool]:
+        """Paste result["text"] into the window focused when the audio landed; sets result["pc"].
+        Returns (ms taken, whether Enter was pressed)."""
+        t_ins = time.perf_counter()
+        prefs = read_settings(flow_service)
+        enter = result["intent"] == "claude" or bool(prefs["press_enter"])
+
+        def type_and_enter(text, enter=False):
+            insert_text(text, enter, flow_service)
+
+        typer = type_and_enter if prefs["input_mode"] == "type" else None
+        try:
+            result["pc"] = await run_in_threadpool(flow_safe_paste, result["text"], enter, armed, typer)
+        except Exception:  # noqa: BLE001 - clipboard busy/locked: still return the text
+            result["pc"] = "failed"
+        return round((time.perf_counter() - t_ins) * 1000), enter
+
+    async def live_dictate(words: str) -> str:
+        """Talk dictation mode: the words after "Hey Piblo" go through Flow and onto the PC. Returns what Piblo says."""
+        armed = flow_foreground()
+        result = await run_in_threadpool(flow_service.finish, words)
+        if not result["text"]:
+            return "I didn't catch any words."
+        if result["intent"] == "note":
+            return "Saved to your notes."
+        if result["intent"] == "remind":
+            return "Saved as a reminder."
+        insert_ms, entered = await paste_on_pc(result, armed)
+        flow_service.log_result(result, 0, insert_ms, result["pc"])
+        if result["pc"] == "clipboard":
+            return "It's on the clipboard. Click where it goes and press Control V."
+        if result["pc"] == "failed":
+            return "The clipboard was busy, so nothing was pasted. Try again."
+        return "Sent." if entered else "Pasted."
+
     # Command router: Tier 0 deterministic + Tier 1 small-model capability
     # selection over the registry. Read capabilities lazily so this can be
     # created before install_registry_routes populates them.
@@ -1077,6 +1114,19 @@ def create_app(
         registry=global_registry,
     )
     api.state._command_router = command_router  # read by the dictate endpoint
+    _route_tasks: set = set()  # keep background route tasks alive until done
+
+    async def publish_voice_route(router, text: str, intent) -> None:
+        try:
+            route = await run_in_threadpool(router.route, text, False)  # rules only: no local model per dictation
+            await global_event_bus.publish(Event(
+                type="voice.command.routed",
+                source="flow",
+                payload={"text": text, "intent": intent, "tier": route.tier, "capability": route.capability,
+                         "args": route.args, "confidence": route.confidence},
+            ))
+        except Exception as e:  # noqa: BLE001 - live-activity extra; never break dictation
+            logging.getLogger("uvicorn.error").warning("voice route failed: %s", type(e).__name__)
 
     @api.post("/dictate")
     async def dictate(request: Request, target: str = "text"):
@@ -1102,51 +1152,20 @@ def create_app(
                 flow_service._cancel.set()
                 raise HTTPException(504, "stt_timeout")
 
-            # Voice -> capability: route the cleaned text through the command
-            # router and publish a voice.command.routed event so PibloCraft live
-            # activity can show what voice mapped to. Additive: existing paste /
-            # log behaviour is unchanged and nothing is executed automatically.
-            router = getattr(api.state, "_command_router", None)
-            if router and result.get("text"):
-                route = await run_in_threadpool(router.route, result["text"])
-                result["command_route"] = {
-                    "tier": route.tier,
-                    "capability": route.capability,
-                    "args": route.args,
-                    "confidence": route.confidence,
-                }
-                await global_event_bus.publish(Event(
-                    type="voice.command.routed",
-                    source="flow",
-                    payload={
-                        "text": result["text"],
-                        "intent": result.get("intent"),
-                        "tier": route.tier,
-                        "capability": route.capability,
-                        "args": route.args,
-                        "confidence": route.confidence,
-                    },
-                ))
-
             insert_ms, pc = 0, ""
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
-                t_ins = time.perf_counter()
-                prefs = read_settings(flow_service)
-                enter = result["intent"] == "claude" or bool(prefs["press_enter"])
-
-                def type_and_enter(text, enter=False):
-                    insert_text(text, enter, flow_service)
-
-                typer = type_and_enter if prefs["input_mode"] == "type" else None
-                try:
-                    result["pc"] = await run_in_threadpool(
-                        flow_safe_paste, result["text"], enter, armed, typer)
-                except Exception:  # noqa: BLE001 - clipboard busy/locked: still return the text
-                    result["pc"] = "failed"
-                result["reply"] = result["pc"]  # firmware decodeReply reads `reply` as the outcome
-                insert_ms, pc = round((time.perf_counter() - t_ins) * 1000), result["pc"]
+                insert_ms, _ = await paste_on_pc(result, armed)
+                result["reply"] = pc = result["pc"]  # firmware decodeReply reads `reply` as the outcome
             if result["text"]:
                 flow_service.log_result(result, upload_ms, insert_ms, pc)
+                # Voice -> capability, for PibloCraft live activity only (nothing is executed).
+                # Runs after typing, in the background: tier 1 calls a local model that can take
+                # seconds, and dictation must never wait for it.
+                router = getattr(api.state, "_command_router", None)
+                if router:
+                    task = asyncio.create_task(publish_voice_route(router, result["text"], result.get("intent")))
+                    _route_tasks.add(task)
+                    task.add_done_callback(_route_tasks.discard)
             else:
                 result["ms"]["upload"] = upload_ms
             return result
@@ -1295,6 +1314,7 @@ def create_app(
     buddy_store = None if cfg.buddy_db == "off" else BuddyStore(
         cfg.buddy_db or resolve_data_dir(cfg) / "buddy.sqlite3")
     buddy = install_buddy_routes(api, Buddy(store=buddy_store, focus=focus, device_keys=device_keys))
+    api.include_router(build_bridge_router(JobBridge(buddy, resolve_data_dir(cfg), cfg.piblocraft_bridge_url)))
     promises_engine = Promises(buddy, model_router=model_router, settings=cfg)
     promises_engine.start()
     buddy.on_ack = promises_engine.on_alert_acked
@@ -1395,7 +1415,7 @@ def create_app(
         return await run_in_threadpool(feature_commands.handle, text)
 
     install_live_voice(api, cfg, security, turn_timings, command_handler=feature_voice_command,
-                      stt=speech if isinstance(speech, SpeechToText) else None)
+                      stt=speech if isinstance(speech, SpeechToText) else None, dictate_handler=live_dictate)
     # ------------------------------------------------------------ SUBTITLES
     install_subtitle_routes(api, subtitle_jobs)
 

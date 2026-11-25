@@ -21,7 +21,7 @@ from starlette.routing import WebSocketRoute
 from websockets.asyncio.client import connect
 
 from .config import Settings
-from .live_brain import LiveBrain, is_noise, split_sentences, first_clause
+from .live_brain import LiveBrain, is_mode_command, is_noise, split_sentences, first_clause, split_wake
 from . import kokoro_pcm, private_mode
 
 log = logging.getLogger("mazhost.live")
@@ -41,6 +41,7 @@ PREROLL_MS = 300
 LONG_SPEECH_MS = 1500  # after this much speech a pause is more likely mid-thought than the end
 LONG_SPEECH_HANGOVER = 1.5
 FIRST_AUDIO_LIMIT_S = 4.0
+WAKE_WINDOW_S = 10.0  # after a bare "Hey Piblo", how long the next utterance counts as dictation
 UPSTREAM_STEP_S = 5.0  # each handshake event from the realtime socket must arrive within this
 UPSTREAM_CONNECT_S = 6.0  # whole upstream handshake, so a silent or text-only server fails fast
 INSTRUCTIONS = ("You are Piblo, a friendly, warm and calm voice assistant on a tiny pocket device. "
@@ -157,9 +158,12 @@ class Resampler24to16:
 class LiveBridge:
     """One device session: owns the upstream realtime socket and the per-turn state machine."""
 
-    def __init__(self, ws: WebSocket, cfg: Settings, timings=None, command_handler=None, stt=None) -> None:
+    def __init__(self, ws: WebSocket, cfg: Settings, timings=None, command_handler=None, stt=None,
+                 dictate_handler=None) -> None:
         self.ws, self.cfg, self.timings, self.stt = ws, cfg, timings, stt
         self.command_handler = command_handler
+        self.dictate_handler = dictate_handler  # dictation mode: "Hey Piblo, <words>" is pasted on the PC
+        self._woke_until = 0.0  # a bare "Hey Piblo" makes the next thing said the dictation
         from .wakeword import load
         self.wakeword = load(cfg)
         self._armed = bool(self.wakeword)
@@ -184,6 +188,7 @@ class LiveBridge:
         self.kokoro = self.cloud and cfg.tts_provider == "kokoro"
         self.brain = LiveBrain(cfg, stt=self.stt) if self.cloud else None
         self._turn: list[bytes] = []
+        self._utt = None  # streaming STT utterance for the turn being heard (MAZ_LIVE_STREAM_STT=1)
         self._cloud: asyncio.Task | None = None
         self._tts_done = asyncio.Event()
 
@@ -253,6 +258,10 @@ class LiveBridge:
         blocks, ended = self.vad.feed(pcm)
         if blocks and self.cloud:
             self._turn.extend(blocks)  # buffered on Core; transcribed once the turn ends
+            if self.cfg.live_stream_stt and (stream := stream_stt()):
+                self._utt = self._utt or stream.stream()
+                for b in blocks:
+                    self._utt.feed(b)  # decoded while the user is still talking
         elif blocks:
             await self._up_send({"type": "input_audio_buffer.append",
                                  "audio": base64.b64encode(b"".join(blocks)).decode()})
@@ -269,7 +278,8 @@ class LiveBridge:
         self._played.clear()
         if self.cloud:
             pcm, self._turn = b"".join(self._turn), []
-            self._cloud = asyncio.create_task(self._cloud_turn(pcm))
+            utt, self._utt = self._utt, None
+            self._cloud = asyncio.create_task(self._cloud_turn(pcm, utt))
             return
         await self._set_state("thinking")
         await self._up_send({"type": "response.create"})
@@ -299,29 +309,43 @@ class LiveBridge:
         if self._cloud and self._cloud is not asyncio.current_task():
             self._cloud.cancel()
             self._cloud = None
-        self._turn = []
+        self._turn, self._utt = [], None
 
     # ---- cloud brain turn ----------------------------------------------------
-    async def _cloud_turn(self, pcm: bytes) -> None:
+    async def _cloud_turn(self, pcm: bytes, utt=None) -> None:
         """ASR -> (drop noise | voice command | cloud brain) -> sentence-by-sentence LFM3 TTS."""
         t, sentences = self._t, asyncio.Queue()
         self.brain.meta = {}
         producer = None
         try:
             t0 = time.monotonic()
-            text = await self.brain.transcribe(pcm)
+            text = (utt.finish().lower() if utt else "") or await self.brain.transcribe(pcm)  # streamed: nearly done at end of speech
             t["asr_ms"] = round((time.monotonic() - t0) * 1000)
             if is_noise(text):
                 log.info("live: dropped noise turn %r", text)
                 self._rearm()
                 return  # still "listening": the device never saw a state change
+            dictated, armed = None, False
+            if self.dictate_handler is not None and self.brain.dictating():
+                woke, words = split_wake(text)
+                spoke_at = t0 - (t.get("speech_ms", 0) + t.get("end_detect_ms", 0)) / 1000  # when this utterance began
+                if not (woke or spoke_at < self._woke_until or is_mode_command(text)):
+                    log.info("live: dictation mode, no wake phrase: ignored")
+                    self._rearm()
+                    return  # room talk, TV: never pasted
+                dictated, armed, self._woke_until = (words if woke else text), woke and not words, 0.0
             await self._send({"type": "text", "role": "user", "text": text})
             await self._set_state("thinking")
             self.brain.on_slow = lambda: sentences.put_nowait("One sec.")
-            reply = await self.command_handler(text) if self.command_handler else None
-            handled = reply is not None
-            if not handled:
-                reply = await self.brain.command(text)
+            if dictated is not None:
+                reply = "Yes?" if not dictated else (
+                    await self.brain.command(dictated, strict=True) or await self.dictate_handler(dictated))
+                handled = True
+            else:
+                reply = await self.command_handler(text) if self.command_handler else None
+                handled = reply is not None
+                if not handled:
+                    reply = await self.brain.command(text)
             if handled or reply:
                 sentences.put_nowait(reply)
                 sentences.put_nowait(None)
@@ -329,6 +353,8 @@ class LiveBridge:
                 producer = asyncio.create_task(self._think(text, sentences))
             while (sentence := await sentences.get()) is not None:
                 await self._tts(sentence)
+            if armed:  # the window opens once "Yes?" has been said, and the next utterance must start inside it
+                self._woke_until = time.monotonic() + WAKE_WINDOW_S
             self._q.put_nowait(None)
             if "first" not in t:  # nothing was spoken
                 self._end_turn_tasks()
@@ -528,7 +554,24 @@ class LiveBridge:
             self.timings.add(row)
 
 
-def install_live_voice(api, cfg: Settings, security, timings=None, command_handler=None, stt=None) -> None:
+_STREAM = None
+
+
+def stream_stt():
+    """The loaded streaming recognizer, or None (model missing: Talk keeps the batch path). Loaded once."""
+    global _STREAM
+    if _STREAM is None:
+        try:
+            from . import stt_stream
+            _STREAM = stt_stream.StreamingSTT() if stt_stream.available() else False
+        except Exception as error:  # noqa: BLE001
+            log.warning("live: streaming STT unavailable: %s", error)
+            _STREAM = False
+    return _STREAM or None
+
+
+def install_live_voice(api, cfg: Settings, security, timings=None, command_handler=None, stt=None,
+                       dictate_handler=None) -> None:
     """Register /voice/live. Plain Starlette route: the app-wide HTTP auth dependency can't take a WebSocket."""
 
     async def endpoint(ws: WebSocket) -> None:
@@ -539,7 +582,7 @@ def install_live_voice(api, cfg: Settings, security, timings=None, command_handl
             await ws.close(4401)
             return
         try:
-            bridge = LiveBridge(ws, cfg, timings, command_handler, stt)
+            bridge = LiveBridge(ws, cfg, timings, command_handler, stt, dictate_handler)
         except Exception as error:
             log.error("live: session setup failed: %s", error)
             try:
