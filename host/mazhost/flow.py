@@ -56,7 +56,8 @@ _UK = {
     "canceling": "cancelling", "traveled": "travelled", "traveling": "travelling", "labeled": "labelled",
     "modeling": "modelling",
 }
-_UK_RE = re.compile(r"\b(" + "|".join(sorted(_UK, key=len, reverse=True)) + r")\b", re.IGNORECASE)
+# Not inside code: "optimize()", "obj.color", "my_organization" keep their spelling.
+_UK_RE = re.compile(r"(?<![\w.])(" + "|".join(sorted(_UK, key=len, reverse=True)) + r")\b(?!\(|\.\w)", re.IGNORECASE)
 
 
 def tidy(text: str, spelling: str = "uk") -> str:

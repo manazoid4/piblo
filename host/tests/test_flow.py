@@ -557,6 +557,7 @@ def test_command_routing_never_delays_dictation(tmp_path, monkeypatch):
     ("We launched in 2026.", "We launched in 2026."),
     ("We optimized the Organization flow.", "We optimised the Organisation flow."),
     ("Set color to gray and initialize() it.", "Set color to gray and initialize() it."),
+    ("Call optimize() then self.organize and summarize.", "Call optimize() then self.organize and summarise."),
 ])
 def test_tidy_times_and_uk_spelling(text, want):
     from mazhost.flow import tidy
