@@ -24,7 +24,9 @@ PHRASE = "um so this is a test of piblo flow on the cardputer"
 
 
 def token() -> str:
-    env = Path(os.environ.get("LOCALAPPDATA", "")) / "Piblo" / "Core" / ".env"
+    if os.environ.get("PIBLO_TOKEN"):  # e.g. a throwaway test Core on another port
+        return os.environ["PIBLO_TOKEN"]
+    env =Path(os.environ.get("LOCALAPPDATA", "")) / "Piblo" / "Core" / ".env"
     for line in env.read_text(encoding="utf-8").splitlines():
         if line.startswith("MAZ_TOKEN="):
             return line.split("=", 1)[1].strip().strip('"')

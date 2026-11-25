@@ -78,9 +78,12 @@ def send(client: httpx.Client, wav: bytes, released_at: float, paste_fn=None) ->
 
 # ---- streaming push-to-talk: audio is decoded while the key is held, so release -> text is ~70 ms
 def stream_available() -> bool:
+    """Opt in with PIBLO_PTT_ENGINE=stream. Default is batch Parakeet through Core: on the 60-phrase
+    spoken bench (scripts/flow_accuracy_bench.py, 25 Nov) streaming was 52 ms but 43% word error
+    (names, tech words, no punctuation); Parakeet was 445 ms and 3.6%."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from mazhost import stt_stream
-    return os.environ.get("PIBLO_PTT_ENGINE", "stream") == "stream" and stt_stream.available()
+    return os.environ.get("PIBLO_PTT_ENGINE", "batch") == "stream" and stt_stream.available()
 
 
 class Hold:

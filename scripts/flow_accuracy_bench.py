@@ -23,14 +23,49 @@ sys.path.insert(0, str(Path(__file__).parent))
 from flow_stream_bench import norm, pct, sapi_wav, wer  # noqa: E402
 
 
+def make_local(engine: str):
+    """wav -> (Flow result, ms). ms = after-release time: stream is fed in real time first, like holding the key."""
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "host"))
+    import os
+    os.environ.setdefault("PIBLO_LEDGER_DIR", tempfile.mkdtemp())  # keep bench text out of the real ledger
+    from mazhost.config import Settings
+    from mazhost.flow import Flow
+
+    flow = Flow(Settings(token="x" * 40, flow_dir=tempfile.mkdtemp()), speech=None)
+    if engine == "stream":
+        from flow_stream_bench import pcm_of
+        from mazhost.stt_stream import StreamingSTT
+        stt = StreamingSTT()
+
+        def run(wav: Path):
+            utt, pcm = stt.stream(), pcm_of(wav)
+            for k in range(0, len(pcm), 3200):  # 100 ms chunks, decoded while "held"
+                utt.feed(pcm[k:k + 3200])
+            t = time.perf_counter()
+            res = flow.finish(utt.finish(), "stream")
+            return res, round((time.perf_counter() - t) * 1000)
+        return run
+    from mazhost.stt import SpeechToText
+    stt = SpeechToText(Settings(token="x" * 40, stt_provider="parakeet"))
+
+    def run(wav: Path):
+        t = time.perf_counter()
+        res = flow.finish(stt._parakeet(wav), "parakeet")
+        return res, round((time.perf_counter() - t) * 1000)
+    return run
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--core", default="http://127.0.0.1:8787")
-    ap.add_argument("--token", required=True)
+    ap.add_argument("--token", default="")
     ap.add_argument("--corpus", default=str(Path(__file__).with_name("flow_corpus.jsonl")))
     ap.add_argument("--clips", default=str(Path(tempfile.gettempdir()) / "piblo-flow-bench"))
     ap.add_argument("--json", default="")
+    ap.add_argument("--local", choices=["stream", "parakeet"], default="",
+                    help="skip Core: run this STT engine + Flow cleanup in-process (Core venv python)")
     a = ap.parse_args()
+    local = make_local(a.local) if a.local else None
 
     cases = [json.loads(line) for line in Path(a.corpus).read_text(encoding="utf-8").splitlines() if line.strip()]
     clips = Path(a.clips)
@@ -40,12 +75,15 @@ def main() -> int:
         wav = clips / f"{i:03d}.wav"
         if not wav.exists():
             sapi_wav(wav, case["say"].replace("'", "''"), i)  # quoted inside a PowerShell '...' string
-        t = time.perf_counter()
-        r = client.post(f"{a.core}/dictate?target=text", content=wav.read_bytes(),
-                        headers={"Authorization": f"Bearer {a.token}", "Content-Type": "audio/wav"})
-        ms = round((time.perf_counter() - t) * 1000)
-        r.raise_for_status()
-        j = r.json()
+        if local:
+            j, ms = local(wav)
+        else:
+            t = time.perf_counter()
+            r = client.post(f"{a.core}/dictate?target=text", content=wav.read_bytes(),
+                            headers={"Authorization": f"Bearer {a.token}", "Content-Type": "audio/wav"})
+            ms = round((time.perf_counter() - t) * 1000)
+            r.raise_for_status()
+            j = r.json()
         row = {"i": i, "say": case["say"], "want_intent": case["intent"], "got_intent": j["intent"],
                "want": case["text"], "got": j["text"], "raw": j.get("raw", ""), "ms": ms,
                "wer": round(wer(case["text"], j["text"]), 3),
