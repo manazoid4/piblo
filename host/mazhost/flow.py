@@ -14,7 +14,8 @@ from .ledger import append_ledger
 
 log = logging.getLogger("mazhost.flow")
 
-DEFAULT_WORDS = ["Piblo", "Piblo Flow", "nod", "Cardputer", "Claude", "MAZos", "FlowLens", "Groq", "Fish"]
+DEFAULT_WORDS = ["Piblo", "Piblo Flow", "nod", "Cardputer", "Claude", "MAZos: Mazo's, Mazos, Mazo",
+                 "FlowLens: flow lens, Flowlands, Flow lands", "Groq", "Fish"]
 GROQ_URL = "https://api.groq.com/openai/v1"
 CLEAN_MODEL = "openai/gpt-oss-20b"
 
@@ -27,17 +28,59 @@ CLEAN_SYSTEM = (
 
 _FILLER = re.compile(r"(?i)\b(?:um+|uh+|er+m?|erm|hmm+)\b,?\s*")
 _REPEAT = re.compile(r"(?i)\b(\w+)(\s+\1\b)+")
-_PREFIX = re.compile(r"(?is)^\W*(note|remind me|claude)\b[\s,:;.\-]*(.*)$")
-_INTENT = {"note": "note", "remind me": "remind", "claude": "claude"}
+# "Claw" / "Claudum" ("Claude, um" run together) are what Parakeet hears for a leading "Claude";
+# they only count as the prefix at the very start, so "the cat's claw" is never touched.
+_PREFIX = re.compile(r"(?is)^\W*(note|remind me|claude|claud|clawed|claw|claud(?:e)?um)\b[\s,:;.\-]*(.*)$")
+_INTENT = {"note": "note", "remind me": "remind"}
+
+# "at 1500" / "before 1730" / "0300 UTC": Parakeet writes clock times as bare 4-digit numbers.
+# Only after a time word, or with a leading zero, so "500 requests" and "in 2026" stay as they are.
+_CLOCK = re.compile(r"(?i)\b(at|before|after|by|until|till|from|around|about)\s+([01]\d|2[0-3])([0-5]\d)\b")
+_CLOCK0 = re.compile(r"\b(0\d)([0-5]\d)\b(?=\s*(?:UTC|GMT|BST|hours|h\b|[.,!?]|$))")
+
+# Parakeet spells the American way; Piblo is UK-first. Whole common words only, so code
+# identifiers like "initialize()" and CSS words (color, center, gray) are untouched. Setting: Flow spelling "uk" | "us".
+_UK = {
+    "optimize": "optimise", "optimized": "optimised", "optimizing": "optimising", "optimization": "optimisation",
+    "organize": "organise", "organized": "organised", "organization": "organisation", "organizations": "organisations",
+    "summarize": "summarise", "summarized": "summarised", "summarizing": "summarising",
+    "prioritize": "prioritise", "prioritized": "prioritised", "realize": "realise", "realized": "realised",
+    "recognize": "recognise", "recognized": "recognised", "customize": "customise", "customized": "customised",
+    "analyze": "analyse", "analyzed": "analysed", "analyzing": "analysing", "apologize": "apologise",
+    "finalize": "finalise", "finalized": "finalised", "standardize": "standardise",
+    "favorite": "favourite", "favorites": "favourites",
+    "behavior": "behaviour", "behaviors": "behaviours", "honor": "honour", "neighbor": "neighbour",
+    "canceled": "cancelled",
+    "canceling": "cancelling", "traveled": "travelled", "traveling": "travelling", "labeled": "labelled",
+    "modeling": "modelling",
+}
+_UK_RE = re.compile(r"\b(" + "|".join(sorted(_UK, key=len, reverse=True)) + r")\b", re.IGNORECASE)
 
 
-# What local STT actually hears for our own names (measured with Parakeet, 14 Nov).
-# Always applied, so installs whose dictionary.txt predates this still benefit.
+def tidy(text: str, spelling: str = "uk") -> str:
+    """Deterministic fixes STT gets wrong: clock times and (optionally) UK spelling."""
+    text = _CLOCK.sub(r"\1 \2:\3", text)
+    text = _CLOCK0.sub(r"\1:\2", text)
+    if spelling == "uk":
+        def uk(m: re.Match) -> str:
+            word = _UK[m.group(1).lower()]
+            return word.capitalize() if m.group(1)[0].isupper() else word
+        text = _UK_RE.sub(uk, text)
+    return text
+
+
+# What local STT actually hears for our own names and common tools (measured with Parakeet,
+# 14 and 25 Nov). Always applied, so installs whose dictionary.txt predates this still benefit.
 BUILTIN_ALIASES = {
-    "Piblo Flow": ["Pebloflow", "Peblo flow", "Pibloflow", "Peblo Flow", "Paper blue flow"],
+    "Piblo Flow": ["Pebloflow", "Peblo flow", "Pibloflow", "Peblo Flow", "Paper blue flow", "PBLO Flow",
+                   "PBO flow", "PBlowflow", "P blow flow", "Pebbloflow"],
+    "PibloCraft": ["Piblo Craft", "Peblo Craft", "Peblocraft", "Pebblocraft", "Piblocraft", "Pebblo craft"],
     "Claude": ["Clawed", "Claud"],  # streaming zipformer hears these (synthetic bench, 19 Nov)
-    "Piblo": ["Pibo", "Peblo", "Pibblo", "Pebblo", "Piblow", "Paper blue", "Peb low", "Peb Lowe"],
+    "Piblo": ["Pibo", "Peblo", "Pibblo", "Pebblo", "Piblow", "Paper blue", "Peb low", "Peb Lowe", "PBLO"],
     "Cardputer": ["card puter", "card pewter", "card computer", "Card putter"],
+    "Tailscale": ["tail scale"],
+    "Vercel": ["Versal", "Vercell", "Ver cell"],
+    "GitHub": ["git hub"],
 }
 
 
@@ -72,14 +115,25 @@ def rule_cleanup(text: str) -> str:
     return t if t[-1] in ".!?" else t + "."
 
 
+# Real words that start with "note"; anything else ("Noteversal") is "Note" glued to the next word.
+_NOTE_WORDS = {"noted", "notes", "notebook", "notebooks", "notepad", "notepads", "noteworthy", "notecard", "notecards"}
+
+
+def split_glued_note(text: str) -> str:
+    m = re.match(r"(?i)^(\W*)(note)([a-z]{3,})\b", text)
+    if not m or (m.group(2) + m.group(3)).lower() in _NOTE_WORDS:
+        return text
+    return f"{m.group(1)}{m.group(2)} {m.group(3)}{text[m.end():]}"
+
+
 def parse_prefix(text: str) -> tuple[str, str]:
     m = _PREFIX.match(text)
     if not m or not m.group(2).strip():
         return "paste", text
-    intent, body = _INTENT[m.group(1).lower()], m.group(2).strip()
+    intent, body = _INTENT.get(m.group(1).lower(), "claude"), m.group(2).strip()
     if intent == "remind":
-        body = re.sub(r"(?i)^to\s+", "", body)
-    return intent, body
+        body = re.sub(r"(?i)^(?:i'm\s+)?to\s+", "", body)  # "remind me, um, to" is heard as "I'm to"
+    return intent, body[:1].upper() + body[1:]  # "Claude, fix it" types "Fix it", not "fix it"
 
 
 class Flow:
@@ -148,7 +202,7 @@ class Flow:
         Talk's dictation mode calls this with the transcript it already has."""
         t1 = time.perf_counter()
         cleaned, provider = self._cleanup(raw)
-        cleaned = apply_dictionary(cleaned, self.lines)
+        cleaned = tidy(apply_dictionary(split_glued_note(cleaned), self.lines), getattr(self.s, "flow_spelling", "uk"))
         intent, body = parse_prefix(cleaned)
         clean = round((time.perf_counter() - t1) * 1000)
         ms = {"stt": stt_ms, "clean": clean, "total": stt_ms + clean}

@@ -398,7 +398,7 @@ def test_bare_wake_phrase_makes_the_next_utterance_the_dictation(monkeypatch, tm
         speak(ws)
         until_listening(ws)  # "Sent."
         ws.send_text(json.dumps({"type": "bye"}))
-    assert pasted == [("fix the failing test.", True, 7)]  # "Claude ..." pastes and presses Enter
+    assert pasted == [("Fix the failing test.", True, 7)]  # "Claude ..." pastes and presses Enter
 
 
 def test_streamed_stt_hears_the_turn_before_it_ends(monkeypatch):

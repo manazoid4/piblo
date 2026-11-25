@@ -372,10 +372,11 @@ def create_app(
     @api.on_event("startup")
     def start_bridge() -> None:
         logging.getLogger("uvicorn.error").info("Piblo Core v%s starting", CORE_VERSION)
+        # Local model load (no download in private mode): the first dictation must not pay 5-8 s.
+        threading.Thread(target=getattr(speech, "warm", lambda: None), daemon=True).start()
         if private_mode.enabled():
             return  # no GitHub bridge in private mode
         bridge_worker.start()
-        threading.Thread(target=getattr(speech, "warm", lambda: None), daemon=True).start()
 
     @api.on_event("shutdown")
     def stop_bridge() -> None:

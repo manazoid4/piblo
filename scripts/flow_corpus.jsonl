@@ -1,0 +1,60 @@
+{"say": "Hi team just wanted to follow up on the Piblo Flow deployment", "intent": "paste", "text": "Hi team just wanted to follow up on the Piblo Flow deployment."}
+{"say": "um the Cardputer build passed on GitHub Actions", "intent": "paste", "text": "The Cardputer build passed on GitHub Actions."}
+{"say": "Please review the MAZos integration pull request when you have a moment", "intent": "paste", "text": "Please review the MAZos integration pull request when you have a moment."}
+{"say": "er the FlowLens dashboard is showing incorrect metrics for Groq inference", "intent": "paste", "text": "The FlowLens dashboard is showing incorrect metrics for Groq inference."}
+{"say": "PibloCraft deployment to Vercel completed successfully at 14 30", "intent": "paste", "text": "PibloCraft deployment to Vercel completed successfully at 14:30."}
+{"say": "Hermes and Codex are both configured for the new Tailscale network", "intent": "paste", "text": "Hermes and Codex are both configured for the new Tailscale network."}
+{"say": "um uh the commit message should reference the GitHub issue number", "intent": "paste", "text": "The commit message should reference the GitHub issue number."}
+{"say": "Slack notification sent to the Piblo Flow channel about the release", "intent": "paste", "text": "Slack notification sent to the Piblo Flow channel about the release."}
+{"say": "Code review comment added to the Cardputer firmware PR", "intent": "paste", "text": "Code review comment added to the Cardputer firmware PR."}
+{"say": "erm the MAZos API rate limit needs increasing to 500 requests per minute", "intent": "paste", "text": "The MAZos API rate limit needs increasing to 500 requests per minute."}
+{"say": "FlowLens alert triggered for high latency on the Groq endpoint", "intent": "paste", "text": "FlowLens alert triggered for high latency on the Groq endpoint."}
+{"say": "PibloCraft build failed due to missing Vercel environment variables", "intent": "paste", "text": "PibloCraft build failed due to missing Vercel environment variables."}
+{"say": "Hermes service restarted after the Tailscale subnet route change", "intent": "paste", "text": "Hermes service restarted after the Tailscale subnet route change."}
+{"say": "Codex analysis complete for the Piblo Flow repository", "intent": "paste", "text": "Codex analysis complete for the Piblo Flow repository."}
+{"say": "um the standup is in 10 minutes in the usual meeting room", "intent": "paste", "text": "The standup is in 10 minutes in the usual meeting room."}
+{"say": "Please merge the dependabot updates for the Cardputer dependencies", "intent": "paste", "text": "Please merge the dependabot updates for the Cardputer dependencies."}
+{"say": "er the MAZos migration script ran successfully on production", "intent": "paste", "text": "The MAZos migration script ran successfully on production."}
+{"say": "FlowLens dashboard now displays Groq token usage per project", "intent": "paste", "text": "FlowLens dashboard now displays Groq token usage per project."}
+{"say": "PibloCraft preview deployment available on Vercel for review", "intent": "paste", "text": "PibloCraft preview deployment available on Vercel for review."}
+{"say": "Hermes and Codex integration tests passing on the CI pipeline", "intent": "paste", "text": "Hermes and Codex integration tests passing on the CI pipeline."}
+{"say": "um uh Tailscale ACL rules updated for the new development subnet", "intent": "paste", "text": "Tailscale ACL rules updated for the new development subnet."}
+{"say": "GitHub Actions workflow optimised for faster Piblo Flow builds", "intent": "paste", "text": "GitHub Actions workflow optimised for faster Piblo Flow builds."}
+{"say": "Cardputer firmware version 2 1 0 tagged and released", "intent": "paste", "text": "Cardputer firmware version 2.1.0 tagged and released."}
+{"say": "MAZos database backup completed at 03 00 UTC yesterday", "intent": "paste", "text": "MAZos database backup completed at 03:00 UTC yesterday."}
+{"say": "erm the Groq API key rotation scheduled for next Monday", "intent": "paste", "text": "The Groq API key rotation scheduled for next Monday."}
+{"say": "note buy milk and bread on the way home", "intent": "note", "text": "Buy milk and bread on the way home."}
+{"say": "note um the Piblo Flow investor meeting is at 15 00 tomorrow", "intent": "note", "text": "The Piblo Flow investor meeting is at 15:00 tomorrow."}
+{"say": "note Cardputer production run scheduled for next Friday", "intent": "note", "text": "Cardputer production run scheduled for next Friday."}
+{"say": "note er MAZos licence renewal due by end of quarter", "intent": "note", "text": "MAZos licence renewal due by end of quarter."}
+{"say": "note FlowLens alert thresholds need tuning for Groq workloads", "intent": "note", "text": "FlowLens alert thresholds need tuning for Groq workloads."}
+{"say": "note PibloCraft launch checklist review with the team on Wednesday", "intent": "note", "text": "PibloCraft launch checklist review with the team on Wednesday."}
+{"say": "note Hermes TLS certificate expires in 30 days", "intent": "note", "text": "Hermes TLS certificate expires in 30 days."}
+{"say": "note Codex evaluation period ends next month", "intent": "note", "text": "Codex evaluation period ends next month."}
+{"say": "note GitHub organisation audit scheduled for 20 minutes from now", "intent": "note", "text": "GitHub organisation audit scheduled for 20 minutes from now."}
+{"say": "note Vercel deploy hooks need updating for the new Tailscale IP range", "intent": "note", "text": "Vercel deploy hooks need updating for the new Tailscale IP range."}
+{"say": "remind me to call the Cardputer supplier about the component shortage", "intent": "remind", "text": "Call the Cardputer supplier about the component shortage."}
+{"say": "remind me um to review the MAZos security audit findings", "intent": "remind", "text": "Review the MAZos security audit findings."}
+{"say": "remind me to merge the FlowLens hotfix branch before 17 00", "intent": "remind", "text": "Merge the FlowLens hotfix branch before 17:00."}
+{"say": "remind me er to send the PibloCraft beta invites to the testers", "intent": "remind", "text": "Send the PibloCraft beta invites to the testers."}
+{"say": "remind me to rotate the Hermes API keys before the weekend", "intent": "remind", "text": "Rotate the Hermes API keys before the weekend."}
+{"say": "remind me to check the Codex usage quotas for the team", "intent": "remind", "text": "Check the Codex usage quotas for the team."}
+{"say": "remind me um to update the GitHub branch protection rules", "intent": "remind", "text": "Update the GitHub branch protection rules."}
+{"say": "remind me to configure the Vercel preview deployment for Piblo Flow", "intent": "remind", "text": "Configure the Vercel preview deployment for Piblo Flow."}
+{"say": "remind me er to renew the Tailscale subscription before expiry", "intent": "remind", "text": "Renew the Tailscale subscription before expiry."}
+{"say": "remind me to order 50 more Cardputer units for Q2", "intent": "remind", "text": "Order 50 more Cardputer units for Q2."}
+{"say": "Claude explain the Piblo Flow architecture in simple terms", "intent": "claude", "text": "Explain the Piblo Flow architecture in simple terms."}
+{"say": "Claude um write a unit test for the MAZos authentication module", "intent": "claude", "text": "Write a unit test for the MAZos authentication module."}
+{"say": "Claude refactor the Cardputer firmware for better power management", "intent": "claude", "text": "Refactor the Cardputer firmware for better power management."}
+{"say": "Claude er generate a FlowLens dashboard config for Groq metrics", "intent": "claude", "text": "Generate a FlowLens dashboard config for Groq metrics."}
+{"say": "Claude create a PibloCraft deployment script for Vercel", "intent": "claude", "text": "Create a PibloCraft deployment script for Vercel."}
+{"say": "Claude debug the Hermes connection timeout issue", "intent": "claude", "text": "Debug the Hermes connection timeout issue."}
+{"say": "Claude um optimise the Codex prompt for code review summaries", "intent": "claude", "text": "Optimise the Codex prompt for code review summaries."}
+{"say": "Claude write a GitHub Actions workflow for Tailscale subnet routing", "intent": "claude", "text": "Write a GitHub Actions workflow for Tailscale subnet routing."}
+{"say": "Claude summarise the MAZos migration risks and mitigations", "intent": "claude", "text": "Summarise the MAZos migration risks and mitigations."}
+{"say": "Claude er design a Cardputer enclosure for the new PCB revision", "intent": "claude", "text": "Design a Cardputer enclosure for the new PCB revision."}
+{"say": "I need to update my notebook with the meeting notes from today", "intent": "paste", "text": "I need to update my notebook with the meeting notes from today."}
+{"say": "Claudette sent over the revised Piblo Flow designs this morning", "intent": "paste", "text": "Claudette sent over the revised Piblo Flow designs this morning."}
+{"say": "I noted that the Cardputer firmware has a memory leak on startup", "intent": "paste", "text": "I noted that the Cardputer firmware has a memory leak on startup."}
+{"say": "This reminds me of the MAZos issue we had last quarter", "intent": "paste", "text": "This reminds me of the MAZos issue we had last quarter."}
+{"say": "The team should note the FlowLens changes before deploying to production", "intent": "paste", "text": "The team should note the FlowLens changes before deploying to production."}

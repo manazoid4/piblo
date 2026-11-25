@@ -32,10 +32,10 @@ def test_rule_cleanup(raw, want):
 
 
 @pytest.mark.parametrize("text,want", [
-    ("Note: buy cables", ("note", "buy cables")),
-    ("note, buy cables.", ("note", "buy cables.")),
-    ("Remind me to call Sam in 20 minutes", ("remind", "call Sam in 20 minutes")),
-    ("Claude, fix the failing test.", ("claude", "fix the failing test.")),
+    ("Note: buy cables", ("note", "Buy cables")),
+    ("note, buy cables.", ("note", "Buy cables.")),
+    ("Remind me to call Sam in 20 minutes", ("remind", "Call Sam in 20 minutes")),
+    ("Claude, fix the failing test.", ("claude", "Fix the failing test.")),
     ("notebook sizes are odd", ("paste", "notebook sizes are odd")),
     ("Claudette said hi", ("paste", "Claudette said hi")),
 ])
@@ -45,7 +45,7 @@ def test_parse_prefix(text, want):
 
 def test_dictionary_default(tmp_path):
     words = load_dictionary(tmp_path / "dict.txt")
-    assert "MAZos" in words and "Groq" in words and (tmp_path / "dict.txt").exists()
+    assert any(w.startswith("MAZos") for w in words) and "Groq" in words and (tmp_path / "dict.txt").exists()
 
 
 class Stt:
@@ -73,10 +73,10 @@ def test_dictate_endpoint(tmp_path):
                     headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
     assert r.status_code == 200, r.text
     j = r.json()
-    assert j["intent"] == "note" and j["text"] == "buy the cables for Cardputer."
+    assert j["intent"] == "note" and j["text"] == "Buy the cables for Cardputer."
     assert "Cardputer" in Stt.prompts[0] and "nod" in Stt.prompts[0]
     assert j["ms"]["total"] >= 0
-    assert "buy the cables" in (tmp_path / "inbox.md").read_text()
+    assert "Buy the cables" in (tmp_path / "inbox.md").read_text()
     assert "dictate" in (tmp_path / "latency.log").read_text()
 
 
@@ -546,3 +546,49 @@ def test_command_routing_never_delays_dictation(tmp_path, monkeypatch):
         while not routed and time.time() < deadline:
             time.sleep(0.05)
     assert routed == ["Hello."]  # still routed, just afterwards
+
+
+@pytest.mark.parametrize("text,want", [
+    ("Meeting at 1500 tomorrow.", "Meeting at 15:00 tomorrow."),
+    ("Merge it before 1730.", "Merge it before 17:30."),
+    ("Backup done at 0300 UTC.", "Backup done at 03:00 UTC."),
+    ("Raise it to 1500 requests per minute.", "Raise it to 1500 requests per minute."),
+    ("We launched in 2026.", "We launched in 2026."),
+    ("We optimized the Organization flow.", "We optimised the Organisation flow."),
+    ("Set color to gray and initialize() it.", "Set color to gray and initialize() it."),
+])
+def test_tidy_times_and_uk_spelling(text, want):
+    from mazhost.flow import tidy
+    assert tidy(text) == want
+
+
+def test_tidy_us_spelling_leaves_words():
+    from mazhost.flow import tidy
+    assert tidy("We optimized it at 1500.", "us") == "We optimized it at 15:00."
+
+
+@pytest.mark.parametrize("text,want", [
+    ("Claw Debug the timeout.", ("claude", "Debug the timeout.")),
+    ("Claudum optimise the prompt.", ("claude", "Optimise the prompt.")),
+    ("Clawson said hi.", ("paste", "Clawson said hi.")),
+    ("The cat's claw is sharp.", ("paste", "The cat's claw is sharp.")),
+])
+def test_misheard_claude_prefix(text, want):
+    assert parse_prefix(text) == want
+
+
+def test_builtin_aliases_for_tools_and_piblocraft():
+    from mazhost.flow import apply_dictionary
+    out = apply_dictionary("Peblocraft on Versal over tail scale, Peblo Craft and PBLO Flow.", [])
+    assert out == "PibloCraft on Vercel over Tailscale, PibloCraft and Piblo Flow."
+
+
+@pytest.mark.parametrize("text,want", [
+    ("Noteversal deploy hooks need updating.", ("note", "Versal deploy hooks need updating.")),
+    ("Notebook sizes are odd.", ("paste", "Notebook sizes are odd.")),
+    ("Noted, thanks.", ("paste", "Noted, thanks.")),
+    ("Remind me I'm to update the rules.", ("remind", "Update the rules.")),
+])
+def test_glued_note_and_misheard_remind(text, want):
+    from mazhost.flow import split_glued_note
+    assert parse_prefix(split_glued_note(text)) == want
