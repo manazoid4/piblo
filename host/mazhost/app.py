@@ -27,6 +27,7 @@ from .dump_routes import build_dump_router, inbox_dir, save_safely
 from .catchup import Catchup, build_catchup_router
 from .promises import Promises, build_promises_router
 from .share_in import build_share_router
+from .home_pulse import build_home_pulse_app, install_home_pulse_routes
 from .buddy_forms import build_buddy_forms_router
 from .onboarding import Onboarding, build_onboarding_router
 from .library_routes import build_library_router
@@ -69,8 +70,12 @@ from .live_voice import install_live_voice
 from .live_brain import scrub
 from .llm import VOICE_MAX_TOKENS, Models, Route, _output_cap
 from .nudge import NudgeClient
-from .pairing import build_pairing_app
+from .pairing import DevicePairingStore, build_pairing_app
 from .pc import PCController
+from .registry_routes import install_registry_routes
+from . import screen_perception
+from .command_router import CommandRouter
+from .universal_registry import Event, global_event_bus, global_registry
 from .brain import maths_line, priorities_line, weather_line
 from .prompts import EXTRACT_PROMPTS, SYSTEM_PROMPT
 from .refine import FILLER, refine
@@ -82,6 +87,7 @@ from .skill_vault import SkillVault
 from starlette.concurrency import run_in_threadpool
 from .flow import Flow, foreground as flow_foreground, safe_paste as flow_safe_paste
 from .flow_routes import build_flow_router, insert_text, read_settings
+from .craft_voice import build_craft_voice_router
 from .stt import SpeechToText
 from .subtitle_routes import install_subtitle_routes
 from .subtitles import SubtitleJobs, WhisperTranscriber
@@ -116,6 +122,10 @@ class TextTurn(BaseModel):
     session_id: str
     route: Route = "local"
     context: str = Field(default="", max_length=1_200)
+
+
+class RouteBody(BaseModel):
+    text: str = Field(min_length=1, max_length=8_000)
 
 
 class SpeaksFirstCheck(BaseModel):
@@ -262,7 +272,7 @@ def create_app(
         allow_origins=cfg.web_origin_list,
         allow_credentials=False,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-MAZ-Token", "X-MAZ-Context"],
+        allow_headers=["Authorization", "Content-Type", "X-MAZ-Token", "X-MAZ-Context", "X-Craft-Capture"],
         expose_headers=["X-MAZ-Width", "X-MAZ-Height", "X-MAZ-Format"],
     )
     install_validation_exception_handler(api)
@@ -1094,6 +1104,29 @@ def create_app(
             return "The clipboard was busy, so nothing was pasted. Try again."
         return "Sent." if entered else "Pasted."
 
+    # Command router: Tier 0 deterministic + Tier 1 small-model capability
+    # selection over the registry. Read capabilities lazily so this can be
+    # created before install_registry_routes populates them.
+    command_router = CommandRouter(
+        ollama_url=cfg.ollama_url,
+        model=cfg.ollama_model,
+        registry=global_registry,
+    )
+    api.state._command_router = command_router  # read by the dictate endpoint
+    _route_tasks: set = set()  # keep background route tasks alive until done
+
+    async def publish_voice_route(router, text: str, intent) -> None:
+        try:
+            route = await run_in_threadpool(router.route, text)
+            await global_event_bus.publish(Event(
+                type="voice.command.routed",
+                source="flow",
+                payload={"text": text, "intent": intent, "tier": route.tier, "capability": route.capability,
+                         "args": route.args, "confidence": route.confidence},
+            ))
+        except Exception as e:  # noqa: BLE001 - live-activity extra; never break dictation
+            logging.getLogger("uvicorn.error").warning("voice route failed: %s", type(e).__name__)
+
     @api.post("/dictate")
     async def dictate(request: Request, target: str = "text"):
         """wav in -> cleaned text out. target=pc-paste also pastes on the PC."""
@@ -1117,12 +1150,21 @@ def create_app(
             except asyncio.TimeoutError:
                 flow_service._cancel.set()
                 raise HTTPException(504, "stt_timeout")
+
             insert_ms, pc = 0, ""
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
                 insert_ms, _ = await paste_on_pc(result, armed)
                 result["reply"] = pc = result["pc"]  # firmware decodeReply reads `reply` as the outcome
             if result["text"]:
                 flow_service.log_result(result, upload_ms, insert_ms, pc)
+                # Voice -> capability, for PibloCraft live activity only (nothing is executed).
+                # Runs after typing, in the background: tier 1 calls a local model that can take
+                # seconds, and dictation must never wait for it.
+                router = getattr(api.state, "_command_router", None)
+                if router:
+                    task = asyncio.create_task(publish_voice_route(router, result["text"], result.get("intent")))
+                    _route_tasks.add(task)
+                    task.add_done_callback(_route_tasks.discard)
             else:
                 result["ms"]["upload"] = upload_ms
             return result
@@ -1257,7 +1299,17 @@ def create_app(
         temp.write_text(json.dumps(device_keys), encoding="utf-8")
         temp.replace(key_file)
 
-    api.mount("/pair", build_pairing_app(cfg, security, device_keys=device_keys, save_keys=save_device_keys, audit=authority.audit_action))
+    # One pairing store shared by /pair and the universal capability registry
+    # so device request state is single-sourced.
+    device_store = DevicePairingStore(device_keys, save_device_keys)
+
+    api.mount(
+        "/pair",
+        build_pairing_app(
+            cfg, security, device_store=device_store, device_keys=device_keys,
+            save_keys=save_device_keys, audit=authority.audit_action,
+        ),
+    )
     buddy_store = None if cfg.buddy_db == "off" else BuddyStore(
         cfg.buddy_db or resolve_data_dir(cfg) / "buddy.sqlite3")
     buddy = install_buddy_routes(api, Buddy(store=buddy_store, focus=focus, device_keys=device_keys))
@@ -1265,6 +1317,8 @@ def create_app(
     promises_engine = Promises(buddy, model_router=model_router, settings=cfg)
     promises_engine.start()
     buddy.on_ack = promises_engine.on_alert_acked
+    api.mount("/home/pulse", build_home_pulse_app(cfg, buddy, resolve_data_dir(cfg)))
+    install_home_pulse_routes(api, cfg, resolve_data_dir(cfg))
     if cfg.vault_dir and cfg.vault_remote_url:
         raise ValueError('Choose a local vault folder or a remote home vault, not both')
     vault = (RemoteFileVault(cfg.vault_remote_url, cfg.vault_remote_token)
@@ -1326,6 +1380,7 @@ def create_app(
     api.include_router(build_dev_router(resolve_data_dir(cfg), Path(cfg.repo_dir) if cfg.repo_dir else Path(__file__).resolve().parents[2]))
     api.include_router(build_features_router(resolve_data_dir(cfg)))
     api.include_router(build_flow_router(flow_service))
+    api.include_router(build_craft_voice_router(security, lambda path: turn_stt(path, "local")))
     body_double = BodyDouble(buddy, resolve_data_dir(cfg) / "body_double.json")
     api.include_router(build_bodydouble_router(body_double))
     api.on_event("startup")(body_double.start)
@@ -1379,6 +1434,38 @@ def create_app(
             work_store=work_store,
             voices=speech_out.voices,
         )
+
+    # Universal capability registry: one discovery/execution contract for
+    # Tier 0 deterministic actions (PC controls, reminders, system status).
+    install_registry_routes(
+        api,
+        registry=global_registry,
+        pc_controller=pc_controller,
+        core_service=core_service,
+        buddy=buddy,
+        perception=screen_perception,
+        device_monitor=device_monitor,
+        device_store=device_store,
+    )
+
+    # Command router: Tier 0 deterministic + Tier 1 small-model capability
+    # selection over the registered capabilities.
+    command_router = CommandRouter(
+        ollama_url=cfg.ollama_url,
+        model=cfg.ollama_model,
+        capabilities=global_registry.list_all(),
+    )
+
+    @api.post("/command/route")
+    def route_command(body: RouteBody):
+        result = command_router.route(body.text)
+        return {
+            "tier": result.tier,
+            "capability": result.capability,
+            "args": result.args,
+            "confidence": result.confidence,
+            "reasoning": result.reasoning,
+        }
 
     return api
 

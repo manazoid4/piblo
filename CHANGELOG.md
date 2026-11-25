@@ -1,5 +1,9 @@
 # Changelog
 
+## v1.5.5
+
+- Craft voice: an explicit Piblo mic capture can be routed to a Craft draft on the PC (Windows Craft pilot); empty captures report "No speech detected".
+
 ## v1.5.4
 - Board link: ESP-NOW starts again if Wi-Fi was off at boot or switched off later.
 - System screen shows the board link state (radio, key, HELLOs sent).

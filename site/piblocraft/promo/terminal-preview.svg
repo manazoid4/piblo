@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" role="img" aria-labelledby="t d">
+  <title id="t">PibloCraft illustration</title>
+  <desc id="d">Three side-by-side agent panes, Claude, Codex and Hermes, with a status line underneath saying one agent is waiting for you. An illustration, not a captured terminal session.</desc>
+  <rect width="960" height="540" rx="22" fill="#2a1a12"/>
+  <path d="M22 0h916a22 22 0 0 1 22 22v36H0V22A22 22 0 0 1 22 0" fill="#3b281a"/>
+  <circle cx="32" cy="29" r="6" fill="#ee5a36"/><circle cx="54" cy="29" r="6" fill="#ffc93c"/><circle cx="76" cy="29" r="6" fill="#8fdcb8"/>
+  <text x="480" y="34" text-anchor="middle" font-family="ui-monospace,Consolas,monospace" font-size="15" fill="#b89a6e">pc: three panes, one job queue</text>
+  <g font-family="ui-monospace,Consolas,monospace" font-size="20">
+    <g>
+      <rect x="24" y="76" width="297" height="372" rx="12" fill="#231610" stroke="#4a3322"/>
+      <text x="42" y="108" fill="#fff4e0" font-weight="bold">Claude 1</text>
+      <text x="303" y="108" text-anchor="end" fill="#8fdcb8">62% left</text>
+      <text x="42" y="150" fill="#b89a6e">job #4</text>
+      <text x="42" y="178" fill="#fff4e0">Tidy the README</text>
+      <text x="42" y="222" fill="#b89a6e">worktree</text>
+      <text x="42" y="250" fill="#fff4e0">pc/4</text>
+      <text x="42" y="294" fill="#8fdcb8">&#9679; working</text>
+      <text x="42" y="418" fill="#b89a6e">&gt; <tspan fill="#fff4e0">&#9613;</tspan></text>
+    </g>
+    <g>
+      <rect x="331" y="76" width="297" height="372" rx="12" fill="#231610" stroke="#4a3322"/>
+      <text x="349" y="108" fill="#fff4e0" font-weight="bold">Codex</text>
+      <text x="610" y="108" text-anchor="end" fill="#8fdcb8">ready</text>
+      <text x="349" y="150" fill="#b89a6e">job #5</text>
+      <text x="349" y="178" fill="#fff4e0">Add a test for login</text>
+      <text x="349" y="222" fill="#b89a6e">check</text>
+      <text x="349" y="250" fill="#fff4e0">npm test</text>
+      <text x="349" y="294" fill="#8fdcb8">&#9679; working</text>
+      <text x="349" y="418" fill="#b89a6e">&gt; <tspan fill="#fff4e0">&#9613;</tspan></text>
+    </g>
+    <g>
+      <rect x="638" y="76" width="297" height="372" rx="12" fill="#231610" stroke="#ee5a36" stroke-width="2"/>
+      <text x="656" y="108" fill="#fff4e0" font-weight="bold">Hermes</text>
+      <text x="917" y="108" text-anchor="end" fill="#ffc93c">needs you</text>
+      <text x="656" y="150" fill="#b89a6e">job #6</text>
+      <text x="656" y="178" fill="#fff4e0">Rename the config</text>
+      <text x="656" y="222" fill="#b89a6e">asks</text>
+      <text x="656" y="250" fill="#fff4e0">OK to run this?</text>
+      <text x="656" y="294" fill="#ffc93c">&#9679; waiting for you</text>
+      <text x="656" y="418" fill="#b89a6e">&gt; <tspan fill="#fff4e0">&#9613;</tspan></text>
+    </g>
+    <rect x="24" y="462" width="911" height="52" rx="12" fill="#3b281a"/>
+    <text x="44" y="494" fill="#8fdcb8">pc ?</text>
+    <text x="104" y="494" fill="#fff4e0">Hermes needs you. Run: pc answer</text>
+  </g>
+</svg>

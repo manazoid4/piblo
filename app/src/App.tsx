@@ -1,4 +1,4 @@
-import { useEffect, useState, createContext, useContext, ReactNode } from 'react';
+import { lazy, Suspense, useEffect, useState, createContext, useContext, ReactNode } from 'react';
 import iconUrl from './assets/piblo-icon.svg';
 import { PairingList } from './components/PairingCard';
 import { CommandPalette } from './components/CommandPalette';
@@ -18,6 +18,8 @@ import { Usage } from './pages/Usage';
 import { Teach } from './pages/Teach';
 import { StoreProvider, usePoll, useStore } from './lib/store';
 import { useUpdate } from './lib/useUpdate';
+
+const Craft = lazy(() => import('./pages/Craft').then(module => ({ default: module.Craft })));
 
 type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -73,7 +75,7 @@ function useTheme() {
 
 export { useTheme };
 
-type Section = 'home' | 'live' | 'ask' | 'memory' | 'actions' | 'settings' | 'usage' | 'teach' | 'dev';
+type Section = 'home' | 'live' | 'ask' | 'memory' | 'actions' | 'settings' | 'usage' | 'teach' | 'dev' | 'craft';
 
 const isDev = import.meta.env.DEV;
 const NAV: { id: Section; label: string; icon: string }[] = [
@@ -86,6 +88,7 @@ const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'usage', label: 'Usage', icon: 'actions' },
   ...(isDev ? [{ id: 'dev' as const, label: 'Piblo Dev', icon: 'dev' }] : []),
   { id: 'teach', label: 'Show me once', icon: 'screen' },
+  ...(window.piblo?.craftTerminal ? [{ id: 'craft' as const, label: 'Craft', icon: 'dev' }] : []),
 ];
 
 function DevicePillView() {
@@ -172,8 +175,8 @@ function Shell() {
     window.setTimeout(() => setNotice(null), 6000);
   };
 
-  const needsCore = section !== 'settings' && section !== 'usage' && !running;
-  const Page = { home: Home, live: LiveView, ask: Ask, memory: Memory, actions: Actions, settings: Settings, usage: Usage, teach: Teach }[section === 'dev' ? 'home' : section];
+  const needsCore = section !== 'settings' && section !== 'usage' && section !== 'craft' && !running;
+  const Page = { home: Home, live: LiveView, ask: Ask, memory: Memory, actions: Actions, settings: Settings, usage: Usage, teach: Teach }[section === 'dev' || section === 'craft' ? 'home' : section];
 
   return (
     <div className="shell">
@@ -209,7 +212,7 @@ function Shell() {
           >
             <Icon name={n.icon} />
             {n.label}
-            {n.id === 'actions' && badge > 0 ? <span className="rail-badge" aria-label={`${badge} waiting`}>{badge}</span> : <kbd>Ctrl+{i + 1}</kbd>}
+            {n.id === 'actions' && badge > 0 ? <span className="rail-badge" aria-label={`${badge} waiting`}>{badge}</span> : i < 9 && <kbd>Ctrl+{i + 1}</kbd>}
           </button>
         ))}
         <div className="rail-foot meta">{running ? (core?.managed ? 'Running' : 'Ready') : ''}</div>
@@ -231,7 +234,7 @@ function Shell() {
         ) : (
           <>
             {showPairing && <PairingList requests={pairing.requests} busy={pairing.busy} notice={notice} onDecide={(id, d) => void decide(id, d)} />}
-            {section === 'dev' ? <PibloDev initialTab={devTab} onOpenCommandPalette={() => setPaletteOpen(true)} /> : <Page />}
+            {section === 'craft' ? <Suspense fallback={null}><Craft /></Suspense> : section === 'dev' ? <PibloDev initialTab={devTab} onOpenCommandPalette={() => setPaletteOpen(true)} /> : <Page />}
           </>
         )}
       </main>

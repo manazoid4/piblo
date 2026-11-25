@@ -3,7 +3,8 @@ from __future__ import annotations
 import time
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from .agent_runner import AgentRunError, AgentRunner, Provider
@@ -12,7 +13,9 @@ from .authority import AuthorityBroker, AuthorityError, Scope
 from .debug_capsule import DebugCapsules
 from .executor import ElevatedExecutor, ExecutionError, Shell
 from .llm import Route
+from .pairing import PairingStore
 from .phone_control import build_phone_app
+from .security import client_info
 from .skill_routes import install_skill_routes
 from .skill_vault import SkillVault
 from .stt import SpeechToText
@@ -89,7 +92,15 @@ def install_control_routes(
     work_store = work_store or WorkStore(settings.work_dir)
     work_store.bootstrap()
     work_service = WorkService(work_store)
-    api.mount("/control", build_phone_app(settings, broker, work_store=work_store, voices=voices))
+    browser_codes = PairingStore()
+    api.mount("/control", build_phone_app(settings, broker, work_store=work_store, voices=voices, browser_codes=browser_codes))
+
+    @api.post("/authority/browser-code")
+    def browser_code(request: Request):
+        if not client_info(request)[2]:
+            raise HTTPException(403, "browser_code_requires_local_core")
+        code, seconds = browser_codes.start()
+        return JSONResponse({"code": code, "expires_in_seconds": seconds}, headers={"Cache-Control": "no-store"})
 
     # Bearer-token boundary (same as every other Cardputer-facing route on
     # this app, e.g. /core/cardputer/status) — the firmware never holds a

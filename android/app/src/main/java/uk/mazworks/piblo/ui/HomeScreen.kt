@@ -40,6 +40,7 @@ import uk.mazworks.piblo.PibloApp
 import uk.mazworks.piblo.hub.Answer
 import uk.mazworks.piblo.hub.LinkState
 import uk.mazworks.piblo.proto.Api
+import uk.mazworks.piblo.proto.CoreClient
 import uk.mazworks.piblo.proto.DeviceStatus
 import uk.mazworks.piblo.proto.PromisesToday
 import uk.mazworks.piblo.proto.TodayPage
@@ -51,21 +52,24 @@ private fun app(ctx: Context) = ctx.applicationContext as PibloApp
  * today's promises and the latest results. No demo content.
  */
 @Composable
-fun HomeScreen(openLive: () -> Unit, onConnect: () -> Unit = {}) {
+fun HomeScreen(openLive: () -> Unit, onConnect: () -> Unit, openCraft: () -> Unit) {
     val a = app(LocalContext.current)
     val scope = rememberCoroutineScope()
     val state by a.hub.state.collectAsStateWithLifecycle()
     val prefs by a.settings.prefs.collectAsStateWithLifecycle(initialValue = uk.mazworks.piblo.data.Prefs())
     val device by a.deviceStatus.collectAsStateWithLifecycle()
     val deviceErr by a.deviceError.collectAsStateWithLifecycle()
-    var promises by remember { mutableStateOf<PromisesToday?>(null) }
-    var today by remember { mutableStateOf<TodayPage?>(null) }
+    val online = state.link == LinkState.ONLINE
+    val tailnet = CoreClient.isTailnetAddress(prefs.coreUrl)
+    var promises by remember(prefs.coreUrl, prefs.tokenBlob) { mutableStateOf<PromisesToday?>(null) }
+    var today by remember(prefs.coreUrl, prefs.tokenBlob) { mutableStateOf<TodayPage?>(null) }
     var updateConfirm by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
 
     // Promises and today's counters refresh on their own; neither may ever spin forever.
-    LaunchedEffect(Unit) {
+    LaunchedEffect(online, prefs.coreUrl, prefs.tokenBlob) {
+        if (!online) return@LaunchedEffect
         while (true) {
             val t = a.transport
             if (t != null) {
@@ -79,23 +83,57 @@ fun HomeScreen(openLive: () -> Unit, onConnect: () -> Unit = {}) {
     }
 
     Column(
-        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
-        if (!prefs.hasComputer) {
-            Section("Welcome") {
-                Text("This phone isn't connected to a computer yet.", fontWeight = FontWeight.SemiBold)
-                Text("Pair with Piblo Core on your Wi-Fi to see your device, approvals and promises here.", style = MaterialTheme.typography.bodySmall, color = Muted)
-                Button(onConnect, modifier = Modifier.testTag("home_connect")) { Text("Connect your computer") }
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text("Home", style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.Bold)
+            Text(
+                when {
+                    online && tailnet -> "Connected through Tailscale"
+                    online -> "Connected to your computer"
+                    prefs.useSimulator -> "Simulator"
+                    else -> "Your Piblo and what needs you"
+                },
+                color = Muted, style = MaterialTheme.typography.bodyMedium,
+            )
         }
 
-        DeviceCard(device, deviceErr, busy, onUpdate = { updateConfirm = true })
+        if (online) {
+            DeviceCard(device, deviceErr, busy, onUpdate = { updateConfirm = true })
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(openLive, modifier = Modifier.testTag("open_live")) { Text("Live View") }
+                OutlinedButton(openCraft, modifier = Modifier.testTag("open_craft")) { Text("PibloCraft") }
+            }
+        } else if (!prefs.useSimulator) {
+            Section(when {
+                !prefs.hasComputer -> "Connect your computer"
+                state.link == LinkState.CONNECTING -> "Connecting to Piblo Core"
+                state.link == LinkState.AUTH_FAILED -> "Pair your phone again"
+                else -> "Computer unreachable"
+            }) {
+                Text(when {
+                    !prefs.hasComputer -> "Pair with Piblo Core to see your device and approvals."
+                    state.link == LinkState.AUTH_FAILED -> "Piblo Core rejected the saved pairing."
+                    tailnet -> "Make sure Tailscale is connected on this phone and Piblo Core is running on your computer."
+                    else -> "Check that Piblo Core is running. Use your home Wi-Fi or your computer's Tailscale address."
+                }, style = MaterialTheme.typography.bodyMedium, color = Muted)
+                if (!prefs.hasComputer || state.link == LinkState.AUTH_FAILED) {
+                    Button(onConnect, modifier = Modifier.testTag("home_connect")) { Text("Connection settings") }
+                } else {
+                    OutlinedButton(a::reconnect, enabled = state.link != LinkState.CONNECTING) { Text("Check again") }
+                    if (tailnet) OpenTailscaleButton()
+                    TextButton(onConnect) { Text("Connection settings") }
+                }
+            }
+        } else {
+            OutlinedButton(openLive, modifier = Modifier.testTag("open_live")) { Text("Live View") }
+        }
 
-        Section("Waiting for you") {
-            val head = state.head
+        val head = state.head
+        if (online || head != null) Section("Waiting for you") {
             if (head == null) {
-                EmptyState("Nothing waiting", "When an agent needs you, its name and what it wants appear here. You approve on this phone or on Piblo.")
+                Text("Nothing waiting", color = Muted, style = MaterialTheme.typography.bodyMedium)
             } else {
                 Text(head.title, fontWeight = FontWeight.Bold)
                 Text(head.body, style = MaterialTheme.typography.bodyMedium)
@@ -108,24 +146,20 @@ fun HomeScreen(openLive: () -> Unit, onConnect: () -> Unit = {}) {
             }
         }
 
-        PromisesCard(promises, busy, onReload = {
+        if (online) PromisesCard(promises, busy, onReload = {
             scope.launch(Dispatchers.IO) {
                 val t = a.transport ?: return@launch
                 try { promises = Api.promisesToday(t.get("/promises/today")) } catch (_: Exception) { }
             }
         })
 
-        Section("Latest") {
-            val t = today
-            if (t == null) {
-                if (prefs.hasComputer) Text("Reading today…", color = Muted, style = MaterialTheme.typography.bodySmall)
-            } else {
+        if (online) today?.let { t ->
+            Section("Today") {
                 Labeled("Done today", "${t.done}")
                 Labeled("Waiting on you", "${t.needs}")
                 Labeled("Approved / denied", "${t.approved} / ${t.denied}")
                 t.lastText?.let { Text("Last: $it", style = MaterialTheme.typography.bodySmall, color = Muted) }
             }
-            Button(openLive, modifier = Modifier.testTag("open_live")) { Text("Open Live View") }
         }
 
         error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
@@ -155,8 +189,8 @@ private fun DeviceCard(d: DeviceStatus?, err: String?, busy: Boolean, onUpdate: 
     Section("Your Piblo") {
         if (d == null) {
             val msg = when {
-                err != null -> "Can't reach your computer. Check it's running and on the same Wi-Fi."
-                else -> "Connecting…"
+                err != null -> "Core is connected. Piblo isn't responding."
+                else -> "Checking Piblo…"
             }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (err == null) CircularProgressIndicator(strokeWidth = 2.dp)
@@ -194,7 +228,7 @@ private fun PromisesCard(data: PromisesToday?, busy: Boolean, onReload: () -> Un
 
     Section("Today's promises") {
         if (data == null || data.empty) {
-            EmptyState("No promises yet", "Promises you confirm here show up on Piblo and come back until you mark them done.")
+            Text(if (data == null) "Checking promises…" else "No promises today", color = Muted, style = MaterialTheme.typography.bodyMedium)
         } else {
             data.cards.forEach { c ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {

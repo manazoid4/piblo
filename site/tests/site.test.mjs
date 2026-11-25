@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process";
 import vm from "node:vm";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const pages = ["/", "/roadmap/", "/timeline/", "/readiness/", "/privacy/"];
+const pages = ["/", "/roadmap/", "/timeline/", "/readiness/", "/privacy/", "/piblocraft/", "/features/"];
 const contents = Object.fromEntries(pages.map(path => [path, readFileSync(join(root, path, "index.html"), "utf8")]));
 const attrs = (html, name) => [...html.matchAll(new RegExp(name + '="([^"]+)"', "g"))].map(match => match[1]);
 const ids = html => new Set(attrs(html, "id"));
@@ -187,14 +187,26 @@ test("homepage structure: screen cards replace phone frames, every image has alt
   const html = contents["/"];
   assert.doesNotMatch(html, /class="device/);
   for (const tag of html.match(/<img[^>]*>/g) || []) assert.match(tag, /\salt="[^"]*"/, tag);
-  // Batch 01 (founder, 17 Nov late): Standard + Home bundle at a £129 early price; £5 reservation is separate and refundable.
+  // Batch 01: Standard + Home bundle at a £129 early price; the £5 reservation comes off it and is refundable (Maz, 22 Nov).
   const batch = html.slice(html.indexOf('id="batch"'), html.indexOf('id="waitlist"'));
   assert.match(batch, /Piblo Standard \+ Piblo Home/);
   assert.match(batch, /&pound;129/);
   assert.match(batch, /class="price"/);
-  assert.match(batch, /isn&rsquo;t taken off it/);
-  assert.doesNotMatch(html, /149|£280|counts towards/);
+  assert.match(batch, /comes off the &pound;129/);
+  assert.doesNotMatch(html, /isn&rsquo;t taken off|separate from the price|149|£280/);
   assert.match(html, /Reserve your place/);
+});
+test("the homepage puts real prototype proof, app examples and the Craft simulation before product details", () => {
+  const html = contents["/"];
+  const sections = [...html.matchAll(/<section[^>]* id="([^"]+)"/g)].map(match => match[1]);
+  assert.deepEqual(sections.slice(0, 4), ["top", "prototype", "showcase", "asks"]); // 21 Nov: prototype photo frames sit right after the hero
+  const hero = html.slice(html.indexOf('id="top"'), html.indexOf('id="showcase"'));
+  assert.match(hero, /class="btn btn-primary" href="#showcase"/);
+  const showcase = html.slice(html.indexOf('id="showcase"'), html.indexOf('id="asks"'));
+  assert.match(showcase, /href="\/piblocraft\/#mission"/);
+  for (const screen of ["home", "ask"]) {
+    assert.ok(showcase.includes(`src="/media/work/windows-${screen}.png"`));
+  }
 });
 test("no aluminium anywhere under site/ (case-insensitive)", () => {
   const walk = dir => readdirSync(dir, { withFileTypes: true }).flatMap(e => e.isDirectory() ? (["node_modules", "tests"].includes(e.name) ? [] : walk(join(dir, e.name))) : [join(dir, e.name)]);
@@ -216,15 +228,16 @@ test("homepage makes no absolute claims and carries the new positioning and Batc
   assert.match(html, /grows with you/i);
   assert.match(html, /Piblo Standard \+ Piblo Home/);
   assert.match(html, /&pound;129/);
-  assert.match(html, /isn&rsquo;t taken off it/);
+  assert.match(html, /comes off the &pound;129/);
 });
-test("homepage tabs: each tab controls an existing tabpanel", () => {
+test("what-it-does bento: plain benefits, each honest about its status", () => {
   const html = contents["/"];
-  assert.match(html, /role="tablist"/);
-  const panels = new Set([...html.matchAll(/<[^>]*role="tabpanel"[^>]*>/g)].map(m => (m[0].match(/\sid="([^"]+)"/) || [])[1]));
-  const tabs = [...html.matchAll(/<[^>]*role="tab"[^>]*>/g)].map(m => m[0]);
-  assert.ok(tabs.length > 0);
-  for (const tab of tabs) assert.ok(panels.has((tab.match(/aria-controls="([^"]+)"/) || [])[1]), tab);
+  const life = html.slice(html.indexOf('id="life"'), html.indexOf('id="batch"'));
+  const tiles = life.match(/<article class="bt[\s\S]*?<\/article>/g) || [];
+  assert.ok(tiles.length >= 6);
+  for (const tile of tiles) { assert.match(tile, /<h3>/); if (!/&pound;0/.test(tile)) assert.match(tile, /class="chip/, tile); }
+  assert.doesNotMatch(life, /API|ms|LLM|AI|agent/i);
+  assert.match(life, /example screens/);
 });
 test("homepage images have alt attributes and existing files; Buddy images are under 300 KB", async () => {
   const { statSync } = await import("node:fs");
@@ -238,4 +251,38 @@ test("homepage images have alt attributes and existing files; Buddy images are u
     assert.ok(existsSync(file), file);
     assert.ok(statSync(file).size < 300 * 1024, f + " over 300 KB");
   }
+});
+
+test("reservation: the £5 comes off the price and is refundable until shipping, everywhere", () => {
+  const html = contents["/"];
+  const hero = html.match(/<p class="note">(Your &pound;5 comes off[\s\S]*?)<\/p>/)[1];
+  const batch = html.match(/<div class="reserve-box">([\s\S]*?)<\/div>/)[1];
+  const faq = html.match(/<summary>How does the &pound;5 reservation work\?<\/summary><p>([\s\S]*?)<\/p>/)[1];
+  const reserved = readFileSync(join(root, "reserved/index.html"), "utf8").match(/<p class="privacy-lead">([\s\S]*?)<\/p>/)[1];
+  for (const text of [hero, batch, faq, reserved]) assert.match(text, /&pound;5 comes off the &pound;129 early price, so Batch 01 costs you &pound;124/);
+  for (const text of [hero, batch, faq]) assert.match(text, /refund it any time before your device ships/);
+});
+test("founder section uses Maz's photo and words, with no location", () => {
+  const html = contents["/"];
+  const founder = html.slice(html.indexOf('id="founder"'), html.indexOf('id="faq"'));
+  assert.match(founder, /<img[^>]+src="\/media\/piblo-founder-maz\.webp"[^>]+alt="[^"]+"/);
+  assert.match(founder, /Hi, I&rsquo;m Maz\./);
+  assert.match(founder, /Swansea University/);
+  assert.ok(existsSync(join(root, "media/piblo-founder-maz.webp")));
+});
+
+test("Kickstarter premortem fixes stay in place", () => {
+  const html = contents["/"];
+  assert.match(html, /small screen for your desk with a real YES key/);
+  assert.match(html, /Why &pound;129\?/);
+  assert.match(html, /source-available rather than open source/);
+  assert.doesNotMatch(html, /<b>Open code\.<\/b>/);
+  const frames = html.match(/class="proto-frame"/g) || [];
+  assert.equal(frames.length, 4, "one video and three photo frames");
+  const sub = ["/roadmap/", "/timeline/", "/readiness/", "/privacy/", "/features/"];
+  const nav = h => (h.match(/<nav class="nav"[^>]*>(.*?)<\/nav>/s) || [])[1];
+  for (const path of sub) assert.equal(nav(contents[path]), nav(contents["/roadmap/"]), path + " uses the shared nav");
+  for (const path of sub) assert.doesNotMatch(contents[path], />(Join the list|Get updates|Get an email when it moves)</, path);
+  assert.doesNotMatch(contents["/readiness/"], /kept privately/);
+  assert.doesNotMatch(contents["/features/"], /Push the fix/);
 });

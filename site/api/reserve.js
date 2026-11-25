@@ -1,4 +1,4 @@
-// £5 refundable reservation for Piblo Standard (batch one). Redirects to a Stripe Payment Link,
+// £5 refundable reservation, taken off the £129 early price, for Piblo Standard (batch one). Redirects to a Stripe Payment Link,
 // so no secret key lives on this site. GET on purpose: a plain link works without JavaScript.
 const PAYMENT_LINK = 'https://buy.stripe.com/4gMbIT2TGfeNb128eIabK01';
 

@@ -512,3 +512,37 @@ def test_timeout_does_not_silence_later_dictations(tmp_path, monkeypatch):
     app.state._flow._cancel.set()  # what the 504 path does
     out = app.state._flow.dictate(__import__("pathlib").Path("x.wav"))
     assert out["text"] and "dictate" in (tmp_path / "latency.log").read_text()
+
+
+def test_command_routing_never_delays_dictation(tmp_path, monkeypatch):
+    """The voice->capability router may call a local model (seconds). Typing must not wait for it."""
+    from mazhost import app as app_module
+    from mazhost.flow import Flow
+
+    monkeypatch.setattr(Flow, "dictate", lambda self, path, **kw: {"intent": "paste", "text": "Hello.", "ms": {"stt": 5, "clean": 1, "total": 6}})
+    monkeypatch.setattr(app_module, "flow_foreground", lambda: 42)
+    monkeypatch.setattr(app_module, "flow_safe_paste", lambda text, enter, armed, paste_fn: "pasted")
+    cfg = Settings(token="t" * 40, core_enabled=False, flow_dir=str(tmp_path), groq_api_key="",
+                   flow_cleanup_llm=False, stt_provider="whisper", flow_cloud=False)
+    app = create_app(cfg, stt=Stt(), models=Models())
+    routed = []
+
+    class SlowRouter:
+        def route(self, text):
+            time.sleep(1.5)
+            routed.append(text)
+            from mazhost.command_router import RouteResult
+            return RouteResult("unclear", None, {}, 0.0, "slow")
+
+    app.state._command_router = SlowRouter()
+    with TestClient(app) as client:
+        t0 = time.perf_counter()
+        r = client.post("/dictate?target=pc-paste", content=_wav(),
+                        headers={"Authorization": "Bearer " + "t" * 40, "Content-Type": "audio/wav"})
+        took = time.perf_counter() - t0
+        assert r.status_code == 200 and r.json()["pc"] == "pasted"
+        assert took < 1.0, f"dictation waited {took:.2f}s for the command router"
+        deadline = time.time() + 5
+        while not routed and time.time() < deadline:
+            time.sleep(0.05)
+    assert routed == ["Hello."]  # still routed, just afterwards

@@ -239,7 +239,8 @@ class ClaimRequest(BaseModel):
 
 def build_pairing_app(
     settings: Settings, security: Security, store: PairingStore | None = None,
-    device_keys: dict[str, str] | None = None, save_keys=None, audit=None
+    device_keys: dict[str, str] | None = None, save_keys=None,
+    audit=None, device_store: DevicePairingStore | None = None,
 ) -> FastAPI:
     pairing_store = store or PairingStore()
     pair_app = FastAPI(title="MAZ Pairing")
@@ -266,7 +267,7 @@ def build_pairing_app(
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "invalid_or_expired_code")
         return {"token": settings.token}
 
-    device_store = DevicePairingStore(device_keys, save_keys)
+    device_store = device_store or DevicePairingStore(device_keys, save_keys)
 
     def _ip(request: Request) -> str:
         return request.client.host if request.client else "unknown"

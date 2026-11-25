@@ -28,6 +28,8 @@ export function Settings() {
   const [app, setApp] = useState<AppSettings | null>(null);
   const [env, setEnv] = useState<CoreEnvView | null>(null);
   const [code, setCode] = useState<{ code: string; ttl: number } | null>(null);
+  const [browserCode, setBrowserCode] = useState<{ code: string; expires_in_seconds: number } | null>(null);
+  const [browserCodeBusy, setBrowserCodeBusy] = useState(false);
   const [diag, setDiag] = useState('');
   const memorySettings = usePoll<{ memory_repo_path: string }>('/dev/memory-settings', 0);
   const update = useUpdate();
@@ -57,6 +59,20 @@ export function Settings() {
     const r = await act<{ code: string; expires_in_seconds: number }>('POST', '/pair/start');
     if (r.ok) setCode({ code: r.data.code, ttl: r.data.expires_in_seconds });
   };
+  const generateBrowserCode = async () => {
+    setBrowserCodeBusy(true);
+    try {
+      const result = await act<{ code: string; expires_in_seconds: number }>('POST', '/authority/browser-code');
+      if (result.ok) setBrowserCode(result.data);
+    } finally {
+      setBrowserCodeBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (!browserCode) return;
+    const timeout = window.setTimeout(() => setBrowserCode(null), browserCode.expires_in_seconds * 1000);
+    return () => window.clearTimeout(timeout);
+  }, [browserCode]);
   const diagnostics = async () => {
     const r = await act<unknown>('GET', '/diagnostics');
     if (r.ok) setDiag(JSON.stringify(r.data, null, 2));
@@ -88,6 +104,12 @@ export function Settings() {
         </Setting>
         <Setting title="Pair a phone" sub={code ? `Open this PC's Core address with /pair on your phone and enter ${code.code}. It works for ${Math.round(code.ttl / 60)} minutes.` : 'Get a one-time code for the phone approval page.'}>
           {code ? <span className="tag selectable" style={{ fontSize: 'var(--text-lg)', letterSpacing: '0.1em' }}>{code.code}</span> : <button className="btn" onClick={phone} disabled={!running}>Get a code</button>}
+        </Setting>
+        <Setting title="Browser sign-in" sub="Open /control/ at your Piblo address on another device. The code works once and expires after five minutes.">
+          {browserCode && <output className="tag selectable" aria-label="Browser sign-in code">{browserCode.code}</output>}
+          <button className="btn" disabled={!running || browserCodeBusy} onClick={generateBrowserCode}>
+            {browserCode ? 'New code' : 'Generate sign-in code'}
+          </button>
         </Setting>
       </section>
 

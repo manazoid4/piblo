@@ -1,23 +1,23 @@
-PIBLO v1.5.4
+PIBLO v1.5.5
 
-PIBLO v1.5.4 - WORK CONSISTENCY QUICKSTART
+PIBLO v1.5.5 - WORK CONSISTENCY QUICKSTART
 ======================================
 
 WHAT TO DOWNLOAD
 ----------------
-Laptop/client only:   MAZ-Core-v1.5.4.zip
-Cardputer only:       MAZ-Cardputer-v1.5.4.zip
-Everything together: Piblo-v1.5.4-Install.zip
+Laptop/client only:   MAZ-Core-v1.5.5.zip
+Cardputer only:       MAZ-Cardputer-v1.5.5.zip
+Everything together: Piblo-v1.5.5-Install.zip
 
 The Cardputer ZIP contains an app-only M5Launcher firmware image. M5Launcher owns installation and rollback. Do NOT flash this app .bin at address 0x0.
 
 FIRST START / WINDOWS
 ---------------------
-1. Extract Piblo-v1.5.4-Install.zip.
+1. Extract Piblo-v1.5.5-Install.zip.
 2. Double-click START-HERE.cmd.
 3. Choose whether to install/update MAZ Core when asked.
 4. If one removable microSD is connected, choose whether to copy the Cardputer .bin to it.
-5. Install Piblo-v1.5.4-M5Launcher.bin with M5Launcher.
+5. Install Piblo-v1.5.5-M5Launcher.bin with M5Launcher.
 6. Once Piblo is on Wi-Fi, open http://piblo.local.
 
 HOME

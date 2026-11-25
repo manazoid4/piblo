@@ -16,4 +16,4 @@ jobs:
       - name: Node version
         run: node --version
       - name: Static security, navigation, claims and interaction contracts
-        run: node --test site/tests/site.test.mjs site/tests/waitlist.test.mjs
+        run: node --test site/tests/site.test.mjs site/tests/waitlist.test.mjs site/tests/piblocraft.test.mjs

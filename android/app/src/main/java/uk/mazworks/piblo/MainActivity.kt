@@ -2,12 +2,14 @@ package uk.mazworks.piblo
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
@@ -27,6 +29,7 @@ import kotlinx.coroutines.launch
 import uk.mazworks.piblo.data.Prefs
 import uk.mazworks.piblo.ui.ActionsScreen
 import uk.mazworks.piblo.ui.AskScreen
+import uk.mazworks.piblo.ui.CraftScreen
 import uk.mazworks.piblo.ui.HomeScreen
 import uk.mazworks.piblo.ui.LiveViewScreen
 import uk.mazworks.piblo.ui.MemoryScreen
@@ -35,8 +38,21 @@ import uk.mazworks.piblo.ui.SettingsScreen
 
 private val tabs = listOf("Home" to "⌂", "Ask" to "?", "Actions" to "✓", "Memory" to "✉", "Settings" to "⚙")
 
-private val Light = lightColorScheme(primary = Color(0xFF0B1B3A), onPrimary = Color(0xFFFFF6E9), secondary = Color(0xFFB88700), background = Color(0xFFFFF6E9), surface = Color(0xFFFFFBF5))
-private val Dark = darkColorScheme(primary = Color(0xFFFFD23F), onPrimary = Color(0xFF0B1B3A), secondary = Color(0xFF4CE0B3), background = Color(0xFF0B1B3A), surface = Color(0xFF13264D))
+// Match the Windows palette in app/src/styles/tokens.css.
+private val Light = lightColorScheme(
+    primary = Color(0xFFB3301A), onPrimary = Color(0xFFFFF4E0),
+    secondary = Color(0xFF0D6E4F), secondaryContainer = Color(0xFFF7D7C0), onSecondaryContainer = Color(0xFF2A1A12),
+    background = Color(0xFFFBFAF7), onBackground = Color(0xFF2A1A12),
+    surface = Color(0xFFFFFAF0), onSurface = Color(0xFF2A1A12), onSurfaceVariant = Color(0xFF5B4336),
+    surfaceVariant = Color(0xFFFBE3BD), outline = Color(0xFF8C6D5A), outlineVariant = Color(0xFFEAD3AC),
+)
+private val Dark = darkColorScheme(
+    primary = Color(0xFFEE5A36), onPrimary = Color(0xFF2A1A12),
+    secondary = Color(0xFF8FDCB8), secondaryContainer = Color(0xFF54402D), onSecondaryContainer = Color(0xFFFFF4E0),
+    background = Color(0xFF2A1A12), onBackground = Color(0xFFFFF4E0),
+    surface = Color(0xFF352318), onSurface = Color(0xFFFFF4E0), onSurfaceVariant = Color(0xFFC8B8A8),
+    surfaceVariant = Color(0xFF402D20), outline = Color(0xFFAB9078), outlineVariant = Color(0xFF5A4536),
+)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -52,26 +68,38 @@ class MainActivity : ComponentActivity() {
                 }
                 var tab by rememberSaveable { mutableIntStateOf(0) }
                 var live by rememberSaveable { mutableStateOf(false) }
+                var craft by rememberSaveable { mutableStateOf(false) }
                 if (live) {
                     Surface(Modifier.fillMaxSize()) { LiveViewScreen(onClose = { live = false }) }
                     return@MaterialTheme
                 }
+                if (craft) {
+                    BackHandler { craft = false }
+                    Surface(Modifier.fillMaxSize()) {
+                        CraftScreen(onClose = { craft = false }, onConnect = { craft = false; tab = 4 })
+                    }
+                    return@MaterialTheme
+                }
                 Scaffold(
                     bottomBar = {
-                        NavigationBar {
+                        NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
                             tabs.forEachIndexed { i, (label, glyph) ->
                                 NavigationBarItem(
                                     selected = tab == i, onClick = { tab = i },
                                     icon = { Text(glyph) }, label = { Text(label, maxLines = 1) },
+                                    colors = NavigationBarItemDefaults.colors(
+                                        selectedTextColor = MaterialTheme.colorScheme.onBackground,
+                                        unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    ),
                                     modifier = Modifier.testTag("tab_$label"),
                                 )
                             }
                         }
                     },
                 ) { pad ->
-                    Surface(Modifier.padding(pad)) {
+                    Surface(Modifier.fillMaxSize().padding(pad), color = MaterialTheme.colorScheme.background) {
                         when (tab) {
-                            0 -> HomeScreen(openLive = { live = true }, onConnect = { tab = 4 })
+                            0 -> HomeScreen(openLive = { live = true }, onConnect = { tab = 4 }, openCraft = { craft = true })
                             1 -> AskScreen()
                             2 -> ActionsScreen(openLive = { live = true })
                             3 -> MemoryScreen()

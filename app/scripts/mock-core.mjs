@@ -78,7 +78,7 @@ function drawScreen() {
   return { png, rgb565 };
 }
 
-export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline = true, pairing = true } = {}) {
+export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline = true, pairing = true, craftTranscript = '' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'piblo-mock-'));
   fs.writeFileSync(path.join(dir, '.env'), `MAZ_TOKEN=${token}\nMAZ_PORT=${port}\nMAZ_DEFAULT_ROUTE=local\nMAZ_GROQ_API_KEY=x\n`);
   const now = () => Math.floor(Date.now() / 1000);
@@ -178,6 +178,8 @@ export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline
     res.end(JSON.stringify(body));
   };
 
+  let capture = false;
+  const captureId = 'craft-fixture-id-with-at-least-32-characters';
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     const p = url.pathname;
@@ -195,6 +197,16 @@ export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline
 
     if (p === '/health' && req.headers.authorization !== `Bearer ${token}`) return json(res, 200, { ok: true, name: 'Piblo Core', version: '1.0.2' });
     if (req.headers.authorization !== `Bearer ${token}`) return json(res, 401, { detail: 'authentication_required' });
+    if (craftTranscript && p === '/craft/voice/arm' && req.method === 'POST') {
+      capture = true;
+      return json(res, 200, { capture_id: captureId, expires_in: 60 });
+    }
+    if (craftTranscript && p === '/craft/voice') {
+      if (!capture || req.headers['x-craft-capture'] !== captureId) return json(res, 404, {});
+      capture = false;
+      if (req.method === 'GET') return json(res, 200, { status: 'ready', text: craftTranscript });
+      if (req.method === 'DELETE') { res.writeHead(204); return res.end(); }
+    }
     if (p === '/health') return json(res, 200, { ok: true, name: 'Piblo Core', version: '1.0.2', llm: { local: true, local_model: 'qwen3.5:4b', local_model_installed: true, local_engine: 'ollama' }, fw_latest: { version: '1.0.2' } });
 
     // Pairing (bearer): list, approve, deny.
@@ -461,7 +473,7 @@ export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline
 
     json(res, 404, { detail: 'not_found' });
   });
-  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ dir, port, token, close: () => server.close() })));
+  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ dir, port: server.address().port, token, close: () => server.close() })));
 }
 
 if (process.argv[1] && process.argv[1].endsWith('mock-core.mjs')) {
