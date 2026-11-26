@@ -9,6 +9,7 @@ namespace {
 const Descriptor TABLE[] = {
     {"home",       "Home",        nullptr,   "home menu now quick actions field",                    0,     false, makeHome},
     {"talk",       "Call Piblo",  "CALL",   "call maz voice assistant conversation playback cloud local context ask", KEY_T, true,  makeComm},
+    {"pc",         "PC controls", "PC",     "pc commands controls volume mute play pause music lock desktop media computer", 0, true, makePcControls},
     {"live",       "Live",        "LIVE",   "live hands-free voice conversation core stream", 0,     false, makeLive},
     {"capturehub", "Capture",     "CAPTURE","capture teach demo brain dump voice recorder screen workflow", KEY_B, true, makeCaptureHub},
     {"agents",     "Agents",      "AGENTS", "agents plan crew retro nudge status assurance sync",   KEY_N, true,  makeAgentsHub},

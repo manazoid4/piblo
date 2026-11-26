@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.5.10
+
+- PC controls is now its own item in More (Home > More > PC controls): desktop, play, mute, volume, lock. No more digging through Device & PC.
+- The More list footer shows "Ctrl+K search all": type any word (pc, volume, wifi, memory) to jump to a feature.
+
 ## v1.5.9
 
 - Calmer screens: Home and Call use the same state words (READY, LISTENING, THINKING, SPEAKING, NEEDS YOU, OFFLINE, UPDATE).

@@ -587,6 +587,7 @@ private:
 }  // namespace
 
 App* makeComm() { return new CommApp(); }
+App* makePcControls() { gOpenPcControls = true; return new CommApp(); }
 
 }  // namespace apps
 }  // namespace maz
