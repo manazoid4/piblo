@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.5.9
+
+- Calmer screens: Home and Call use the same state words (READY, LISTENING, THINKING, SPEAKING, NEEDS YOU, OFFLINE, UPDATE).
+- Each key hint now appears once, in the footer; the extra labels on Home are gone.
+- Top bar shows the firmware version (e.g. v1.5.9) when everything is connected, and says "CORE OFF" or "NO WIFI" when not. The vague status dot and the "WiFi" word are gone.
+- Control > PC COMMANDS now opens the PC controls directly (desktop, play, mute, volume, lock): left/right to choose, ENTER then Y to send, ESC back. Before, it opened Talk and the controls were hidden behind the C key.
+- ENTER and ESC give an instant flash and repaint; wider side margins on titles and the footer.
+
 ## v1.5.6
 
 - Cardputer keeps sending HELLO until the Piblo board answers, so a missed HELLO no longer leaves the link stuck (linked but every PING dropped).

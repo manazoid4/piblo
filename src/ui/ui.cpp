@@ -3,6 +3,7 @@
 #include <time.h>
 
 #include <nod_theme.h>
+#include <talk_home.h>
 
 #include "../core/settings.h"
 #include "../core/quiet.h"
@@ -101,13 +102,13 @@ void statusBar(M5Canvas& g) {
     // Claude Code status light (hub /buddy): bright = waiting on you, grey = working.
     if (Sys.buddy) g.fillCircle(SB_BUDDY_X, 7, 3, Sys.buddy == 2 ? TEXT : DIM);
 
-    // Hub dot: white = answering, red = Wi-Fi is up but hub is not, hollow = no Wi-Fi.
-    if (Sys.hostOnline) g.fillCircle(SB_CORE_X, 7, 3, TEXT);
-    else if (Sys.wifiConnected) g.fillCircle(SB_CORE_X, 7, 3, ERR);
-    else g.drawCircle(SB_CORE_X, 7, 3, DIM);
+    // Link in words, not a dot: the version when all is well, otherwise what is wrong.
+    const char* link = Sys.hostOnline ? "v" NOD_FW_VERSION : Sys.wifiConnected ? "CORE OFF" : "NO WIFI";
+    g.setTextDatum(top_right);
+    g.setTextColor(Sys.hostOnline ? DIM : Sys.wifiConnected ? ERR : WARN, PANEL);
+    g.drawString(link, SB_LINK_R, 4);
+    g.setTextDatum(top_left);
 
-    g.setTextColor(Sys.wifiConnected ? TEXT : DIM, PANEL);
-    g.drawString("WiFi", SB_WIFI_X, 4);
 
     // Battery sits on the right edge with its percentage just inside it.
     batteryGlyph(g, SCREEN_W - 24, 3, Sys.batteryPct < 0 ? 0 : Sys.batteryPct,
@@ -122,6 +123,10 @@ void statusBar(M5Canvas& g) {
     }
 }
 
+static uint32_t gAckMs = 0;
+static bool     gAckBack = false;
+void pressAck(bool back) { gAckMs = millis() | 1; gAckBack = back; }
+
 void hintBar(M5Canvas& g, const char* hints) {
     const int y = SCREEN_H - HINT_H;
     g.fillRect(0, y, SCREEN_W, HINT_H, PANEL);
@@ -134,7 +139,9 @@ void hintBar(M5Canvas& g, const char* hints) {
     // amber when there is somewhere to return to, hairline grey on Home when
     // there is not — a control that vanishes is a control you stop trusting.
     const bool canBack = Sys.navDepth > 1;
-    g.fillRoundRect(2, y + 1, 32, 11, 2, canBack ? TEXT : LINE);
+    const bool acked = gAckMs && millis() - gAckMs < 150;
+    if (acked && !gAckBack) g.drawFastHLine(0, y, SCREEN_W, ACCENT);
+    g.fillRoundRect(2, y + 1, 32, 11, 2, acked && gAckBack ? ACCENT : canBack ? TEXT : LINE);
     g.setTextColor(canBack ? BG : DIM, canBack ? TEXT : LINE);
     g.drawString("<ESC", 6, y + 3);
     // Two or more deep: a tick past the chip says there is still more behind
@@ -161,10 +168,10 @@ void header(M5Canvas& g, const char* title, const char* right) {
     g.setTextDatum(top_left);
     // The chip says how to go back; this chevron says there is a back at all,
     // inside the body where the eye already is.
-    const int titleX = Sys.navDepth > 1 ? PAD + 10 : PAD;
+    const int titleX = Sys.navDepth > 1 ? MARGIN + 10 : MARGIN;
     if (Sys.navDepth > 1) {
         g.setTextColor(DIM, BG);
-        g.drawString("<", PAD, BODY_Y + 2);
+        g.drawString("<", MARGIN, BODY_Y + 2);
     }
     g.setTextColor(TEXT, BG);
     g.drawString(title, titleX, BODY_Y + 2);
@@ -172,10 +179,10 @@ void header(M5Canvas& g, const char* title, const char* right) {
         g.setFont(&fonts::Font0);
         g.setTextColor(DIM, BG);
         g.setTextDatum(top_right);
-        g.drawString(right, SCREEN_W - PAD, BODY_Y + 7);
+        g.drawString(right, SCREEN_W - MARGIN, BODY_Y + 7);
         g.setTextDatum(top_left);
     }
-    g.drawFastHLine(PAD, BODY_Y + 19, SCREEN_W - PAD * 2, LINE);
+    g.drawFastHLine(MARGIN, BODY_Y + 19, SCREEN_W - MARGIN * 2, LINE);
 }
 
 // ----------------------------------------------------------------- widgets
@@ -270,10 +277,15 @@ StatusWord statusWord(Phase p) {
     using namespace theme;
     static const StatusWord W[] = {
         {"READY", TEXT},     {"LISTENING", LIVE}, {"THINKING", TEXT},  {"SPEAKING", TEXT},
-        {"NEEDS YOU", TEXT}, {"OFFLINE", DIM},    {"ERROR", ERR},      {"UPDATE READY", TEXT},
+        {"NEEDS YOU", TEXT}, {"OFFLINE", DIM},    {"ERROR", ERR},      {"UPDATE", TEXT},
         {"SAVED", OK},
     };
     return W[static_cast<int>(p)];
+}
+
+Phase phaseOf(nod::TalkState s) {
+    return s == nod::TALK_LISTENING ? Phase::Listening : s == nod::TALK_THINKING ? Phase::Thinking
+         : s == nod::TALK_SPEAKING ? Phase::Speaking : Phase::Ready;
 }
 
 void glyph(M5Canvas& g, int x, int y, int s, Phase p) {

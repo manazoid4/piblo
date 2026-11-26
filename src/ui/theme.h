@@ -68,7 +68,8 @@ constexpr uint32_t TALK_BLUE_DIM = 0x5B7A3A;
 
 // Calm UI tokens (see docs/UI-GUIDE.md). Fonts: state word Font4 scaled,
 // sub lines Font2, body and chrome Font0 (6x8 px per character).
-constexpr int   HINT_CHARS        = 33;    // fits beside the <ESC chip
+constexpr int   MARGIN            = 8;     // min edge gap on consumer screens (PAD stays 6 for dense lists)
+constexpr int   HINT_CHARS        = 31;    // fits beside the <ESC chip with an 8 px right margin
 constexpr int   TOAST_TITLE_CHARS = 31;    // Font2 inside the toast box
 constexpr int   TOAST_TEXT_CHARS  = 36;    // Font0 detail line
 constexpr float STATE_SCALE       = 1.5f;  // Font4 multiplier for state words
@@ -82,8 +83,7 @@ constexpr int   REPLY_CHARS       = 38;
 constexpr int   SB_UPD_X   = 50;   // "UPD" badge, 18 px
 constexpr int   SB_ACT_X   = 74;   // recording / focus timer, up to 57 px
 constexpr int   SB_BUDDY_X = 142;  // Claude Code light
-constexpr int   SB_CORE_X  = 152;  // Core dot
-constexpr int   SB_WIFI_X  = 160;  // "WiFi", 24 px
+constexpr int   SB_LINK_R  = 186;  // version / "CORE OFF" / "NO WIFI", right edge, up to 48 px
 constexpr int   SB_PCT_R   = 213;  // battery % right edge, up to 24 px
 
 constexpr uint32_t T_FAST  = 120;

@@ -21,6 +21,7 @@
 
 namespace maz {
 namespace apps {
+bool gOpenPcControls = false;
 
 using namespace theme;
 using ui::Phase;
@@ -64,7 +65,7 @@ public:
     const char* title() const override { return "CALL PIBLO"; }
 
     const char* hints() const override {
-        if (_controlMode) return _confirm ? "Y send to PC  N cancel" : "</> choose  ENTER send  C back";
+        if (_controlMode) return _confirm ? "Y send to PC  N cancel" : "</> choose  ENTER send  ESC back";
         if (voice::state() == voice::State::Listening)
             return field::contextArmed() ? "SPACE release to ask" : "SPACE release to send";
         if (working()) return canCancel() ? "ESC cancel" : "ESC leave, Piblo keeps going";
@@ -77,7 +78,8 @@ public:
 
     void onEnter() override {
         _scroll = 0;
-        _controlMode = false;
+        _controlMode = gOpenPcControls;  // PC COMMANDS lands straight on the controls
+        gOpenPcControls = false;
         _confirm = false;
         _discard = false;
         _sending = host_worker::busy();
@@ -240,9 +242,9 @@ public:
             drawCommWrapped(g, _reply, REPLY_Y, _scroll);
         } else if (!_err.empty()) {
             state(g, Phase::Error, _err.c_str());
-            g.setFont(&fonts::Font0);
-            g.setTextColor(ERR, BG);
-            g.drawString("ESC back", PAD, REPLY_Y);
+            g.setFont(&fonts::Font2);
+            g.setTextColor(DIM, BG);
+            g.drawString("ESC back", MARGIN, REPLY_Y);
         } else if (!_reply.empty()) {
             state(g, Phase::Ready, (std::string(routeName()) + (Cfg.ttsEnabled ? " / voice on" : " / text only")).c_str());
             drawCommWrapped(g, _reply, REPLY_Y, _scroll);
@@ -250,10 +252,10 @@ public:
             state(g, Phase::Offline, link);
         } else {
             state(g, Phase::Ready, gCommSession.empty() ? "hold SPACE to talk" : "hold SPACE: next turn");
-            g.setFont(&fonts::Font0);
+            g.setFont(&fonts::Font2);
             g.setTextDatum(top_center);
             g.setTextColor(DIM, BG);
-            g.drawString("ENTER: type a line instead", SCREEN_W / 2, REPLY_Y + 6);
+            g.drawString("ENTER: type instead", SCREEN_W / 2, REPLY_Y + 6);
             g.setTextDatum(top_left);
         }
     }

@@ -447,6 +447,10 @@ void dispatchKey(const KeyEvent& e) {
 
     if (handleGlobalKey(e)) return;
     if (gStack.empty()) return;
+    if (e.down && (e.code == KEY_ENTER || e.code == KEY_ESC)) {  // instant visual ack, repaint now
+        ui::pressAck(e.code == KEY_ESC);
+        gStack.back()->invalidate();
+    }
 
     KeyEvent ev = e;
     if (ev.down && ev.code == KEY_ESC) {
