@@ -121,6 +121,7 @@ def finish_hold(hold: Hold, flow, released: float, paste_fn, hwnd: int = 0, safe
     if result["intent"] in ("paste", "claude") and result["text"]:
         result["pc"] = (safe_fn or safe_paste)(result["text"], result["intent"] == "claude", hwnd,
                                                lambda t, enter=False: paste_fn(t, enter=enter, on_typed=lambda: typed.append(time.perf_counter())))
+        flow.after_paste(result["text"], result["pc"])
     else:
         result["pc"] = "saved"
     result["ms"]["release_to_text"] = round(((typed[0] if typed else time.perf_counter()) - released) * 1000)

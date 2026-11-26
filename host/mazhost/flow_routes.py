@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 INPUT_MODES = ("paste", "type")
 CLEANUPS = ("auto", "rules", "groq", "local")
 STT_CHOICES = ("auto", "parakeet", "whisper")
-DEFAULTS = {"input_mode": "paste", "press_enter": False, "cleanup": "auto", "stt": "auto", "spelling": "uk"}
+DEFAULTS = {"input_mode": "paste", "press_enter": False, "cleanup": "auto", "stt": "auto", "spelling": "uk", "learn": True}
 LATENCY_KEEP = 50
 TARGET_MS = 1500  # first audio byte -> text typed, CPU
 DICTIONARY_MAX = 500
@@ -88,6 +88,7 @@ def apply_settings(flow, data: dict) -> None:
     stt = data.get("stt", "auto")
     s.stt_provider = stt_default if stt == "auto" else stt
     s.flow_spelling = data.get("spelling", "uk")
+    s.flow_learn = bool(data.get("learn", True))
 
 
 def effective_cleanup(flow) -> str:
@@ -296,6 +297,13 @@ class FlowSettingsIn(BaseModel):
     cleanup: Literal["auto", "rules", "groq", "local"] | None = None
     stt: Literal["auto", "parakeet", "whisper"] | None = None
     spelling: Literal["uk", "us"] | None = None
+    learn: bool | None = None
+
+
+class ObserveIn(BaseModel):
+    pasted: str = Field(max_length=4000)
+    final: str = Field(max_length=4000)
+    app: str = Field(default="", max_length=64)
 
 
 class WordIn(BaseModel):
@@ -305,6 +313,10 @@ class WordIn(BaseModel):
 def build_flow_router(flow) -> APIRouter:
     apply_settings(flow, read_settings(flow))
     api = APIRouter(tags=["flow"])
+    if getattr(flow, "learner", None) is None:
+        from .flow_learn import Learner
+
+        flow.learner = Learner(flow.dir)
 
     def settings_view() -> dict:
         stored = read_settings(flow)
@@ -393,6 +405,20 @@ def build_flow_router(flow) -> APIRouter:
             "errors": errors,
             "effective_cleanup": effective_cleanup(flow),
         }
+
+    @api.get("/flow/learned")
+    def get_learned():
+        return {"entries": flow.learner.learned()}
+
+    @api.delete("/flow/learned/{rule_id}")
+    def undo_learned(rule_id: str):
+        if not flow.learner.undo(rule_id):
+            raise HTTPException(404, "no such learned rule")
+        return {"entries": flow.learner.learned()}
+
+    @api.post("/flow/learned/observe")
+    def observe_learned(body: ObserveIn):
+        return {"events": flow.learner.observe(body.pasted, body.final, body.app)}
 
     @api.get("/flow/target")
     def target():

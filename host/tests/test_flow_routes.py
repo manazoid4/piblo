@@ -44,7 +44,7 @@ def test_patch_settings_persists_and_applies_to_live_flow(tmp_path):
     assert body["input_mode"] == "type" and body["effective_cleanup"] == "groq"
     assert flow.s.flow_cloud is True and flow.s.flow_cleanup_llm is False
     stored = json.loads((tmp_path / "settings.json").read_text(encoding="utf-8"))
-    assert stored == {"input_mode": "type", "cleanup": "groq", "press_enter": True, "stt": "auto", "spelling": "uk"}
+    assert stored == {"input_mode": "type", "cleanup": "groq", "press_enter": True, "stt": "auto", "spelling": "uk", "learn": True}
 
     flow2 = make_flow(tmp_path, groq_api_key="k")
     api2 = make_client(flow2)

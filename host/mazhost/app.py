@@ -1085,6 +1085,7 @@ def create_app(
             result["pc"] = await run_in_threadpool(flow_safe_paste, result["text"], enter, armed, typer)
         except Exception:  # noqa: BLE001 - clipboard busy/locked: still return the text
             result["pc"] = "failed"
+        flow_service.after_paste(result["text"], result["pc"])
         return round((time.perf_counter() - t_ins) * 1000), enter
 
     async def live_dictate(words: str) -> str:
