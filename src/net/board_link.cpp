@@ -492,6 +492,14 @@ void update() {
         return;
     }
 
+    // The board only adds us as its peer after a HELLO, and its BEACONs keep gLastRx fresh,
+    // so a missed HELLO would leave us "linked" forever with every PING dropped. Keep
+    // saying HELLO until the board answers a PONG.
+    if (!gState.healthy && (int32_t)(now - gNextHello) >= 0) {
+        sendHello();
+        gNextHello = now + kHelloIntervalMs;
+    }
+
     // Periodic PING to check health
     if ((int32_t)(now - gNextPing) >= 0) {
         sendPing();

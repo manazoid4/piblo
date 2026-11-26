@@ -16,6 +16,7 @@
 #include "../core/shell.h"
 #include "../core/sys.h"
 #include "../storage/store.h"
+#include "board_link.h"
 #include "host_worker.h"
 #include "mazhost.h"
 #include "net.h"
@@ -289,6 +290,11 @@ String statusJson(bool unlocked) {
     j += ",\"host_link\":\"" + String(host::linkName()) + "\"";
     j += ",\"host_worker\":\"" + String(host_worker::stateName()) + "\"";
     j += ",\"host_worker_stack\":" + String(host_worker::stackHighWaterBytes());
+    // ESP-NOW board link, so it can be checked remotely instead of on the System screen
+    j += ",\"board_linked\":" + String(board::state().linked ? "true" : "false");
+    j += ",\"board_healthy\":" + String(board::state().healthy ? "true" : "false");
+    j += ",\"board_diag\":\"" + jsonEscape(board::diag().c_str()) + "\"";
+    j += ",\"board_mac\":\"" + String(board::macString().c_str()) + "\"";
     j += ",\"agents_working\":" + String(Sys.agentsWorking);
     j += ",\"agents_waiting\":" + String(Sys.agentsWaiting);
     j += ",\"agents_stale\":" + String(Sys.agentsStale);
