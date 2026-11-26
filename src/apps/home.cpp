@@ -47,7 +47,7 @@ public:
     const char* hints() const override {
         if (Cfg.easyMode) {
             const char* link = linkSentence(true);
-            return link ? link : "UP/DOWN choose  ENTER open";
+            return link ? link : "ENTER open  Ctrl+K search all";
         }
         return _hints.c_str();
     }

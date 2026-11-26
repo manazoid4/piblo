@@ -32,6 +32,7 @@ App*              create(const char* id);
 App* makeHome();
 App* makeLive();
 App* makeComm();
+App* makePcControls();
 App* makeCapture();
 App* makePcType();
 App* makeCaptureHub();
