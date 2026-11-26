@@ -106,26 +106,7 @@ fun HomeScreen(openLive: () -> Unit, onConnect: () -> Unit, openCraft: () -> Uni
                 OutlinedButton(openCraft, modifier = Modifier.testTag("open_craft")) { Text("PibloCraft") }
             }
         } else if (!prefs.useSimulator) {
-            Section(when {
-                !prefs.hasComputer -> "Connect your computer"
-                state.link == LinkState.CONNECTING -> "Connecting to Piblo Core"
-                state.link == LinkState.AUTH_FAILED -> "Pair your phone again"
-                else -> "Computer unreachable"
-            }) {
-                Text(when {
-                    !prefs.hasComputer -> "Pair with Piblo Core to see your device and approvals."
-                    state.link == LinkState.AUTH_FAILED -> "Piblo Core rejected the saved pairing."
-                    tailnet -> "Make sure Tailscale is connected on this phone and Piblo Core is running on your computer."
-                    else -> "Check that Piblo Core is running. Use your home Wi-Fi or your computer's Tailscale address."
-                }, style = MaterialTheme.typography.bodyMedium, color = Muted)
-                if (!prefs.hasComputer || state.link == LinkState.AUTH_FAILED) {
-                    Button(onConnect, modifier = Modifier.testTag("home_connect")) { Text("Connection settings") }
-                } else {
-                    OutlinedButton(a::reconnect, enabled = state.link != LinkState.CONNECTING) { Text("Check again") }
-                    if (tailnet) OpenTailscaleButton()
-                    TextButton(onConnect) { Text("Connection settings") }
-                }
-            }
+            ComputerOffline(onConnect)
         } else {
             OutlinedButton(openLive, modifier = Modifier.testTag("open_live")) { Text("Live View") }
         }

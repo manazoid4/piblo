@@ -31,6 +31,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import uk.mazworks.piblo.PibloApp
+import uk.mazworks.piblo.data.Prefs
+import uk.mazworks.piblo.hub.LinkState
+import uk.mazworks.piblo.proto.CoreClient
 
 val Navy = Color(0xFF0B1B3A)
 val Navy2 = Color(0xFF13264D)
@@ -57,6 +65,53 @@ fun OpenTailscaleButton() {
         }
     }) { Text("Open Tailscale") }
     if (launchFailed) Text("Open Tailscale from your phone's app list.", style = MaterialTheme.typography.bodySmall)
+}
+
+/** True when screens that read from Piblo Core can show live data (connected, or the simulator). */
+@Composable
+fun computerReachable(): Boolean {
+    val a = LocalContext.current.applicationContext as PibloApp
+    val state by a.hub.state.collectAsStateWithLifecycle()
+    val prefs by a.settings.prefs.collectAsStateWithLifecycle(initialValue = Prefs())
+    return state.link == LinkState.ONLINE || prefs.useSimulator
+}
+
+/** "Reading…" while connected; while the computer is unreachable, say so instead of spinning forever. */
+@Composable
+fun Loading(text: String = "Reading…") {
+    Text(if (computerReachable()) text else "Needs your computer. It can't be reached right now.", color = Muted, style = MaterialTheme.typography.bodySmall)
+}
+
+/** Shown at the top of every tab while Piblo Core can't be reached: why, and the one-tap fixes. Nothing when connected. */
+@Composable
+fun ComputerOffline(onConnect: () -> Unit) {
+    val a = LocalContext.current.applicationContext as PibloApp
+    val state by a.hub.state.collectAsStateWithLifecycle()
+    val prefs by a.settings.prefs.collectAsStateWithLifecycle(initialValue = Prefs())
+    if (state.link == LinkState.ONLINE || prefs.useSimulator) return
+    val tailnet = CoreClient.isTailnetAddress(prefs.coreUrl)
+    Section(when {
+        !prefs.hasComputer -> "Connect your computer"
+        state.link == LinkState.CONNECTING -> "Connecting to Piblo Core"
+        state.link == LinkState.AUTH_FAILED -> "Pair your phone again"
+        else -> "Can't reach your computer"
+    }, Modifier.testTag("computer_offline")) {
+        Text(when {
+            !prefs.hasComputer -> "Pair with Piblo Core to see your device and approvals."
+            state.link == LinkState.AUTH_FAILED -> "Piblo Core rejected the saved pairing."
+            tailnet -> "Make sure Tailscale is connected on this phone and Piblo Core is running on your computer."
+            else -> "Away from home? Turn on Tailscale on this phone and your computer, then use its Tailscale address. At home, check Piblo Core is running."
+        }, style = MaterialTheme.typography.bodyMedium, color = Muted)
+        if (!prefs.hasComputer || state.link == LinkState.AUTH_FAILED) {
+            Button(onConnect, modifier = Modifier.testTag("home_connect")) { Text("Connection settings") }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedButton(a::reconnect, enabled = state.link != LinkState.CONNECTING) { Text("Check again") }
+                OpenTailscaleButton()
+            }
+            TextButton(onConnect) { Text("Connection settings") }
+        }
+    }
 }
 
 @Composable

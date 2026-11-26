@@ -41,7 +41,7 @@ private fun app(ctx: Context) = ctx.applicationContext as PibloApp
 
 /** Memory: everything Piblo has been shown, plus your saved thoughts and library. */
 @Composable
-fun MemoryScreen() {
+fun MemoryScreen(onConnect: () -> Unit = {}) {
     val a = app(LocalContext.current)
     val scope = rememberCoroutineScope()
     var history by remember { mutableStateOf<List<HistoryItem>>(emptyList()) }
@@ -74,6 +74,7 @@ fun MemoryScreen() {
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        ComputerOffline(onConnect)
         Section("Messages") {
             if (history.isEmpty()) {
                 EmptyState("Nothing here yet", "Approvals, alerts, reminders and results from Piblo and your computer will appear here.")
