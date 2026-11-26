@@ -303,7 +303,8 @@ private:
             _hints = std::string(lead) + tail;
             return;
         }
-        _hints = std::string("ENTER open") + tail;
+        // Footer fits 31 chars: the search hint gives way to W/U when those matter.
+        _hints = *tail ? std::string("ENTER open") + tail : std::string("ENTER open  Ctrl+K search all");
     }
 
     void move(int delta) {
