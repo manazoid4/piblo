@@ -33,7 +33,7 @@ constexpr ControlItem CONTROL_ITEMS[] = {
     {"OVERVIEW",    "live state",      nullptr},
     {"WI-FI",       "scan / connect",  "network"},
     {"PC",    "PC / AI bridge",  nullptr},
-    {"PC COMMANDS", "media / lock",    "talk"},
+    {"PC COMMANDS", "vol / play / lock", "talk"},
     {"LIVE SCREEN", "piblo.local", nullptr},
     {"STORAGE",     "SD / flash",      nullptr},
     {"DIAGNOSTICS", "hardware tests",  "tools"},
@@ -69,6 +69,7 @@ public:
 
         const auto& item = CONTROL_ITEMS[_cursor.sel];
         if (item.target) {
+            gOpenPcControls = _cursor.sel == 3;  // PC COMMANDS
             sfx::confirm();
             shell::pushById(item.target);
             return true;

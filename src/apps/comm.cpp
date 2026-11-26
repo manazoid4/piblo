@@ -21,6 +21,7 @@
 
 namespace maz {
 namespace apps {
+bool gOpenPcControls = false;
 
 using namespace theme;
 using ui::Phase;
@@ -64,7 +65,7 @@ public:
     const char* title() const override { return "CALL PIBLO"; }
 
     const char* hints() const override {
-        if (_controlMode) return _confirm ? "Y send to PC  N cancel" : "</> choose  ENTER send  C back";
+        if (_controlMode) return _confirm ? "Y send to PC  N cancel" : "</> choose  ENTER send  ESC back";
         if (voice::state() == voice::State::Listening)
             return field::contextArmed() ? "SPACE release to ask" : "SPACE release to send";
         if (working()) return canCancel() ? "ESC cancel" : "ESC leave, Piblo keeps going";
@@ -77,7 +78,8 @@ public:
 
     void onEnter() override {
         _scroll = 0;
-        _controlMode = false;
+        _controlMode = gOpenPcControls;  // PC COMMANDS lands straight on the controls
+        gOpenPcControls = false;
         _confirm = false;
         _discard = false;
         _sending = host_worker::busy();

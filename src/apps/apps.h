@@ -81,6 +81,7 @@ App* makeShift();
 
 void scheduleReminder(store::Record& reminder, uint32_t delaySeconds);
 void updateProductServices();
+extern bool gOpenPcControls;  // set before pushing "talk" to open its PC controls
 
 }  // namespace apps
 }  // namespace maz
