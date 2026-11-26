@@ -83,8 +83,7 @@ constexpr int   REPLY_CHARS       = 38;
 constexpr int   SB_UPD_X   = 50;   // "UPD" badge, 18 px
 constexpr int   SB_ACT_X   = 74;   // recording / focus timer, up to 57 px
 constexpr int   SB_BUDDY_X = 142;  // Claude Code light
-constexpr int   SB_CORE_X  = 152;  // Core dot
-constexpr int   SB_WIFI_X  = 160;  // "WiFi", 24 px
+constexpr int   SB_LINK_R  = 186;  // version / "CORE OFF" / "NO WIFI", right edge, up to 48 px
 constexpr int   SB_PCT_R   = 213;  // battery % right edge, up to 24 px
 
 constexpr uint32_t T_FAST  = 120;

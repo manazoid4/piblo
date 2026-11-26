@@ -102,11 +102,12 @@ void statusBar(M5Canvas& g) {
     // Claude Code status light (hub /buddy): bright = waiting on you, grey = working.
     if (Sys.buddy) g.fillCircle(SB_BUDDY_X, 7, 3, Sys.buddy == 2 ? TEXT : DIM);
 
-    // One link dot, no jargon: white = all good, red = Wi-Fi is up but Core is not, hollow = no Wi-Fi.
-    // Home says in a plain sentence what to do; the System screen has the details.
-    if (Sys.hostOnline) g.fillCircle(SB_CORE_X, 7, 3, TEXT);
-    else if (Sys.wifiConnected) g.fillCircle(SB_CORE_X, 7, 3, ERR);
-    else g.drawCircle(SB_CORE_X, 7, 3, DIM);
+    // Link in words, not a dot: the version when all is well, otherwise what is wrong.
+    const char* link = Sys.hostOnline ? "v" NOD_FW_VERSION : Sys.wifiConnected ? "CORE OFF" : "NO WIFI";
+    g.setTextDatum(top_right);
+    g.setTextColor(Sys.hostOnline ? DIM : Sys.wifiConnected ? ERR : WARN, PANEL);
+    g.drawString(link, SB_LINK_R, 4);
+    g.setTextDatum(top_left);
 
 
     // Battery sits on the right edge with its percentage just inside it.
