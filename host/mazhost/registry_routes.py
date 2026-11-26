@@ -8,12 +8,17 @@ capability.execution.* events on the registry event bus.
 
 from __future__ import annotations
 
+import os
+import shutil
+import urllib.parse
+import webbrowser
 from typing import Any, Callable
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, Field
 
 from .buddy import AlertIn
+from .memory_notes import MemoryNotes
 from .pc import ActionResult, PCController
 from .pairing import DevicePairingStore
 from .universal_registry import Capability, UniversalCapabilityRegistry
@@ -98,6 +103,97 @@ def _ocr_handler(perception) -> Callable:
     return handler
 
 
+KNOWN_APPS: dict[str, str] = {
+    # key -> executable to look up on PATH (Windows .exe suffix is added by shutil.which).
+    "chrome": "chrome",
+    "firefox": "firefox",
+    "edge": "msedge",
+    "microsoft edge": "msedge",
+    "ie": "iexplore",
+    "notepad": "notepad",
+    "calc": "calc",
+    "calculator": "calc",
+    "paint": "mspaint",
+    "cmd": "cmd",
+    "powershell": "powershell",
+    "word": "winword",
+    "excel": "excel",
+    "powerpoint": "powerpnt",
+    "outlook": "outlook",
+    "teams": "teams",
+    "slack": "slack",
+    "discord": "discord",
+    "spotify": "spotify",
+    "obsidian": "obsidian",
+    "vscode": "code",
+    "code": "code",
+    "pycharm": "pycharm64",
+    "github desktop": "GitHubDesktop",
+}
+
+
+def _resolve_app(name: str) -> str:
+    key = name.strip().lower()
+    if key in KNOWN_APPS:
+        found = shutil.which(KNOWN_APPS[key])
+        if found:
+            return found
+    found = shutil.which(name.strip())
+    if found:
+        return found
+    raise ValueError(f"app_not_found:{name}")
+
+
+def _app_launch_handler() -> Callable:
+    def handler(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        name = str(args.get("name", "")).strip()
+        if not name:
+            raise ValueError("app_name_required")
+        if os.name != "nt":
+            raise RuntimeError("app_launch_windows_only")
+        target = _resolve_app(name)
+        os.startfile(target)  # type: ignore[attr-defined]
+        return {"app": name, "target": target, "provider": "app-local"}
+
+    return handler
+
+
+def _browser_open_handler() -> Callable:
+    def handler(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        url = str(args.get("url", "")).strip()
+        if not url:
+            raise ValueError("browser_url_required")
+        if not (url.startswith("http://") or url.startswith("https://")):
+            raise ValueError("browser_url_must_be_http_or_https")
+        webbrowser.open(url)
+        return {"url": url, "provider": "browser-local"}
+
+    return handler
+
+
+def _browser_search_handler() -> Callable:
+    def handler(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        query = str(args.get("query", "")).strip()
+        if not query:
+            raise ValueError("browser_query_required")
+        url = "https://duckduckgo.com/?q=" + urllib.parse.quote(query)
+        webbrowser.open(url)
+        return {"query": query, "url": url, "provider": "browser-local"}
+
+    return handler
+
+
+def _notes_create_handler(notes: MemoryNotes) -> Callable:
+    def handler(args: dict[str, Any], context: dict[str, Any]) -> dict:
+        text = str(args.get("text", "")).strip()
+        if not text:
+            raise ValueError("note_text_required")
+        path = notes.remember(text)
+        return {"note": text, "path": str(path), "provider": "notes-local"}
+
+    return handler
+
+
 def _device_status_handler(monitor) -> Callable:
     def handler(args: dict[str, Any], context: dict[str, Any]) -> dict:
         return monitor.status()
@@ -152,6 +248,7 @@ def install_registry_routes(
     perception=None,
     device_monitor=None,
     device_store: DevicePairingStore | None = None,
+    memory_notes: MemoryNotes | None = None,
 ) -> None:
     # Tier 0 PC controls (Windows media / desktop / lock), reusing PCController.
     for action in PC_ACTIONS:
@@ -227,6 +324,75 @@ def install_registry_routes(
                 output_schema={"type": "object"},
                 category="screen-perception",
                 handler=_ocr_handler(perception),
+            )
+        )
+
+    # Application launching.
+    registry.register(
+        Capability(
+            id="app.launch",
+            name="Launch application",
+            description="Open an installed Windows application by name.",
+            input_schema={
+                "type": "object",
+                "properties": {"name": {"type": "string"}},
+                "required": ["name"],
+            },
+            output_schema={"type": "object"},
+            category="computer-control",
+            required_permissions=["app_control"],
+            handler=_app_launch_handler(),
+        )
+    )
+
+    # Browser interactions.
+    registry.register(
+        Capability(
+            id="browser.open",
+            name="Open URL",
+            description="Open a web page in the default browser.",
+            input_schema={
+                "type": "object",
+                "properties": {"url": {"type": "string"}},
+                "required": ["url"],
+            },
+            output_schema={"type": "object"},
+            category="browser-control",
+            handler=_browser_open_handler(),
+        )
+    )
+    registry.register(
+        Capability(
+            id="browser.search",
+            name="Web search",
+            description="Search the web and open results in the default browser.",
+            input_schema={
+                "type": "object",
+                "properties": {"query": {"type": "string"}},
+                "required": ["query"],
+            },
+            output_schema={"type": "object"},
+            category="browser-control",
+            handler=_browser_search_handler(),
+        )
+    )
+
+    # Personal notes.
+    if memory_notes is not None:
+        registry.register(
+            Capability(
+                id="notes.create",
+                name="Create note",
+                description="Save a text note to memory.",
+                input_schema={
+                    "type": "object",
+                    "properties": {"text": {"type": "string"}},
+                    "required": ["text"],
+                },
+                output_schema={"type": "object"},
+                category="personal-organization",
+                required_permissions=["notes"],
+                handler=_notes_create_handler(memory_notes),
             )
         )
 
