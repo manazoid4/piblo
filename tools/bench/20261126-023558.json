@@ -1,0 +1,58 @@
+{
+  "time": "2026-11-26T02:35:23",
+  "n": 20,
+  "measured_on": "device",
+  "device_version": "1.5.6",
+  "status_roundtrip": {
+    "n": 20,
+    "median_ms": 79.1,
+    "p95_ms": 103.7
+  },
+  "screen_capture": {
+    "n": 20,
+    "median_ms": 419.8,
+    "p95_ms": 736.5
+  },
+  "key_to_screen_change": {
+    "n": 20,
+    "median_ms": 453.1,
+    "p95_ms": 2063.1
+  },
+  "router": {
+    "volume up": {
+      "deterministic_tier": "tier-0",
+      "capability": "pc.volume_up",
+      "median_ms_model_false": 0.006,
+      "llm_calls_with_model_true": 0,
+      "tier_with_model_true": "tier-0"
+    },
+    "what's next": {
+      "deterministic_tier": "unclear",
+      "capability": null,
+      "median_ms_model_false": 0.008,
+      "llm_calls_with_model_true": 1,
+      "tier_with_model_true": "unclear"
+    },
+    "open settings": {
+      "deterministic_tier": "unclear",
+      "capability": null,
+      "median_ms_model_false": 0.008,
+      "llm_calls_with_model_true": 1,
+      "tier_with_model_true": "unclear"
+    },
+    "remind me in 5 minutes to stretch": {
+      "deterministic_tier": "tier-0",
+      "capability": "reminder.create",
+      "median_ms_model_false": 0.003,
+      "llm_calls_with_model_true": 0,
+      "tier_with_model_true": "tier-0"
+    },
+    "lock the pc": {
+      "deterministic_tier": "tier-0",
+      "capability": "pc.lock",
+      "median_ms_model_false": 0.007,
+      "llm_calls_with_model_true": 0,
+      "tier_with_model_true": "tier-0"
+    }
+  }
+}
