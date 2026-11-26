@@ -100,9 +100,9 @@ class MainActivity : ComponentActivity() {
                     Surface(Modifier.fillMaxSize().padding(pad), color = MaterialTheme.colorScheme.background) {
                         when (tab) {
                             0 -> HomeScreen(openLive = { live = true }, onConnect = { tab = 4 }, openCraft = { craft = true })
-                            1 -> AskScreen()
-                            2 -> ActionsScreen(openLive = { live = true })
-                            3 -> MemoryScreen()
+                            1 -> AskScreen(onConnect = { tab = 4 })
+                            2 -> ActionsScreen(openLive = { live = true }, onConnect = { tab = 4 })
+                            3 -> MemoryScreen(onConnect = { tab = 4 })
                             else -> SettingsScreen(openLive = { live = true })
                         }
                     }

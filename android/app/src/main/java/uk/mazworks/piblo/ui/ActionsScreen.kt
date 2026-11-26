@@ -52,7 +52,7 @@ private val QUICK = listOf(
 
 /** Actions: quiet hours, approvals, needs-you, today, focus and the PC quick keys. */
 @Composable
-fun ActionsScreen(openLive: () -> Unit) {
+fun ActionsScreen(openLive: () -> Unit, onConnect: () -> Unit = {}) {
     val a = app(LocalContext.current)
     val scope = rememberCoroutineScope()
     val state by a.hub.state.collectAsStateWithLifecycle()
@@ -83,6 +83,7 @@ fun ActionsScreen(openLive: () -> Unit) {
         Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        ComputerOffline(onConnect)
         Section("Quiet") {
             if (halt?.halted == true) {
                 Text("Approvals are paused on Piblo.", fontWeight = FontWeight.SemiBold)
@@ -123,7 +124,7 @@ fun ActionsScreen(openLive: () -> Unit) {
 
         Section("Needs you") {
             val n = needs
-            if (n == null) Text("Reading…", color = Muted, style = MaterialTheme.typography.bodySmall)
+            if (n == null) Loading()
             else if (n.items.isEmpty()) EmptyState("Nothing needs you", "Pull requests, reviews and agent questions land here.")
             else n.items.forEach { item ->
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
@@ -142,7 +143,7 @@ fun ActionsScreen(openLive: () -> Unit) {
 
         Section("Today") {
             val t = today
-            if (t == null) Text("Reading…", color = Muted, style = MaterialTheme.typography.bodySmall)
+            if (t == null) Loading()
             else {
                 Labeled("Done", "${t.done}")
                 Labeled("Waiting", "${t.needs}")

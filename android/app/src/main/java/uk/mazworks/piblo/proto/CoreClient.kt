@@ -46,6 +46,32 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
     fun patch(path: String, body: String? = null): String = call("PATCH", path, body)
     fun delete(path: String): String = call("DELETE", path)
 
+    /** Stream a file (the app update) to [dest]; at most [maxBytes]. Call from Dispatchers.IO. */
+    fun download(path: String, dest: java.io.File, maxBytes: Long = 200L * 1024 * 1024) {
+        val url = URL(base + path)
+        if (url.protocol == "http" && !permitsLocalHttp(url.host)) throw IOException("HTTPS required for non-local Piblo Core")
+        val c = url.openConnection() as HttpURLConnection
+        try {
+            c.connectTimeout = 4000
+            c.readTimeout = 30_000
+            c.instanceFollowRedirects = false
+            c.setRequestProperty("X-Piblo-Client", "android/$clientVersion")
+            c.setRequestProperty("Authorization", "Bearer $token")
+            val status = c.responseCode
+            if (status !in 200..299) throw CoreHttpException(status, Proto.parseError(c.errorStream?.use { readCapped(it) } ?: ""))
+            c.inputStream.use { input ->
+                dest.outputStream().use { out ->
+                    val buf = ByteArray(64 * 1024); var total = 0L
+                    while (true) {
+                        val n = input.read(buf); if (n < 0) break
+                        total += n; if (total > maxBytes) throw IOException("update too large")
+                        out.write(buf, 0, n)
+                    }
+                }
+            }
+        } finally { c.disconnect() }
+    }
+
     /** For slow brain turns: a long read timeout, still bounded so a stuck call can never spin forever. */
     fun postSlow(path: String, body: String? = null): String = request(base, "POST", path, body, token, clientVersion, readTimeoutMs = 120_000)
 
