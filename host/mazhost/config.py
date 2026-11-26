@@ -106,6 +106,7 @@ class Settings(BaseSettings):
     # nemotron-3.5-lightning:free ~0.6 s first token; deepseek-v4.1-flash (cheap paid) ~0.7 s; gemma :free was 429ing.
     live_cloud_backups: list[str] = ["nvidia/nemotron-3.5-lightning:free", "deepseek/deepseek-v4.1-flash"]
     live_ollama_model: str = "qwen36-heretic:latest"
+    unified_memory_root: str = ""  # MAZ_UNIFIED_MEMORY_ROOT: optional existing local checkout; share capture never pushes
     live_memory_github: str = ""  # owner/repo:path; empty = off; needs github_token
     live_memory_file: str = ""  # "remember ..." notes; empty = <data_dir>/piblo-memory.md
     wakeword: bool = True  # MAZ_WAKEWORD=0: live voice listens without "Hey Piblo"; on but ungated if sherpa-onnx/model missing

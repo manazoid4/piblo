@@ -463,11 +463,12 @@ def stats(root) -> dict:
         return _stats(conn)
 
 
-def recent(root, limit: int = 10) -> list[dict]:
+def recent(root, limit: int = 10, kind: str | None = None) -> list[dict]:
     """Recent saves from the same Markdown source used by the search index."""
     root = Path(root)
     rows = []
-    for sub in _DIRS.values():
+    folders = [_DIRS[kind]] if kind in _DIRS else list(_DIRS.values())
+    for sub in folders:
         for path in (root / sub).glob("*.md"):
             try:
                 meta, body = dumps._parse(path.read_text(encoding="utf-8"))

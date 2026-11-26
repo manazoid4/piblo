@@ -12,6 +12,17 @@ interface Dump {
   source?: string;
   claimed_by?: string;
 }
+interface SavedReference {
+  id: string;
+  kind: string;
+  url?: string;
+  title?: string;
+  author?: string;
+  tags?: string[];
+  github_candidates?: string[];
+  when?: string;
+}
+
 interface Hit {
   id: string;
   kind: string;
@@ -107,10 +118,54 @@ function Inbox() {
   );
 }
 
+/** Share a Reel from Instagram to Piblo. We only claim link/caption capture, never that its video was watched. */
+function FeedVault() {
+  const act = useAct();
+  const saved = usePoll<{ items: SavedReference[] }>('/library/recent?kind=instagram&limit=20', 8000);
+  const saveRepo = async (url: string, fromUrl: string) => {
+    const result = await act('POST', '/share', {
+      url, text: `Found in a Reel shared to Piblo: ${fromUrl}`,
+    }, 'Saved GitHub reference to Piblo on this PC');
+    if (result.ok) saved.reload();
+  };
+  const rows = saved.data?.items ?? [];
+  return (
+    <section className="card stack" aria-labelledby="feed-h">
+      <div className="row">
+        <h2 id="feed-h" className="grow">Feed Vault</h2>
+        <span className="tag">{rows.length} recent</span>
+      </div>
+      <p className="sub">Share an Instagram post or Reel to Piblo from your phone. It saves the link and any text you share. Video understanding is not active.</p>
+      {saved.error && <p role="alert">{saved.error}</p>}
+      <div className="list">
+        {rows.map((item) => (
+          <div className="list-item" key={item.id}>
+            <div className="grow">
+              <div className="title selectable">{item.title || item.url || 'Saved Instagram link'}</div>
+              <div className="detail">
+                {item.tags?.includes('captions_provided') ? 'Captions supplied' : item.tags?.includes('transcript_provided') ? 'Transcript supplied' : 'Link or shared text only — not watched'}
+              </div>
+            </div>
+            <div className="row wrap">
+              {(item.github_candidates ?? []).map((repo) => (
+                <button className="btn sm" key={repo} onClick={() => void saveRepo(repo, item.url || '')}>Save GitHub repo</button>
+              ))}
+              {item.url && <button className="btn sm ghost" onClick={() => void window.piblo.openExternal(item.url!)}>Open source</button>}
+            </div>
+          </div>
+        ))}
+        {!saved.loading && !rows.length && <Empty title="Nothing shared yet"><p>In Instagram, choose Share, then Piblo. You can also save a Reel link below.</p></Empty>}
+      </div>
+    </section>
+  );
+}
+
 function Library() {
   const [q, setQ] = useState('');
   const [hits, setHits] = useState<Hit[] | null>(null);
   const [url, setUrl] = useState('');
+  const [reason, setReason] = useState('');
+  const [receipt, setReceipt] = useState('');
   const act = useAct();
 
   const search = async () => {
@@ -120,10 +175,30 @@ function Library() {
   };
   const ingest = async () => {
     if (!/^https?:\/\//i.test(url.trim())) return;
-    const r = await act('POST', '/ingest', { kind: 'url', url: url.trim() }, 'Saved to your library');
-    if (r.ok) setUrl('');
+    const r = await act<{ kind: string; unified_memory?: { state?: string } }>(
+      'POST', '/share', { url: url.trim(), text: reason.trim() || url.trim(), title: '' },
+    );
+    if (r.ok) {
+      setUrl('');
+      setReason('');
+      const state = r.data.unified_memory?.state;
+      setReceipt(state === 'local_checkout'
+        ? 'Saved in Piblo and local Unified Memory. GitHub sync is still pending.'
+        : r.data.kind === 'github'
+          ? 'Saved on this PC. Configure Unified Memory to sync GitHub references.'
+          : 'Saved in Piblo on this PC.');
+    }
   };
 
+  const syncRepos = async () => {
+    const r = await act<{ state: string; saved?: number; note_added?: number; already_saved?: number; reason?: string }>('POST', '/share/repo-sync');
+    if (!r.ok) return;
+    if (r.data.state !== 'local_checkout') {
+      setReceipt('Repos remain saved in Piblo on this PC. Set MAZ_UNIFIED_MEMORY_ROOT to your Unified Memory checkout to sync.');
+    } else {
+      setReceipt(`Local Unified Memory checkout updated: ${(r.data.saved ?? 0) + (r.data.note_added ?? 0)} additions and ${r.data.already_saved ?? 0} previously saved. No GitHub push performed.`);
+    }
+  };
   return (
     <section className="card stack" aria-labelledby="lib-h">
       <h2 id="lib-h">Library</h2>
@@ -147,9 +222,12 @@ function Library() {
         </div>
       )}
       <div className="row">
-        <input className="input" placeholder="Save a link to your library (https://...)" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void ingest()} aria-label="Link to save" />
+        <input className="input" placeholder="Paste a GitHub repo or Instagram Reel URL (https://...)" value={url} onChange={(e) => setUrl(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && void ingest()} aria-label="Link to save" />
         <button className="btn" onClick={ingest} disabled={!/^https?:\/\//i.test(url.trim())}>Save link</button>
       </div>
+      <input className="input" placeholder="Why save this? (optional)" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} aria-label="What could Piblo use this for?" />
+      {receipt && <p role="status" className="meta">{receipt}</p>}
+      <button className="btn sm ghost" onClick={() => void syncRepos()}>Sync saved GitHub links to local Unified Memory</button>
     </section>
   );
 }
@@ -159,6 +237,7 @@ export function Memory() {
     <div className="page">
       <PageHead title="Memory" sub="Everything your Piblo heard and everything you saved, in one place." />
       <Inbox />
+      <FeedVault />
       <Library />
       <FileVault />
     </div>
