@@ -1,5 +1,10 @@
 # Changelog
 
+## v1.5.6
+
+- Cardputer keeps sending HELLO until the Piblo board answers, so a missed HELLO no longer leaves the link stuck (linked but every PING dropped).
+- Core status reports board_linked, board_healthy, board_diag, board_mac.
+
 ## v1.5.5
 
 - Craft voice: an explicit Piblo mic capture can be routed to a Craft draft on the PC (Windows Craft pilot); empty captures report "No speech detected".
