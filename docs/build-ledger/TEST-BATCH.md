@@ -22,3 +22,12 @@
 ## Companion & OCR
 - [ ] Test Android companion pairing and handoff.
 - [ ] Validate OCR screen perception fallback on sample UI screenshots.
+
+## Everyday intelligence (24 Nov, PR on branch ccr-eab81452-54wunq)
+- [ ] Android: open Home > Find devices, Add this phone, then from the PC `POST /assist {"text":"find my phone"}` then `"ring it"`: phone rings on silent; Stop works.
+- [ ] Android: Start listening with AirPods (paired to the phone) nearby; Add from "Heard nearby"; Hotter/colder fills as you walk closer.
+- [ ] Android: AirPods paired to an iPhone: do Apple adverts appear as "AirPods-type (identity unverified)" with `neverForLocation`? Open Find My hand-off works.
+- [ ] Windows: freeze an app (or `python -m http.server 8000` twice) and say "sort this out": diagnosis names it; "yes" asks on the Piblo device; after approval the app ends and "checked again" is reported.
+- [ ] Windows: install an OCR engine; "sort this out" over a browser "DNS_PROBE" page shows the DNS finding.
+- [ ] Grant `browser_history` (device approval), then "carry on where I left off" reopens the last Chrome/Edge page and file.
+- [ ] Run `python scripts/benchmark_assist.py` against the real Core and record results.

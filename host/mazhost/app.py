@@ -75,7 +75,13 @@ from .pc import PCController
 from .registry_routes import install_registry_routes
 from . import screen_perception
 from .command_router import CommandRouter
-from .universal_registry import Event, global_event_bus, global_registry
+from .universal_registry import Event, PermissionPolicy, global_event_bus, global_registry
+from .assist import ApprovalGate, AssistPipeline, Metrics
+from .assist_routes import build_assist_router
+from .find_devices_routes import install_find_devices
+from .resume import Resumer, install_resume
+from .troubleshoot import install_troubleshoot
+from . import intents as assist_intents
 from .brain import maths_line, priorities_line, weather_line
 from .prompts import EXTRACT_PROMPTS, SYSTEM_PROMPT
 from .refine import FILLER, refine
@@ -548,6 +554,16 @@ def create_app(
         command = None if pocket_context else parse_command(refined.text)
         if command:
             return deterministic_command(session_id, refined.text, command, refined.actions)
+        # Everyday intents (find my device, sort this out, carry on) and yes/no
+        # follow-ups to them run through the one assist pipeline, no model.
+        assist_hit = None if pocket_context else assist_intents.match(refined.text)
+        if assist_hit and (assist_hit.get("capability") or assist_pipeline.has_pending(session_id)):
+            run = run_assist_blocking(refined.text, session_id)
+            reply = run.get("reply") or next(
+                (e["say"] for e in reversed(run.get("events", [])) if e.get("say")), "On it.")
+            sessions.add_turn(session_id, refined.text, reply)
+            return {"text": refined.text, "reply": reply, "provider": "piblo-assist",
+                    "actions": refined.actions, "assist": run, "timings": {"llm_ms": 0}}
         feature_reply = None if pocket_context else feature_commands.handle(refined.text)
         if feature_reply is not None:
             if not sessions.has(session_id):
@@ -599,6 +615,17 @@ def create_app(
             "actions": refined.actions,
             "timings": {"llm_ms": llm_ms},
         }
+
+    def run_assist_blocking(text: str, session_id: str, wait_s: float = 8.0) -> dict:
+        """Run an assist from the sync turn path; long approvals keep running in the background."""
+        async def go() -> dict:
+            started = await assist_pipeline.start(text, source="turn", session=session_id)
+            return await assist_pipeline.wait(started["id"], wait_s)
+        try:
+            import anyio.from_thread
+            return anyio.from_thread.run(go)
+        except RuntimeError:  # called outside a worker thread (direct calls in tests)
+            return asyncio.run(go())
 
     def local_turn(route: Route) -> bool:
         return private_mode.enabled() or route.startswith("local") or not any((
@@ -1392,7 +1419,8 @@ def create_app(
     api.include_router(build_needs_router(cfg, buddy))
     install_maker_routes(api, cfg, buddy)
     install_focus_routes(api, focus, buddy.sync_focus)
-    api.include_router(build_where_router(cfg, buddy, focus))
+    where_router = build_where_router(cfg, buddy, focus)
+    api.include_router(where_router)
     api.include_router(build_memory_router(memory_notes))
     api.include_router(build_ledger_router())
     install_rescue_routes(api, security.authorize, resolve_data_dir(cfg))
@@ -1449,6 +1477,29 @@ def create_app(
         device_store=device_store,
     )
 
+    # Everyday intelligence: Find My Devices, "sort this out", "carry on where
+    # I left off", all over the same registry with permissions enforced.
+    control_root = Path(cfg.control_dir).expanduser()
+    approval_gate = ApprovalGate(buddy)
+    global_registry.policy = PermissionPolicy(control_root / "permissions.json",
+                                              approval_ok=approval_gate.approval_ok)
+    install_find_devices(api, registry=global_registry, buddy=buddy, control_dir=control_root)
+
+    def explain_screen(screen_text: str) -> str:
+        reply, _provider = model_router.chat([
+            {"role": "system", "content": "You help fix computer problems. In at most 3 short sentences, "
+                                          "say what the screen text shows is wrong and the single next step. "
+                                          "If nothing is wrong, say so."},
+            {"role": "user", "content": screen_text}], "auto")
+        return reply
+
+    install_troubleshoot(global_registry, perception=screen_perception, explain=explain_screen)
+    install_resume(global_registry, resumer=Resumer(
+        tasks=lambda: buddy.store.tasks(50) if buddy.store else [],
+        where=lambda: where_router.items(),
+        browser_allowed=lambda: "browser_history" in global_registry.policy.granted(),
+        project_roots=cfg.project_root_paths))
+
     # Command router: Tier 0 deterministic + Tier 1 small-model capability
     # selection over the registered capabilities.
     command_router = CommandRouter(
@@ -1456,6 +1507,10 @@ def create_app(
         model=cfg.ollama_model,
         capabilities=global_registry.list_all(),
     )
+    assist_pipeline = AssistPipeline(global_registry, router=command_router, gate=approval_gate,
+                                     metrics=Metrics(control_root / "assist-metrics.jsonl"))
+    api.state.assist = assist_pipeline
+    api.include_router(build_assist_router(assist_pipeline, global_registry, global_registry.policy))
 
     @api.post("/command/route")
     def route_command(body: RouteBody):
