@@ -2,7 +2,7 @@
 
 Identity: calm, Apple-esque, retro-inspired, approachable, not a smartphone. Keys: dial = UP/DOWN (; .), YES = ENTER, back = ESC.
 
-## Audit (v1.5.6, 240x135)
+## Audit (v1.5.7, 240x135)
 - Home said the same thing 2-3 times: "Talk: ENTER" under Buddy plus footer "ENTER talk", "hold SPACE" on Save plus footer, "all apps" on More, "Quick: 1-3" filler line.
 - Home word ("Talk/Listening") differed from Call word ("READY/LISTENING"): two vocabularies for one state.
 - Status bar spelled "WiFi" and had a separate Core dot (jargon, two signals for one idea).

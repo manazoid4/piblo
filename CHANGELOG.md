@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.5.7
+
+- Calmer screens: Home and Call use the same state words (READY, LISTENING, THINKING, SPEAKING, NEEDS YOU, OFFLINE, UPDATE).
+- Each key hint now appears once, in the footer; the extra labels on Home are gone.
+- Top bar shows one connection dot instead of the word "WiFi" plus a second dot.
+- ENTER and ESC give an instant flash and repaint; wider side margins on titles and the footer.
+
 ## v1.5.6
 
 - Cardputer keeps sending HELLO until the Piblo board answers, so a missed HELLO no longer leaves the link stuck (linked but every PING dropped).
