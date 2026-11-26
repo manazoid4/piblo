@@ -1,10 +1,10 @@
 # Changelog
 
-## v1.5.7
+## v1.5.8
 
 - Calmer screens: Home and Call use the same state words (READY, LISTENING, THINKING, SPEAKING, NEEDS YOU, OFFLINE, UPDATE).
 - Each key hint now appears once, in the footer; the extra labels on Home are gone.
-- Top bar shows the firmware version (e.g. v1.5.7) when everything is connected, and says "CORE OFF" or "NO WIFI" when not. The vague status dot and the "WiFi" word are gone.
+- Top bar shows the firmware version (e.g. v1.5.8) when everything is connected, and says "CORE OFF" or "NO WIFI" when not. The vague status dot and the "WiFi" word are gone.
 - ENTER and ESC give an instant flash and repaint; wider side margins on titles and the footer.
 
 ## v1.5.6
