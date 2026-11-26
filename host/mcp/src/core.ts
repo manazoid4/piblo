@@ -11,6 +11,7 @@ export interface CoreConfig {
   url: string;
   token: string;
   agent: string;
+  displayUrl?: string;
 }
 
 /** Pull MAZ_TOKEN / NOD_TOKEN / PIBLO_TOKEN out of a dotenv-style file. Returns "" when absent. */
@@ -50,6 +51,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): CoreConfig {
     url: (env.PIBLO_URL || DEFAULT_URL).replace(/\/+$/, ""),
     token: resolveToken(env),
     agent: cleanAgentName(env.PIBLO_AGENT_NAME),
+    displayUrl: env.PIBLO_DISPLAY_URL,
   };
 }
 
@@ -83,7 +85,36 @@ export function urlAllowed(raw: string): boolean {
 }
 
 export class CoreClient {
-  constructor(private readonly cfg: CoreConfig) {}
+  constructor(private readonly cfg: CoreConfig, private readonly redirect: RequestRedirect = "follow") {}
+
+  async displayStatus(): Promise<{ state: string; reason?: string }> {
+    if (!this.cfg.displayUrl) return { state: "unknown", reason: "Display address not configured" };
+    let url: URL;
+    try { url = new URL(this.cfg.displayUrl); } catch { return { state: "error", reason: "Invalid display address" }; }
+    // Only literal private IPv4 addresses are allowed; never forward the Core token or follow redirects.
+    if (url.protocol !== "http:" || url.username || url.password || url.pathname !== "/" || url.search || url.hash ||
+        !/^\d+\.\d+\.\d+\.\d+$/.test(url.hostname) || !urlAllowed(url.toString())) {
+      return { state: "error", reason: "Display address must be a private IPv4 HTTP origin" };
+    }
+    try {
+      const response = await fetch(url, { redirect: "error", signal: AbortSignal.timeout(2000) });
+      if (!response.ok || !response.body) return { state: "error", reason: "Display portal returned an error" };
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let prefix = "", bytes = 0;
+      while (bytes < 16384 && !prefix.includes("Set up this Piblo board.")) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        const part = chunk.value.subarray(0, 16384 - bytes);
+        bytes += part.length;
+        prefix += decoder.decode(part, { stream: true });
+      }
+      await reader.cancel();
+      return prefix.includes("Set up this Piblo board.")
+        ? { state: "reachable_unverified", reason: "Portal responded; device identity is not authenticated" }
+        : { state: "error", reason: "Unexpected display portal response" };
+    } catch { return { state: "offline", reason: "Display portal unreachable" }; }
+  }
 
   private async call<T>(method: "GET" | "POST", path: string, body?: unknown, timeoutMs = 10_000): Promise<T> {
     if (!urlAllowed(this.cfg.url)) {
@@ -102,6 +133,7 @@ export class CoreClient {
           "X-Piblo-Client": `mcp/${VERSION}`,
         },
         body: body === undefined ? undefined : JSON.stringify(body),
+        redirect: this.redirect,
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch {

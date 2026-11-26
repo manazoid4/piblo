@@ -3,17 +3,19 @@
 // Prints a single JSON line to stdout: { text, isError }. Exit 0 on a clean call, 1 on failure.
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Client } from "@modelcontextprotocol/client";
+import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
 import { StdioClientTransport } from "@modelcontextprotocol/client/stdio";
 
 const ENTRY = join(dirname(fileURLToPath(import.meta.url)), "..", "dist", "index.js");
 const [, , url, token, tool, argsJson] = process.argv;
 
-const transport = new StdioClientTransport({
+const transport = new URL(url).pathname === "/mcp"
+  ? new StreamableHTTPClientTransport(new URL(url), { requestInit: { headers: { Authorization: `Bearer ${token}` } } })
+  : new StdioClientTransport({
   command: process.execPath,
   args: [ENTRY],
   env: { PATH: process.env.PATH ?? "", PIBLO_URL: url, PIBLO_TOKEN: token, PIBLO_AGENT_NAME: "e2e-test" },
-});
+  });
 const client = new Client({ name: "e2e-test", version: "1.0.0" });
 
 try {
