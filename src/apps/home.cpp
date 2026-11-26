@@ -215,7 +215,16 @@ private:
         if (host::updateReady()) return "Update available: press U";
         if (Sys.agentQuestion) return "Agent asked: press N";
         now = field::nowText();
-        return now != "READY" ? ui::ellipsis(now, 20) : std::string("Quick: 1-3");
+        return now != "READY" ? ui::ellipsis(now, 20) : std::string();
+    }
+
+    // Talk beats trouble beats update beats an agent question; else READY.
+    static ui::Phase homePhase(nod::TalkState st) {
+        if (st != nod::TALK_IDLE) return ui::phaseOf(st);
+        if (linkSentence(true)) return ui::Phase::Offline;
+        if (host::updateReady()) return ui::Phase::Update;
+        if (Sys.agentQuestion) return ui::Phase::NeedsYou;
+        return ui::Phase::Ready;
     }
 
     void renderTalk(M5Canvas& g) {
@@ -226,18 +235,12 @@ private:
         const nod::TalkState st = nod::talkFromSources(
             voice::state() == voice::State::Listening, voice::isPlaying(),
             host_worker::busy() && host_worker::jobKind() == host_worker::JobKind::TalkAudio);
-        static const char* const sub[] = {"ENTER", "", "", ""};
-        static const char* const word[] = {"Talk", "Listening", "Thinking", "Speaking"};
         // Piblo himself in place of the Talk circle; the word sits under him.
         if (_focus == nod::FOCUS_TALK) g.drawRoundRect(L.cx - L.r, L.cy - L.r, L.r * 2, L.r * 2, 10, nt::TEXT);
         ui::character(g, L.cx - ui::CHAR_W / 2, L.cy - ui::CHAR_H / 2 - 10, st, voice::level(), millis());
+        // The shared state word, same words and colours as Call. Hints live in the footer only.
         g.setFont(&fonts::Font2);
-        g.setTextDatum(middle_center);
-        g.setTextColor(nt::TEXT, nt::BG);
-        g.drawString(st == nod::TALK_IDLE ? "Talk: ENTER" : word[st], L.cx, L.cy + L.r - 12);
-        (void)sub;
-
-        static const char* const hint[3] = {"hold SPACE", "", "all apps"};
+        ui::stateWord(g, L.cx, L.cy + L.r - 20, homePhase(st), nullptr, true);
         g.setTextDatum(middle_left);
         for (int i = 0; i < 3; ++i) {
             const nod::Rect& b = L.btn[i];
@@ -248,13 +251,6 @@ private:
             g.setFont(&fonts::Font2);
             g.setTextColor(nt::TEXT, nt::BUTTON);
             g.drawString(nod::kTalkButton[i], b.x + 10, b.y + b.h / 2);
-            if (hint[i][0]) {
-                g.setFont(&fonts::Font0);
-                g.setTextColor(nt::DIM, nt::BUTTON);
-                g.setTextDatum(middle_right);
-                g.drawString(hint[i], b.x + b.w - 8, b.y + b.h / 2);
-                g.setTextDatum(middle_left);
-            }
         }
         g.setFont(&fonts::Font0);
         g.setTextColor(linkSentence(true) ? nt::TEXT : nt::DIM, nt::BG);
@@ -303,7 +299,8 @@ private:
         // W opens Wi-Fi from Home (registry shortcut), so say so when Wi-Fi is down.
         const char* tail = (linkSentence(true) && !Sys.wifiConnected) ? "  W wifi" : host::updateReady() ? "  U update" : "";
         if (!_grid) {
-            _hints = std::string(_focus == nod::FOCUS_TALK ? "ENTER talk  hold SPACE save" : "ENTER open") + tail;
+            const char* lead = _focus == nod::FOCUS_TALK ? "ENTER talk" : _focus == nod::FOCUS_SAVE ? "ENTER save" : "ENTER open";
+            _hints = std::string(lead) + tail;
             return;
         }
         _hints = std::string("ENTER open") + tail;

@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+#include <talk_home.h>
+
 #include "theme.h"
 
 namespace maz {
@@ -39,6 +41,10 @@ void wordmark(M5Canvas& g, int cx, int y, uint16_t colour);
 // One word set and one colour per state, shared by Home and Call.
 enum class Phase : uint8_t { Ready, Listening, Thinking, Speaking, NeedsYou, Offline, Error, Update, Saved };
 struct StatusWord { const char* text; uint16_t colour; };
+// Instant press feedback: ENTER lights the footer rule, ESC lights the <ESC chip for ~150 ms.
+void pressAck(bool back);
+// Talk state -> the shared state word (Home and Call use the same words and colours).
+Phase phaseOf(nod::TalkState s);
 StatusWord statusWord(Phase p);
 // Small face drawn from primitives: s px square at (x, y). Thinking and
 // NeedsYou animate with a 2-frame loop driven by millis().

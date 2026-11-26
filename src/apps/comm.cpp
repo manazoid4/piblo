@@ -240,9 +240,9 @@ public:
             drawCommWrapped(g, _reply, REPLY_Y, _scroll);
         } else if (!_err.empty()) {
             state(g, Phase::Error, _err.c_str());
-            g.setFont(&fonts::Font0);
-            g.setTextColor(ERR, BG);
-            g.drawString("ESC back", PAD, REPLY_Y);
+            g.setFont(&fonts::Font2);
+            g.setTextColor(DIM, BG);
+            g.drawString("ESC back", MARGIN, REPLY_Y);
         } else if (!_reply.empty()) {
             state(g, Phase::Ready, (std::string(routeName()) + (Cfg.ttsEnabled ? " / voice on" : " / text only")).c_str());
             drawCommWrapped(g, _reply, REPLY_Y, _scroll);
@@ -250,10 +250,10 @@ public:
             state(g, Phase::Offline, link);
         } else {
             state(g, Phase::Ready, gCommSession.empty() ? "hold SPACE to talk" : "hold SPACE: next turn");
-            g.setFont(&fonts::Font0);
+            g.setFont(&fonts::Font2);
             g.setTextDatum(top_center);
             g.setTextColor(DIM, BG);
-            g.drawString("ENTER: type a line instead", SCREEN_W / 2, REPLY_Y + 6);
+            g.drawString("ENTER: type instead", SCREEN_W / 2, REPLY_Y + 6);
             g.setTextDatum(top_left);
         }
     }

@@ -68,7 +68,8 @@ constexpr uint32_t TALK_BLUE_DIM = 0x5B7A3A;
 
 // Calm UI tokens (see docs/UI-GUIDE.md). Fonts: state word Font4 scaled,
 // sub lines Font2, body and chrome Font0 (6x8 px per character).
-constexpr int   HINT_CHARS        = 33;    // fits beside the <ESC chip
+constexpr int   MARGIN            = 8;     // min edge gap on consumer screens (PAD stays 6 for dense lists)
+constexpr int   HINT_CHARS        = 31;    // fits beside the <ESC chip with an 8 px right margin
 constexpr int   TOAST_TITLE_CHARS = 31;    // Font2 inside the toast box
 constexpr int   TOAST_TEXT_CHARS  = 36;    // Font0 detail line
 constexpr float STATE_SCALE       = 1.5f;  // Font4 multiplier for state words
