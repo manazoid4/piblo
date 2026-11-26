@@ -72,8 +72,27 @@ const shot = (page, name) => page.screenshot({ path: path.join(out, name + '.png
     }
   }
 
-  // Piblo Dev tabs + Command Palette at 1280x800
-  await page.keyboard.press('Control+7');
+  // Usage, Show me once and Craft: click by label so new sections can't shift the order.
+  for (const [label, heading, file] of [
+    ['Usage', 'Usage', '19-usage'],
+    ['Show me once', 'Show me once', '20-show-me-once'],
+    ['Craft', 'Craft', '21-craft'],
+  ]) {
+    const link = page.locator('nav.rail button', { hasText: label });
+    if (!(await link.count())) { console.log(`skip ${label}: not in this build`); continue; }
+    await link.first().click();
+    await page.waitForSelector(`h1:has-text("${heading}")`, { timeout: 15_000 });
+    await page.waitForTimeout(900);
+    await shot(page, `${file}-1280`);
+    await size(app, page, 900, 700);
+    await page.waitForTimeout(600);
+    await shot(page, `${file}-900`);
+    await size(app, page, 1280, 800);
+  }
+
+  // Piblo Dev only exists in dev builds (import.meta.env.DEV).
+  if (await page.locator('nav.rail button', { hasText: 'Piblo Dev' }).count()) {
+  await page.locator('nav.rail button', { hasText: 'Piblo Dev' }).click();
   await page.waitForSelector('h1:has-text("Piblo Dev")');
   await page.waitForTimeout(800);
   await shot(page, '10-piblo-dev-today-1280');
@@ -106,6 +125,7 @@ const shot = (page, name) => page.screenshot({ path: path.join(out, name + '.png
   await page.getByRole('button', { name: 'Request approval' }).waitFor();
   const launched = await fetch(`http://localhost:${m.port}/mock/agent-runs`, { headers: { Authorization: `Bearer ${m.token}` } }).then((r) => r.json());
   if (launched.count !== 1 || launched.run?.prompt !== runs.request.task || launched.run?.project !== 'example' || launched.run?.provider !== 'codex') throw new Error('Approved agent task did not match the request');
+  }
 
   await page.keyboard.press('Control+k');
   await page.waitForSelector('[role="dialog"][aria-label="Jump anywhere"]');

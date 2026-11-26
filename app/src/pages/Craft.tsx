@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { CraftTask } from './CraftTask';
+import { PageHead } from '../components/ui';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
@@ -91,14 +92,21 @@ export function Craft() {
     }
   }
 
-  return <section>
-    <h1>Craft</h1>
-    <CraftTask />
-    <h2>Terminal</h2>
-    {opened
-      ? <button className="btn" disabled={id === undefined} onClick={() => void close()}>Close terminal</button>
-      : <button className="btn" onClick={() => { setStatus(''); setOpened(true); }}>Open terminal</button>}
-    {status && <p role="status">{status}</p>}
-    {opened && <div ref={host} aria-label="PowerShell terminal" style={{ height: 'clamp(260px, 60vh, 720px)', marginTop: '1rem', background: '#1d1b19', padding: 8 }} />}
-  </section>;
+  return <>
+    <PageHead title="Craft" sub="Draft a task, dictate it from Piblo, and run it in a real terminal." />
+    <div className="stack">
+      <CraftTask />
+      <section className="card stack" aria-labelledby="craft-terminal">
+        <div className="row">
+          <h2 id="craft-terminal" className="grow">Terminal</h2>
+          {opened
+            ? <button className="btn sm" disabled={id === undefined} onClick={() => void close()}>Close terminal</button>
+            : <button className="btn sm primary" onClick={() => { setStatus(''); setOpened(true); }}>Open terminal</button>}
+        </div>
+        {!opened && <p className="sub">PowerShell on this PC. It resizes with the window.</p>}
+        {status && <p role="status" className="meta">{status}</p>}
+        {opened && <div ref={host} aria-label="PowerShell terminal" style={{ height: 'clamp(260px, 60vh, 720px)', background: '#1d1b19', padding: 8, borderRadius: 'var(--r-sm)' }} />}
+      </section>
+    </div>
+  </>;
 }
