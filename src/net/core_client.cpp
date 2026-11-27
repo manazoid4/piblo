@@ -1,6 +1,9 @@
 #include "../audio/live.h"
 #include "mazhost.h"
 
+#include <atomic>
+#include <cstring>
+
 #include <ArduinoJson.h>
 #include <HTTPClient.h>
 #include "remote_tls.h"
@@ -60,6 +63,23 @@ CoreJob decodeJob(const String& body, int status) {
     if (doc["ok"].is<bool>()) out.ok = doc["ok"].as<bool>();
     else out.ok = out.state == "queued" || out.state == "running";
     return out;
+}
+
+bool safeId(const std::string& id) {  // goes into a URL path
+    if (id.empty() || id.size() > 48) return false;
+    for (char c : id)
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_')) return false;
+    return true;
+}
+
+// Reveal handoff (worker thread writes, UI thread takes). `gRevealReady` is the release flag.
+AuthReveal        gReveal;
+uint32_t          gRevealAt = 0;
+std::atomic<bool> gRevealReady{false};
+
+void secureZero(void* p, size_t n) {
+    volatile uint8_t* v = static_cast<volatile uint8_t*>(p);
+    while (n--) *v++ = 0;
 }
 
 }  // namespace
@@ -155,14 +175,112 @@ bool buddyDecide(const std::string& id, const std::string& decision, std::string
     String payload;
     serializeJson(req, payload);
     const int status = http.POST(payload);
-    const String body = status > 0 ? http.getString() : String();
+    String body = status > 0 ? http.getString() : String();
     http.end();
     if (status == 404) { applied = "gone"; return true; }  // expired or cancelled at the terminal
     if (alert) { applied = decision; return status == 200; }
     JsonDocument doc;
-    if (status != 200 || deserializeJson(doc, body)) return false;
+    if (status == 409) {  // Piblo Key required: nothing was decided, the approval stays open
+        if (!deserializeJson(doc, body) && std::string(doc["error"] | "") == "key_tap_required") {
+            applied = "key_tap_required";
+            return true;
+        }
+        return false;
+    }
+    const bool parsed = status == 200 && !deserializeJson(doc, body);
+    if (parsed && doc["reveal"]["code"].is<const char*>()) {
+        // auth.show allowed: the code exists only in this response. Keep it in RAM, short-lived.
+        const char* c = doc["reveal"]["code"];
+        secureZero(&gReveal, sizeof(gReveal));
+        if (c && strlen(c) < sizeof(gReveal.code)) {
+            strncpy(gReveal.code, c, sizeof(gReveal.code) - 1);
+            gReveal.remaining = doc["reveal"]["remaining"] | 0;
+            gReveal.period = doc["reveal"]["period"] | 30;
+            gRevealAt = millis();
+            gRevealReady.store(gReveal.remaining > 0, std::memory_order_release);
+        }
+    }
+    if (body.length()) secureZero(const_cast<char*>(body.c_str()), body.length());  // best effort: the buffer held the code
+    if (!parsed) return false;
     applied = doc["decision"] | "";
     return true;
+}
+
+bool takeAuthReveal(AuthReveal& out) {
+    if (!gRevealReady.exchange(false, std::memory_order_acq_rel)) return false;
+    out = gReveal;
+    // Core's clock started when it answered; count only what is left of it.
+    const int used = static_cast<int>((millis() - gRevealAt) / 1000);
+    out.remaining -= used;
+    secureZero(&gReveal, sizeof(gReveal));
+    return out.remaining > 0;
+}
+
+void wipeAuthReveal() {
+    gRevealReady.store(false, std::memory_order_release);
+    secureZero(&gReveal, sizeof(gReveal));
+}
+
+AuthCodes authCodes() {
+    AuthCodes out;
+    NodHttp http;
+    if (!coreBegin(http, "/auth/codes", true, true)) { out.error = "offline"; return out; }
+    const int status = http.GET();
+    const String body = status > 0 ? http.getString() : String();
+    http.end();
+    out.status = status;
+    JsonDocument doc;
+    if (status != 200 || deserializeJson(doc, body)) { out.error = status == 404 ? "old_core" : "unreachable"; return out; }
+    for (JsonObject a : doc["accounts"].as<JsonArray>()) {
+        if (static_cast<int>(out.accounts.size()) >= AUTH_MAX_ACCOUNTS) break;
+        AuthAccount acc;
+        acc.id = a["id"] | "";
+        acc.issuer = a["issuer"] | "";
+        acc.label = a["label"] | "";
+        if (!safeId(acc.id)) continue;
+        if (acc.issuer.size() > 32) acc.issuer.resize(32);
+        if (acc.label.size() > 40) acc.label.resize(40);
+        out.accounts.push_back(std::move(acc));
+    }
+    out.ok = true;
+    return out;
+}
+
+AuthSuggestion authSuggest() {
+    AuthSuggestion out;
+    NodHttp http;
+    if (!coreBegin(http, "/auth/codes/suggest", true, true)) return out;
+    const int status = http.GET();
+    const String body = status > 0 ? http.getString() : String();
+    http.end();
+    out.status = status;
+    JsonDocument doc;
+    if (status != 200 || deserializeJson(doc, body)) return out;
+    out.ok = true;
+    JsonObject s = doc["suggestion"];
+    if (!s.isNull()) {
+        out.id = s["id"] | "";
+        out.issuer = s["issuer"] | "";
+        if (!safeId(out.id)) out.id.clear();
+        if (out.issuer.size() > 32) out.issuer.resize(32);
+    }
+    return out;
+}
+
+bool authCodeAction(const std::string& id, const char* action, std::string& error) {
+    error.clear();
+    if (!safeId(id) || !action || (strcmp(action, "fill") && strcmp(action, "show"))) { error = "bad_request"; return false; }
+    NodHttp http;
+    if (!coreBegin(http, "/auth/codes/" + id + "/" + action, true, true)) { error = "offline"; return false; }
+    http.addHeader("Content-Type", "application/json");
+    const int status = http.POST("{}");
+    const String body = status > 0 ? http.getString() : String();
+    http.end();
+    if (status == 200) return true;
+    JsonDocument doc;
+    if (status > 0 && !deserializeJson(doc, body)) error = doc["error"] | "failed";
+    else error = status > 0 ? "failed" : "unreachable";
+    return false;
 }
 
 CoreStatus coreStatus() {

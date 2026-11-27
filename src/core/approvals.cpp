@@ -13,6 +13,7 @@
 #include "../net/host_worker.h"
 #include "../net/mazhost.h"
 #include "../ui/theme.h"
+#include "../ui/ui.h"
 #include "sys.h"
 
 namespace maz {
@@ -108,6 +109,7 @@ std::string clip(const std::string& s, size_t from, size_t n, bool more) {
 }  // namespace
 
 bool active() { return gPhase != Phase::Idle; }
+void pollSoon() { gNextPoll = 0; }
 bool holding() { return gHoldKey != 0; }
 
 bool update(bool screenOff) {
@@ -122,7 +124,12 @@ bool update(bool screenOff) {
         } else if (host_worker::jobKind() == host_worker::JobKind::BuddyDecide) {
             host_worker::BuddyDecideResult r;
             if (host_worker::takeBuddyDecideResult(r) && r.id.rfind("al-", 0) != 0) {  // "al-": generic alert answer, see alerts.cpp
-                if (r.ok) {
+                if (r.ok && r.applied == "key_tap_required") {
+                    // Core wants a Piblo Key tap first. Nothing was decided: keep the request open so
+                    // YES works again after the tap.
+                    toast("Tap your Piblo Key on your phone", WARN, 2600);
+                    gNextPoll = now + 400;
+                } else if (r.ok) {
                     markDone(r.id); drop(r.id);
                     if (r.applied == "allow" || r.applied == "allow_all") { toast("Approved", OK); sfx::confirm(); }
                     else if (r.applied == "deny") toast("Denied", ERR);
@@ -209,10 +216,17 @@ void render(M5Canvas& g) {
     g.setTextDatum(top_left);
 
     if (gPhase == Phase::Result) {
-        g.setFont(&fonts::Font4);
         g.setTextDatum(middle_center);
         g.setTextColor(gMsgColor, PANEL);
-        g.drawString(gMsg.c_str(), SCREEN_W / 2, y + h / 2);
+        if (gMsg.size() > 14) {  // long messages: smaller font, wrapped
+            g.setFont(&fonts::Font2);
+            const std::vector<std::string> lines = ui::wrap(gMsg, 24);
+            const int n = static_cast<int>(std::min<size_t>(lines.size(), 3));
+            for (int i = 0; i < n; ++i) g.drawString(lines[i].c_str(), SCREEN_W / 2, y + h / 2 + (i - (n - 1) / 2.0f) * 20);
+        } else {
+            g.setFont(&fonts::Font4);
+            g.drawString(gMsg.c_str(), SCREEN_W / 2, y + h / 2);
+        }
         g.setTextDatum(top_left);
         return;
     }
@@ -224,7 +238,8 @@ void render(M5Canvas& g) {
     // Detailed approvals carry amount/recipient lines; without them (older Core, plain agent
     // asks) every line below renders exactly as before. Accept both Core heads (see header).
     const bool details = approvalHasDetails(r.summary);
-    const std::string head = details ? nodLine(r.summary, 0) : "CLAUDE CODE NEEDS YOU";
+    const bool authReq = r.tool.rfind("auth.", 0) == 0;  // Piblo Codes: say so, not "Claude Code"
+    const std::string head = details ? nodLine(r.summary, 0) : authReq ? "PIBLO CODES" : "CLAUDE CODE NEEDS YOU";
     g.setFont(&fonts::Font0);
     g.setTextColor(ACCENT, PANEL);
     g.drawString(head.c_str(), x + 6, y + 5);
@@ -238,7 +253,7 @@ void render(M5Canvas& g) {
     }
     g.setFont(&fonts::Font2);
     g.setTextColor(TEXT, PANEL);
-    g.drawString(clip(r.tool, 0, 14, false).c_str(), x + 6, y + 17);
+    g.drawString(clip(authReq ? std::string(r.tool == "auth.show" ? "Show code" : "Type code") : r.tool, 0, 14, false).c_str(), x + 6, y + 17);
     if (!r.project.empty()) {
         g.setFont(&fonts::Font0);
         g.setTextDatum(top_right);

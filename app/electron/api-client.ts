@@ -1,5 +1,6 @@
 // Main-process HTTP client for Core. The token never reaches the renderer.
 import type { ApiErrorCode, ApiResult } from '../shared/types';
+import { AUTH_PATHS, type AuthPrefs, type CodeAccount, type CodesList, type ImportResult, type PibloKey } from '../shared/auth';
 
 export interface ApiClientDeps {
   baseUrl(): string;
@@ -16,6 +17,11 @@ const FRIENDLY: Record<string, string> = {
   approval_expired: 'That approval has already expired.',
   no_fish_key: 'No Fish Audio key is set, so voice search is unavailable.',
   too_many_auth_failures: 'Too many failed attempts. Wait a minute and try again.',
+  invalid_uri: 'That is not a valid authenticator link.',
+  unsupported_type: 'Only time-based codes (TOTP) are supported.',
+  invalid_secret: 'That link has a secret Piblo cannot read.',
+  not_confirmed: 'Please confirm first.',
+  fill_unavailable: 'Piblo can only type codes on Windows, into the window you are using.',
 };
 
 export interface CoreHealth {
@@ -79,7 +85,9 @@ export function createApiClient(deps: ApiClientDeps) {
     }
     let detail: unknown;
     try {
-      detail = ((await res.json()) as { detail?: unknown }).detail;
+      const j = (await res.json()) as { detail?: unknown; error?: unknown; message?: unknown };
+      // FastAPI wraps errors as {detail}; the /auth routes answer {error, message} directly.
+      detail = j.detail ?? (j.error || j.message ? j : undefined);
     } catch {
       detail = undefined;
     }
@@ -88,7 +96,20 @@ export function createApiClient(deps: ApiClientDeps) {
     return { ok: false, status: res.status, code, message: friendly(detail, `Core answered HTTP ${res.status}.`) };
   }
 
+  const auth = {
+    codes: () => run<CodesList>('GET', AUTH_PATHS.codes, undefined, false),
+    importCode: (uri: string) => run<ImportResult>('POST', AUTH_PATHS.importCode, { uri: uri.trim() }, false),
+    updateCode: (id: string, patch: { issuer?: string; label?: string; match?: string[] }) => run<{ ok: boolean; account?: CodeAccount }>('PATCH', AUTH_PATHS.code(id), patch, false),
+    deleteCode: (id: string) => run<{ ok: boolean }>('DELETE', AUTH_PATHS.code(id), { confirm: true }, false),
+    prefs: () => run<AuthPrefs & { ok?: boolean }>('GET', AUTH_PATHS.prefs, undefined, false),
+    setPrefs: (prefs: AuthPrefs) => run<AuthPrefs & { ok?: boolean }>('PUT', AUTH_PATHS.prefs, prefs, false),
+    keys: () => run<{ ok: boolean; keys: PibloKey[] }>('GET', AUTH_PATHS.keys, undefined, false),
+    enrollKey: (code: string) => run<{ ok: boolean; key: PibloKey }>('POST', AUTH_PATHS.enroll, { code: code.trim() }, false),
+    removeKey: (id: string) => run<{ ok: boolean }>('DELETE', AUTH_PATHS.key(id), { confirm: true }, false),
+  };
+
   return {
+    auth,
     request: <T = unknown>(method: string, path: string, body?: unknown) => run<T>(method, path, body, false),
     bytes: (path: string, method = 'GET', body?: unknown) => run<Uint8Array>(method, path, body, true),
     /** Unauthenticated probe: is Piblo's background service listening here? */

@@ -18,6 +18,7 @@ from datetime import date
 from typing import Callable, Literal
 
 from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
 from .buddy_store import BuddyStore
@@ -107,6 +108,7 @@ class BuddyRequest(NodFields):
     sensitive: bool = False
     urgent: bool = False
     undo: str = Field(default="", max_length=200)
+    require_key: bool = False   # allow only after a fresh Piblo Key tap (docs/protocol/AUTH.md)
 
 
 class BuddyDecision(BaseModel):
@@ -181,6 +183,10 @@ class Buddy:
         self.focus = focus
         self.device_keys = device_keys if device_keys is not None else {}
         self.on_ack = on_ack
+        # Piblo Keys (default off): tool -> hook(item) -> extra fields for the decide response that allowed it,
+        # and the check that a fresh Piblo Key tap exists for approvals created with require_key.
+        self.allow_hooks: dict[str, Callable[[dict], dict | None]] = {}
+        self.key_proof_check: Callable[[dict], bool] | None = None
         self._today = today or _local_today
         self._idem: dict[str, str] = {}     # idempotency key -> approval id (this process)
         self._clients: dict[str, dict] = {}
@@ -482,13 +488,14 @@ class Buddy:
     def request(self, tool: str, summary: str, session_id: str = "", project: str = "",
                 amount: str = "", recipient: str = "", category: str = "", nod: bool = False,
                 agent: str = "", idem: str = "", sensitive: bool = False, urgent: bool = False,
-                undo: str = "") -> dict:
+                undo: str = "", require_key: bool = False) -> dict:
         with self._cv:
             digest = self._digest({"tool": tool, "summary": summary, "agent": agent or project,
                                    "amount": amount, "recipient": recipient,
                                    "category": (category or OTHER) if amount or recipient or category or nod else "",
                                    "nod": nod, "sensitive": sensitive, "urgent": urgent, "undo": undo,
-                                   "session_id": session_id, "project": project})
+                                   "session_id": session_id, "project": project,
+                                   "require_key": require_key})
             if idem:
                 known = self._idem.get(idem)
                 if known in self._items:
@@ -514,6 +521,8 @@ class Buddy:
             if amount or recipient or category or nod:
                 self._items[rid].update(amount=amount, recipient=recipient,
                                         category=category or OTHER, nod=nod)
+            if require_key:
+                self._items[rid]["require_key"] = True
             item = self._items[rid]
             fields = [f"From: {item['agent'] or 'Helper'}"]
             if recipient:
@@ -546,6 +555,8 @@ class Buddy:
         fields = {k: item.get(k, "") for k in ("agent", "tool", "summary", "amount", "recipient", "category",
                                                 "session_id", "project", "undo")}
         fields.update({k: bool(item.get(k, False)) for k in ("nod", "sensitive", "urgent")})
+        if item.get("require_key"):   # only when set, so every existing digest is unchanged
+            fields["require_key"] = True
         return hashlib.sha256(json.dumps(fields, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode()).hexdigest()
 
     def _focus_locked(self) -> None:
@@ -611,6 +622,7 @@ class Buddy:
                       "summary": _nod_summary(i) if "category" in i and i["category"] != "message" else i["summary"],
                       "project": i.get("project", ""), "agent": i.get("agent", ""),
                       "sensitive": bool(i.get("sensitive")), "session_id": i["session_id"],
+                      **({"require_key": True} if i.get("require_key") else {}),
                       "left": max(0, int(i["deadline"] - monotonic_now)),
                       **{k: i[k] for k in ("amount", "recipient", "category", "nod", "digest", "nonce", "card") if k in i}}
                      for i in live[:limit]]
@@ -656,6 +668,9 @@ class Buddy:
                 item["instruction"] = instruction.strip()
             if decision == "allow" and "held_since" in item:
                 raise PermissionError("held_for_focus")
+            if decision == "allow" and item.get("require_key") and not self._halted_locked() \
+                    and not (self.key_proof_check and self.key_proof_check(item)):
+                raise RuntimeError("key_tap_required")
             if decision == "allow" and not self._halted_locked():
                 key = self.device_keys.get(device_id) or _ask_env("DEVICE_KEY")
                 message = f"{rid}:{item['digest']}:{decision}:{item['nonce']}".encode()
@@ -675,7 +690,14 @@ class Buddy:
                 self._roll()
                 self._bump("approved" if decision == "allow" else "denied")
             self._cv.notify_all()
-            return dict(item)
+            out = dict(item)
+            hook = self.allow_hooks.get(item["tool"]) if item["decision"] == "allow" else None
+            if hook:
+                try:
+                    out.update(hook(item) or {})   # e.g. a one-off `reveal`; never stored on the record
+                except Exception as error:
+                    log.error("allow hook failed: %s", type(error).__name__)
+            return out
 
     def nods(self, limit: int = 20) -> dict:
         """Nod log: recent approval outcomes, newest first, from the in-memory queue (last MAX_ITEMS)."""
@@ -770,7 +792,7 @@ def install_buddy_routes(api: FastAPI, buddy: Buddy | None = None) -> Buddy:
         return buddy.request(body.tool, body.summary, body.session_id, body.project,
                              body.amount, body.recipient, body.category, body.nod,
                              agent=body.agent, idem=body.idempotency_key, sensitive=body.sensitive,
-                             urgent=body.urgent, undo=body.undo)
+                             urgent=body.urgent, undo=body.undo, require_key=body.require_key)
 
     @api.get("/buddy/nods")
     def buddy_nods(limit: int = 20):
@@ -801,6 +823,9 @@ def install_buddy_routes(api: FastAPI, buddy: Buddy | None = None) -> Buddy:
         except PermissionError as error:
             raise HTTPException(403, str(error))
         except RuntimeError as error:
+            if str(error) == "key_tap_required":
+                return JSONResponse({"error": "key_tap_required", "detail": "key_tap_required",
+                                     "message": "Tap your Piblo Key on your phone."}, status_code=409)
             raise HTTPException(409, str(error))
         except ValueError as error:
             raise HTTPException(400, str(error))

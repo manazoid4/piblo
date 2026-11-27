@@ -8,7 +8,7 @@ namespace maz {
 namespace ui {
 
 // micLevel 0..1 (voice::level()). `label`/`sub` are drawn inside when r >= 30.
-void talkOrb(M5Canvas& g, int cx, int cy, int r, nod::TalkState s, float micLevel,
+void talkOrb(M5Canvas& g, int cx, int cy, int r, ::nod::TalkState s, float micLevel,
              bool focused = false, const char* label = nullptr, const char* sub = nullptr);
 
 }  // namespace ui

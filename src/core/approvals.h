@@ -16,6 +16,8 @@ namespace approvals {
 // Poll Core / submit the decision. Returns true when a NEW request just
 // arrived (the shell wakes the screen). screenOff stretches the poll interval.
 bool update(bool screenOff);
+// Ask Core for pending requests on the next tick (after raising one, e.g. a code fill).
+void pollSoon();
 // True while the overlay owns the keyboard.
 bool active();
 // Consume a key press while active; returns true when swallowed.

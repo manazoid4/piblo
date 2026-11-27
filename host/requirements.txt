@@ -8,6 +8,7 @@ httpx==0.28.1
 tzdata==2026.3
 pyserial==3.5
 psutil==7.2.2
+cryptography==46.0.3  # Piblo Keys vault (AES-GCM) and Piblo Key (AES-CMAC)
 
 # Local speech-to-text. faster-whisper is the least painful reliable option on
 # Windows: pip-installable CTranslate2 wheels, no compiler, CPU works fine.

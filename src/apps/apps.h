@@ -69,6 +69,7 @@ App* makeDecision();
 App* makeSprint();
 App* makeAgentsV3();
 App* makeReminders();
+App* makeCodes();
 
 App* makePlan();
 App* makePromptDeck();

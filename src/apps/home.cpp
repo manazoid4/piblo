@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "../audio/sfx.h"
+#include "../core/approvals.h"
 #include "../core/field.h"
 #include "../core/settings.h"
 #include "../core/shell.h"
@@ -35,8 +36,8 @@ namespace {
 struct EasyItem { const char* label; const char* target; };
 constexpr EasyItem EASY_ITEMS[] = {
     {"Notes", "notes"},       {"Reminders", "reminders"}, {"Messages", "inbox"},
-    {"Tasks", "tasks"},       {"Shortcuts", "snippets"},  {"Settings", "settings"},
-    {"Help", "help"},
+    {"Tasks", "tasks"},       {"Codes", "codes"},         {"Shortcuts", "snippets"},
+    {"Settings", "settings"}, {"Help", "help"},
 };
 constexpr int EASY_COUNT = sizeof(EASY_ITEMS) / sizeof(EASY_ITEMS[0]);
 
@@ -47,7 +48,9 @@ public:
     const char* hints() const override {
         if (Cfg.easyMode) {
             const char* link = linkSentence(true);
-            return link ? link : "ENTER open  Ctrl+K search all";
+            if (link) return link;
+            if (!_sugId.empty()) return _sugHint.c_str();
+            return "ENTER open  Ctrl+K search all";
         }
         return _hints.c_str();
     }
@@ -68,6 +71,18 @@ public:
         if (!e.down) {
             if (e.code == KEY_SPACE) _spaceArmed = false;
             return false;
+        }
+
+        // "<Issuer> code? YES": Y asks Core to type that code (the normal approval follows).
+        if (e.code == KEY_Y && !_sugId.empty() && !(e.mods & (MOD_CTRL | MOD_FN | MOD_ALT))) {
+            std::string err;
+            sfx::confirm();
+            host::authCodeAction(_sugId, "fill", err);
+            approvals::pollSoon();
+            _sugId.clear();
+            _sugNext = millis() + 6000;
+            invalidate();
+            return true;
         }
 
         // Easy Mode: one list, plain old keys. The shell's dispatch already
@@ -141,6 +156,7 @@ public:
             shell::pushById("braindump");  // keeps recording while SPACE is held
             return;
         }
+        pollSuggestion();
         rebuildHints();
         // The shell repaints every 250 ms; the Talk circle asks for ~8 fps so the
         // breathing ring and the thinking arc look smooth. Nothing else redraws.
@@ -214,6 +230,7 @@ private:
         }
         if (host::updateReady()) return "Update available: press U";
         if (Sys.agentQuestion) return "Agent asked: press N";
+        if (!_sugId.empty()) return _sugLine;
         now = field::nowText();
         return now != "READY" ? ui::ellipsis(now, 20) : std::string();
     }
@@ -295,6 +312,28 @@ private:
         if (_sel >= static_cast<int>(_primary.size())) _sel = 0;
     }
 
+    // GET /auth/codes/suggest at most every 3 s, only while Home is the top screen (update() runs
+    // for the top app only) and Core is reachable and the host worker is idle. Backs off on errors.
+    void pollSuggestion() {
+        const uint32_t now = millis();
+        if (static_cast<int32_t>(now - _sugNext) < 0) return;
+        _sugNext = now + 3000;
+        if (!Sys.wifiConnected || !Sys.hostOnline || !host::configured() || Cfg.fieldMode) { _sugId.clear(); return; }
+        if (host_worker::state() != host_worker::State::Idle || approvals::active()) return;
+        const host::AuthSuggestion s = host::authSuggest();
+        if (!s.ok) {
+            _sugId.clear();
+            _sugNext = now + (s.status == 404 ? 60000u : 10000u);  // older Core has no /auth routes
+            return;
+        }
+        if (s.id != _sugId) {
+            _sugId = s.id;
+            _sugLine = ui::ellipsis(s.issuer, 8) + " code? YES";
+            _sugHint = ui::ellipsis(s.issuer, 14) + " code? Y = YES";
+            invalidate();
+        }
+    }
+
     void rebuildHints() {
         // W opens Wi-Fi from Home (registry shortcut), so say so when Wi-Fi is down.
         const char* tail = (linkSentence(true) && !Sys.wifiConnected) ? "  W wifi" : host::updateReady() ? "  U update" : "";
@@ -328,6 +367,8 @@ private:
     ListCursor _easyCursor;
     uint32_t _lastAnim = 0;
     std::string _hints;
+    std::string _sugId, _sugLine, _sugHint;  // Piblo Codes suggestion (id empty = none)
+    uint32_t _sugNext = 0;
 };
 
 }  // namespace

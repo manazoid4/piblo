@@ -43,6 +43,7 @@ const Descriptor TABLE[] = {
     {"sprint",     "Work Sprint", nullptr, "sprint outcome timer debrief",              0, false, makeSprint},
     {"decision",   "Decision",    nullptr, "decision what why reason",                  KEY_D, false, makeDecision},
     {"notes",      "Notes",       nullptr, "notes note write text",                     0,     false, makeNotes},
+    {"codes",      "Codes",       nullptr, "2fa otp authenticator code login",          0,     false, makeCodes},
     {"tasks",      "Tasks",       nullptr, "tasks todo next",                           0,     false, makeTasks},
     {"recorder",   "Voice Recorder", nullptr, "recorder record memo audio wav",         0,     false, makeRecorder},
     {"calc",       "Calculator",  "Calc",  "calculator calc math sum",                  KEY_C, false, makeCalculator},

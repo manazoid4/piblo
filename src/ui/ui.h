@@ -44,7 +44,7 @@ struct StatusWord { const char* text; uint16_t colour; };
 // Instant press feedback: ENTER lights the footer rule, ESC lights the <ESC chip for ~150 ms.
 void pressAck(bool back);
 // Talk state -> the shared state word (Home and Call use the same words and colours).
-Phase phaseOf(nod::TalkState s);
+Phase phaseOf(::nod::TalkState s);
 StatusWord statusWord(Phase p);
 // Small face drawn from primitives: s px square at (x, y). Thinking and
 // NeedsYou animate with a 2-frame loop driven by millis().
