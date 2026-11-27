@@ -201,6 +201,16 @@ p {
   margin-top: var(--s-1);
 }
 
+@media (max-width: 560px) {
+  .shell { grid-template-columns: 52px minmax(0, 1fr); }
+  .rail { padding: var(--s-3) var(--s-1); }
+  .rail-item { justify-content: center; padding: 0; }
+  .rail-label, .rail-item kbd, .rail-badge, .rail-foot { display: none; }
+  .content { padding: var(--s-3); }
+  .card[aria-labelledby='flow-h'] .setting { flex-wrap: wrap; }
+  .card[aria-labelledby='flow-h'] .setting .grow { flex-basis: 100%; }
+}
+
 /* ---- primitives ---- */
 .card {
   background: var(--surface);

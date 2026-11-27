@@ -9,6 +9,7 @@ type FlowSettings = {
   stt: 'auto' | 'parakeet' | 'whisper';
   effective_cleanup: string;
   has_groq_key: boolean;
+  learn?: boolean;
 };
 type FlowStatus = { count: number; avg_total_ms: number; p95_total_ms: number; recent: { chars: number }[]; errors: string[] };
 
@@ -20,6 +21,39 @@ export function flowStatusLine(status: FlowStatus | null, error: string | null):
   if (!n) return 'No dictations yet.';
   const last = status.errors[status.errors.length - 1];
   return `${n} dictation${n === 1 ? '' : 's'} · average ${status.avg_total_ms} ms${last ? ` · last problem: ${last}` : ''}`;
+}
+
+export type LearnedEntry = { id: string; term: string; misheard: string; app?: string | null; needed?: number; seen: number; status: 'candidate' | 'active' | 'rejected' | 'undone' };
+/** Learned rules from Core, as a bare list or `{entries}`; only live and pending ones show. */
+export function learnedEntries(data: LearnedEntry[] | { entries?: LearnedEntry[] } | null): LearnedEntry[] {
+  const list = Array.isArray(data) ? data : data?.entries ?? [];
+  return list.filter((e) => e.status === 'active' || e.status === 'candidate');
+}
+export const needsMore = (e: LearnedEntry) => `needs ${e.needed ?? Math.max(1, 2 - e.seen)} more`;
+
+/** "Learned automatically": what Flow fixed on its own, one click to undo. */
+export function LearnedBlock({ entries, onUndo }: { entries: LearnedEntry[]; onUndo: (id: string) => void }) {
+  if (!entries.length) return null;
+  return (
+    <div style={{ paddingTop: 'var(--s-2)' }}>
+      <h3 id="learned-h">Learned automatically</h3>
+      <p className="meta">Flow fixed these for you. Undo any that are wrong.</p>
+      <ul aria-labelledby="learned-h" style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+        {entries.map((e) => (
+          <li key={e.id} className="row wrap" data-status={e.status} style={{ justifyContent: 'space-between', color: e.status === 'candidate' ? 'var(--text-3)' : undefined, overflowWrap: 'anywhere' }}>
+            <span style={{ minWidth: 0 }}>
+              {e.misheard} → <strong>{e.term}</strong>
+              <span className="meta">
+                {e.app ? ` · in ${e.app}` : ''}
+                {e.status === 'candidate' ? ` · ${needsMore(e)}` : ` · seen ${e.seen} time${e.seen === 1 ? '' : 's'}`}
+              </span>
+            </span>
+            <button className="btn" aria-label={`Undo ${e.misheard} to ${e.term}`} onClick={() => onUndo(e.id)}>Undo</button>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 const CLEANUP_SUB: Record<string, string> = {
@@ -34,7 +68,9 @@ export function FlowSection() {
   const settings = usePoll<FlowSettings>('/flow/settings', 0);
   const status = usePoll<FlowStatus>('/flow/status', 15000);
   const dictionary = usePoll<{ words: string[]; entries?: { term: string; aliases: string[] }[] }>('/flow/dictionary', 0);
+  const learned = usePoll<LearnedEntry[] | { entries?: LearnedEntry[] }>('/flow/learned', 5000);
   const [word, setWord] = useState('');
+  const [undone, setUndone] = useState<string[]>([]);
 
   const s = settings.data;
   const entries = dictionary.data?.entries ?? (dictionary.data?.words ?? []).map((w) => ({ term: w, aliases: [] }));
@@ -52,6 +88,15 @@ export function FlowSection() {
   const remove = async (w: string) => {
     const r = await act<{ words: string[] }>('DELETE', `/flow/dictionary/${encodeURIComponent(w)}`, undefined, 'Word removed');
     if (r.ok) dictionary.reload();
+  };
+
+  // An older Core answers 404 (so `error` is set): hide the block quietly.
+  const learnedRows = learned.error ? [] : learnedEntries(learned.data).filter((e) => !undone.includes(e.id));
+  const undo = async (id: string) => {
+    setUndone((u) => [...u, id]);
+    const r = await act<void>('DELETE', `/flow/learned/${encodeURIComponent(id)}`, undefined, 'Undone');
+    if (!r.ok) setUndone((u) => u.filter((x) => x !== id));
+    learned.reload();
   };
 
   return (
@@ -105,6 +150,12 @@ export function FlowSection() {
           ))}
         </div>
       )}
+      {s?.learn !== undefined && (
+        <Setting title="Learn from my corrections" sub="Flow remembers likely dictation fixes on this PC.">
+          <Switch label="Learn from my corrections" checked={s.learn} onChange={(v) => void save({ learn: v })} />
+        </Setting>
+      )}
+      <LearnedBlock entries={learnedRows} onUndo={(id) => void undo(id)} />
       <p className="meta" style={{ paddingTop: 'var(--s-2)' }}>{flowStatusLine(status.data, status.error)}</p>
     </section>
   );

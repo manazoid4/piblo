@@ -86,6 +86,7 @@ from .sessions import SessionStore
 from .skill_vault import SkillVault
 from starlette.concurrency import run_in_threadpool
 from .flow import Flow, foreground as flow_foreground, safe_paste as flow_safe_paste
+from .flow_learn import read_focused as flow_read_focused
 from .flow_routes import build_flow_router, insert_text, read_settings
 from .craft_voice import build_craft_voice_router
 from .stt import SpeechToText
@@ -1081,10 +1082,14 @@ def create_app(
             insert_text(text, enter, flow_service)
 
         typer = type_and_enter if prefs["input_mode"] == "type" else None
+        target = None
+        if prefs["learn"] and not enter and armed and flow_foreground() == armed:
+            target = await run_in_threadpool(flow_read_focused)
         try:
             result["pc"] = await run_in_threadpool(flow_safe_paste, result["text"], enter, armed, typer)
         except Exception:  # noqa: BLE001 - clipboard busy/locked: still return the text
             result["pc"] = "failed"
+        flow_service.after_paste(result["text"], result["pc"], target)
         return round((time.perf_counter() - t_ins) * 1000), enter
 
     async def live_dictate(words: str) -> str:
@@ -1152,6 +1157,7 @@ def create_app(
                 flow_service._cancel.set()
                 raise HTTPException(504, "stt_timeout")
 
+            result["learn"] = flow_service.s.flow_learn
             insert_ms, pc = 0, ""
             if target == "pc-paste" and result["intent"] in ("paste", "claude") and result["text"]:
                 insert_ms, _ = await paste_on_pc(result, armed)

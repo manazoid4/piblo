@@ -1,5 +1,41 @@
 import { describe, expect, it } from 'vitest';
-import { flowStatusLine } from '../src/components/FlowSection';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { createElement, type ReactElement } from 'react';
+import { flowStatusLine, learnedEntries, LearnedBlock, type LearnedEntry } from '../src/components/FlowSection';
+
+const mk = (o: Partial<LearnedEntry>): LearnedEntry => ({ id: 'a', term: 'Piblo', misheard: 'pibble', seen: 5, status: 'active', ...o });
+
+describe('learned automatically', () => {
+  it('reads a bare list or {entries} and drops rejected/undone', () => {
+    const list = [mk({}), mk({ id: 'b', status: 'undone' }), mk({ id: 'c', status: 'rejected' }), mk({ id: 'd', status: 'candidate' })];
+    expect(learnedEntries(list).map((e) => e.id)).toEqual(['a', 'd']);
+    expect(learnedEntries({ entries: list }).map((e) => e.id)).toEqual(['a', 'd']);
+  });
+
+  it('renders nothing when the endpoint is missing (404 gives no data)', () => {
+    expect(learnedEntries(null)).toEqual([]);
+    expect(renderToStaticMarkup(createElement(LearnedBlock, { entries: [], onUndo: () => {} }))).toBe('');
+  });
+
+  it('renders rules, app name, seen count, candidates and undo buttons', () => {
+    const entries = [mk({ app: 'Chrome' }), mk({ id: 'd', status: 'candidate', seen: 1, misheard: 'sonar', term: 'Sonarr' })];
+    const html = renderToStaticMarkup(createElement(LearnedBlock, { entries, onUndo: () => {} }));
+    expect(html).toContain('Learned automatically');
+    expect(html).toContain('pibble →');
+    expect(html).toContain('in Chrome');
+    expect(html).toContain('seen 5 times');
+    expect(html).toContain('needs 1 more');
+    expect(html.match(/>Undo</g)?.length).toBe(2);
+  });
+
+  it('undo passes the entry id', () => {
+    const calls: string[] = [];
+    const tree = LearnedBlock({ entries: [mk({})], onUndo: (id) => calls.push(id) }) as ReactElement;
+    const find = (n: any): any => (!n || typeof n !== 'object' ? null : n.props?.onClick ? n : [n.props?.children].flat(Infinity).map(find).find(Boolean));
+    find(tree).props.onClick();
+    expect(calls).toEqual(['a']);
+  });
+});
 
 describe('flowStatusLine', () => {
   it('explains an unreadable history', () => {

@@ -21,7 +21,7 @@ const check = (name, ok, detail = '') => {
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'piblo-flow-'));
 fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ closeToTray: true, startWithWindows: false, onboardingDone: true }));
 
-const m = await startMock({ port: 18792 });
+const m = await startMock({ port: 0 });
 const app = await electron.launch({
   args: [root, `--user-data-dir=${dir}`, '--disable-features=CalculateNativeWinOcclusion', '--disable-renderer-backgrounding'],
   env: { ...process.env, NOD_CORE_DIR: m.dir, NOD_CORE_PORT: String(m.port) },
@@ -119,7 +119,39 @@ const overflow = await page.evaluate(() => ({ scroll: document.documentElement.s
 check('no horizontal overflow at 900x700', overflow.scroll <= overflow.client + 1, `${overflow.scroll} <= ${overflow.client}`);
 await page.screenshot({ path: path.join(shots, 'settings-dictation-900.png') });
 
-console.log(`screenshots: ${shots}`);
+const learned = flow.getByRole('list', { name: 'Learned automatically' });
+await learned.waitFor();
+await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].setContentSize(1280, 900));
+await learned.screenshot({ path: path.join(shots, 'learned-words-mock-1280.png') });
+const undo = learned.getByRole('button', { name: /undo/i }).first();
+const undoLabel = await undo.getAttribute('aria-label');
+await undo.click();
+await learned.getByRole('button', { name: undoLabel }).waitFor({ state: 'detached' });
+check('Undo removes a learned rule', (await learned.getByRole('button', { name: undoLabel }).count()) === 0);
+await page.reload();
+await page.waitForSelector('h1:has-text("Home")', { timeout: 30_000 });
+await page.keyboard.press('Control+6');
+await learned.waitFor();
+check('Undo persists across reload', (await learned.getByRole('button', { name: undoLabel }).count()) === 0);
+const learning = flow.getByRole('switch', { name: 'Learn from my corrections' });
+await learning.click();
+await page.waitForFunction(() => document.querySelector('[aria-label="Learn from my corrections"]')?.getAttribute('aria-checked') === 'false');
+check('Automatic learning can be switched off', !(await learning.isChecked()));
+
+await app.evaluate(({ BrowserWindow }) => {
+  const window = BrowserWindow.getAllWindows()[0];
+  window.setMinimumSize(1, 1);
+  window.setContentSize(380, 760);
+});
+await page.waitForFunction(() => window.innerWidth === 380);
+await learned.screenshot({ path: path.join(shots, 'learned-words-mock-380.png') });
+const rowWidth = await learned.evaluate((el) => ({ inner: el.clientWidth, scroll: el.scrollWidth }));
+check('Learned rows fit at 380px', rowWidth.inner >= 220 && rowWidth.scroll <= rowWidth.inner + 1, JSON.stringify(rowWidth));
+m.oldFlowCore();
+await learned.waitFor({ state: 'detached', timeout: 10_000 });
+check('Older Core hides the learned list', (await learned.count()) === 0);
+
+console.log('screenshots:', shots);
 await app.close();
 m.close();
 

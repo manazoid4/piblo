@@ -1,6 +1,7 @@
 """Piblo Flow: dictation cleanup, spoken-prefix routing, personal dictionary, paste."""
 from __future__ import annotations
 
+import functools
 import logging
 import re
 import threading
@@ -10,6 +11,7 @@ from pathlib import Path
 import httpx
 
 from . import private_mode
+from .flow_learn import Learner, focused_app, watch_paste
 from .ledger import append_ledger
 
 log = logging.getLogger("mazhost.flow")
@@ -60,6 +62,15 @@ _UK = {
 _UK_RE = re.compile(r"(?<![\w.])(" + "|".join(sorted(_UK, key=len, reverse=True)) + r")\b(?!\(|\.\w)", re.IGNORECASE)
 
 
+def same_spelling_variant(a: str, b: str) -> bool:
+    """Treat known UK/US spelling pairs as style, including their -ing forms."""
+    a, b = a.lower(), b.lower()
+    if a.endswith("ing") and b.endswith("ing"):
+        a, b = a[:-3] + "e", b[:-3] + "e"
+    short, long = sorted((a, b), key=len)
+    return _UK.get(a) == b or _UK.get(b) == a or (short.endswith("or") and long == short[:-2] + "our")
+
+
 def tidy(text: str, spelling: str = "uk") -> str:
     """Deterministic fixes STT gets wrong: clock times and (optionally) UK spelling."""
     text = _CLOCK.sub(r"\1 \2:\3", text)
@@ -96,16 +107,25 @@ def load_dictionary(path: Path) -> list[str]:
     return [w.strip() for w in path.read_text(encoding="utf-8").splitlines() if w.strip()]
 
 
-def apply_dictionary(text: str, words: list[str]) -> str:
-    entries: dict[str, list[str]] = {k: list(v) for k, v in BUILTIN_ALIASES.items()}
+@functools.lru_cache(maxsize=8)
+def _compiled(words: tuple[str, ...]):
+    """One alternation over every term and alias, built once per dictionary (not per dictation)."""
+    lookup = {alias.lower(): term for term, aliases in BUILTIN_ALIASES.items()
+              for alias in (term, *aliases)}
     for line in words:
         term, _, aliases = line.partition(":")
-        entries.setdefault(term.strip(), []).extend(a.strip() for a in aliases.split(",") if a.strip())
+        term = term.strip()
+        if term:
+            for alias in [term, *(a.strip() for a in aliases.split(",") if a.strip())]:
+                lookup[alias.lower()] = term
     # Longest first so "Piblo Flow" wins over "Piblo".
-    for term in sorted(entries, key=len, reverse=True):
-        alts = [re.escape(term)] + [re.escape(a) for a in entries[term]]
-        text = re.sub(rf"(?i)\b(?:{'|'.join(alts)})\b", term, text)
-    return text
+    keys = sorted(lookup, key=len, reverse=True)
+    return re.compile(r"\b(?:" + "|".join(re.escape(k) for k in keys) + r")\b", re.IGNORECASE), lookup
+
+
+def apply_dictionary(text: str, words: list[str]) -> str:
+    pattern, lookup = _compiled(tuple(words))
+    return pattern.sub(lambda m: lookup.get(m.group(0).lower(), m.group(0)), text)
 
 
 def rule_cleanup(text: str) -> str:
@@ -151,6 +171,9 @@ class Flow:
         self.dir.mkdir(parents=True, exist_ok=True)
         self.lines = load_dictionary(self.dir / "dictionary.txt")
         self.words = [line.partition(":")[0].strip() for line in self.lines]  # terms only, for prompts
+        self.learner = Learner(self.dir)
+        self._merged: tuple | None = None  # (lines, learner version, app, merged tuple)
+        self.learn_delay = 8.0
         self._cancel = threading.Event()
         self.dictate_timeout = 60  # seconds before the endpoint returns 504
 
@@ -185,6 +208,21 @@ class Flow:
                 log.warning("flow cleanup chain failed: %s", type(e).__name__)
         return rule_cleanup(text), "rules"
 
+    def _lines_with_learned(self) -> tuple[str, ...]:
+        """Dictionary plus promoted learned rules; rebuilt only when either changes."""
+        app = focused_app()
+        key = (self.lines, self.learner.version, app)
+        merged = self._merged
+        if merged is None or merged[:3] != key:
+            merged = self._merged = (*key, tuple(self.learner.rules(app)) + tuple(self.lines))
+        return merged[3]
+
+    def after_paste(self, text: str, status: str, target) -> None:
+        """Learn from the user's fixes to what was just pasted (background; off by the `learn` setting)."""
+        if status == "pasted" and text and target and self.s.flow_learn:
+            watch_paste(self.learner.observe, text, target, self.learn_delay,
+                        enabled=lambda: self.s.flow_learn)
+
     def dictate(self, wav: Path, log: bool = True) -> dict:
         """wav -> {text, intent, raw, ms, via, stt_via}. With log=False the caller finishes
         the timing line with log_result() once the text has really been typed."""
@@ -207,7 +245,7 @@ class Flow:
         Talk's dictation mode calls this with the transcript it already has."""
         t1 = time.perf_counter()
         cleaned, provider = self._cleanup(raw)
-        cleaned = tidy(apply_dictionary(split_glued_note(cleaned), self.lines), getattr(self.s, "flow_spelling", "uk"))
+        cleaned = tidy(apply_dictionary(split_glued_note(cleaned), self._lines_with_learned()), getattr(self.s, "flow_spelling", "uk"))
         intent, body = parse_prefix(cleaned)
         clean = round((time.perf_counter() - t1) * 1000)
         ms = {"stt": stt_ms, "clean": clean, "total": stt_ms + clean}

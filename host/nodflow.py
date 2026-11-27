@@ -61,6 +61,7 @@ def send(client: httpx.Client, wav: bytes, released_at: float, paste_fn=None) ->
     """One call = one release = at most one paste."""
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from mazhost.flow import paste
+    from mazhost.flow_learn import read_focused
     paste_fn = paste_fn or paste
 
     r = client.post("/dictate", content=wav, headers={"Content-Type": "audio/wav"})
@@ -68,12 +69,32 @@ def send(client: httpx.Client, wav: bytes, released_at: float, paste_fn=None) ->
     j = r.json()
     intent, text = j["intent"], j["text"]
     if text and intent in ("paste", "claude"):
+        target = read_focused() if intent == "paste" and j.get("learn") and local_core(client.base_url) else None
         status = paste_fn(text, enter=intent == "claude")
         if status != "pasted":
             log(f"paste_status={status} text_len={len(text)}")
+        elif target:
+            learn_on_core(client, text, target)
     elapsed = round((time.perf_counter() - released_at) * 1000)
     log(f"release_to_done_ms={elapsed} core_ms={j['ms']} intent={intent} chars={len(text)}")
     print(f"{elapsed} ms  [{intent}] {text}")
+
+
+def local_core(url: httpx.URL) -> bool:
+    return url.host in ("localhost", "127.0.0.1", "::1")
+
+
+def learn_on_core(client: httpx.Client, text: str, target) -> None:
+    from mazhost.flow_learn import watch_paste
+
+    def enabled() -> bool:
+        r = client.get("/flow/settings", timeout=2)
+        return r.is_success and r.json().get("learn", False)
+
+    def observe(pasted: str, final: str, app: str) -> None:
+        client.post("/flow/learned/observe", json={"pasted": pasted, "final": final, "app": app}, timeout=2)
+
+    watch_paste(observe, text, target, enabled=enabled)
 
 
 # ---- streaming push-to-talk: audio is decoded while the key is held, so release -> text is ~70 ms
@@ -108,19 +129,30 @@ class Hold:
         return self.utt.finish()
 
 
-def finish_hold(hold: Hold, flow, released: float, paste_fn, hwnd: int = 0, safe_fn=None) -> dict:
+def finish_hold(hold: Hold, flow, released: float, paste_fn, hwnd: int = 0, safe_fn=None, client=None) -> dict:
     """Release -> final text -> cleanup -> paste (focus-guarded). Logs one `ptt` line with release_to_text."""
     from mazhost.flow import safe_paste
-
+    from mazhost.flow_learn import Learner, read_focused
+    from mazhost.flow_routes import read_settings
     raw = hold.release()
     stt_ms = round((time.perf_counter() - released) * 1000)
     if not raw.strip():
         return {"text": "", "intent": "paste", "ms": {"release_to_text": stt_ms}}
+    # Core is the sole writer. Refresh the shared rules so an undo takes effect on the next hold.
+    local = client is not None and local_core(client.base_url)
+    if local:
+        flow.learner = Learner(flow.dir)
+        flow._merged = None
+    target = None
     result = flow.finish(raw.lower(), "zipformer-stream", stt_ms)
     typed: list[float] = []
     if result["intent"] in ("paste", "claude") and result["text"]:
+        if local and result["intent"] == "paste" and read_settings(flow)["learn"]:
+            target = read_focused()
         result["pc"] = (safe_fn or safe_paste)(result["text"], result["intent"] == "claude", hwnd,
                                                lambda t, enter=False: paste_fn(t, enter=enter, on_typed=lambda: typed.append(time.perf_counter())))
+        if target and result["pc"] == "pasted":
+            learn_on_core(client, result["text"], target)
     else:
         result["pc"] = "saved"
     result["ms"]["release_to_text"] = round(((typed[0] if typed else time.perf_counter()) - released) * 1000)
@@ -244,7 +276,8 @@ def main() -> None:
         stats(Path(Settings().flow_dir).expanduser() / "latency.log", "--json" in sys.argv)
         return
     url = os.environ.get("NOD_CORE_URL", f"http://127.0.0.1:{_port()}")
-    client = httpx.Client(base_url=url, headers={"Authorization": f"Bearer {_token()}"}, timeout=30)
+    client = httpx.Client(base_url=url, headers={"Authorization": f"Bearer {_token()}"}, timeout=30,
+                          trust_env=not local_core(httpx.URL(url)))
     if "--wav" in sys.argv:
         wav = Path(sys.argv[sys.argv.index("--wav") + 1]).read_bytes()
         if "--dry-run" in sys.argv:  # post only, paste nothing
@@ -285,7 +318,7 @@ def main() -> None:
             try:
                 short = released - t0 < MIN_HOLD_S or max(map(abs, array("h", b"".join(chunks))), default=0) < SILENCE_PEAK
                 r = finish_hold(hold, streaming[1], released, paste if "--dry-run" not in sys.argv else (lambda t, enter=False, on_typed=None: on_typed and on_typed()),
-                                foreground()) if not short else hold.release()
+                                foreground(), client=client) if not short else hold.release()
                 if not short:
                     print(f"{r['ms']['release_to_text']} ms  [{r['intent']}] {r['text']}")
             except Exception as e:  # noqa: BLE001

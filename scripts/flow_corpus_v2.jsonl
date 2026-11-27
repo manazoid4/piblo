@@ -1,0 +1,191 @@
+{"say": "deploy the frontend to Vercel before the demo", "intent": "paste", "text": "Deploy the frontend to Vercel before the demo.", "cat": "tech", "split": "in"}
+{"say": "Vercel is showing a build error on the preview branch", "intent": "paste", "text": "Vercel is showing a build error on the preview branch.", "cat": "tech", "split": "out"}
+{"say": "connect the laptop to the tailnet with Tailscale", "intent": "paste", "text": "Connect the laptop to the tailnet with Tailscale.", "cat": "tech", "split": "in"}
+{"say": "the Tailscale subnet router went offline overnight", "intent": "paste", "text": "The Tailscale subnet router went offline overnight.", "cat": "tech", "split": "out"}
+{"say": "switch the dictation cleanup over to Groq", "intent": "paste", "text": "Switch the dictation cleanup over to Groq.", "cat": "tech", "split": "in"}
+{"say": "Groq inference is much faster than the old endpoint", "intent": "paste", "text": "Groq inference is much faster than the old endpoint.", "cat": "tech", "split": "out"}
+{"say": "ask Codex to review the pull request", "intent": "paste", "text": "Ask Codex to review the pull request.", "cat": "tech", "split": "in"}
+{"say": "Codex suggested a cleaner way to write the loop", "intent": "paste", "text": "Codex suggested a cleaner way to write the loop.", "cat": "tech", "split": "out"}
+{"say": "PibloCraft needs a new template for the landing page", "intent": "paste", "text": "PibloCraft needs a new template for the landing page.", "cat": "tech", "split": "in"}
+{"say": "the PibloCraft preview takes too long to render", "intent": "paste", "text": "The PibloCraft preview takes too long to render.", "cat": "tech", "split": "out"}
+{"say": "flash the Cardputer with the latest firmware", "intent": "paste", "text": "Flash the Cardputer with the latest firmware.", "cat": "tech", "split": "in"}
+{"say": "the Cardputer battery lasts about six hours", "intent": "paste", "text": "The Cardputer battery lasts about six hours.", "cat": "tech", "split": "out"}
+{"say": "the FastAPI server returns a four hundred error", "intent": "paste", "text": "The FastAPI server returns a four hundred error.", "cat": "tech", "split": "in"}
+{"say": "add a health check route to the FastAPI app", "intent": "paste", "text": "Add a health check route to the FastAPI app.", "cat": "tech", "split": "out"}
+{"say": "the Kubernetes pod keeps restarting after the deploy", "intent": "paste", "text": "The Kubernetes pod keeps restarting after the deploy.", "cat": "tech", "split": "in"}
+{"say": "scale the Kubernetes deployment down to two replicas", "intent": "paste", "text": "Scale the Kubernetes deployment down to two replicas.", "cat": "tech", "split": "out"}
+{"say": "migrate the PostgreSQL database before the release", "intent": "paste", "text": "Migrate the PostgreSQL database before the release.", "cat": "tech", "split": "in"}
+{"say": "PostgreSQL is running out of connections", "intent": "paste", "text": "PostgreSQL is running out of connections.", "cat": "tech", "split": "out"}
+{"say": "run npm install and then start the dev server", "intent": "paste", "text": "Run npm install and then start the dev server.", "cat": "tech", "split": "in"}
+{"say": "npm audit found three vulnerabilities", "intent": "paste", "text": "Npm audit found three vulnerabilities.", "cat": "tech", "split": "out"}
+{"say": "pytest is failing on the audio tests", "intent": "paste", "text": "Pytest is failing on the audio tests.", "cat": "tech", "split": "in"}
+{"say": "rerun pytest with the verbose flag", "intent": "paste", "text": "Rerun pytest with the verbose flag.", "cat": "tech", "split": "out"}
+{"say": "push the branch to GitHub and open a pull request", "intent": "paste", "text": "Push the branch to GitHub and open a pull request.", "cat": "tech", "split": "in"}
+{"say": "GitHub Actions timed out on the Windows runner", "intent": "paste", "text": "GitHub Actions timed out on the Windows runner.", "cat": "tech", "split": "out"}
+{"say": "Claude wrote the first draft of the migration", "intent": "paste", "text": "Claude wrote the first draft of the migration.", "cat": "tech", "split": "in"}
+{"say": "ask Claude to explain the stack trace", "intent": "paste", "text": "Ask Claude to explain the stack trace.", "cat": "tech", "split": "out"}
+{"say": "FlowLens shows the latency spike at noon", "intent": "paste", "text": "FlowLens shows the latency spike at noon.", "cat": "tech", "split": "in"}
+{"say": "the FlowLens alert fired twice last night", "intent": "paste", "text": "The FlowLens alert fired twice last night.", "cat": "tech", "split": "out"}
+{"say": "MAZos stores the notes in a local database", "intent": "paste", "text": "MAZos stores the notes in a local database.", "cat": "tech", "split": "in"}
+{"say": "the MAZos installer needs a signed certificate", "intent": "paste", "text": "The MAZos installer needs a signed certificate.", "cat": "tech", "split": "out"}
+{"say": "Docker is eating all the memory on this machine", "intent": "paste", "text": "Docker is eating all the memory on this machine.", "cat": "tech", "split": "in"}
+{"say": "rebuild the Docker image without the cache", "intent": "paste", "text": "Rebuild the Docker image without the cache.", "cat": "tech", "split": "out"}
+{"say": "the websocket drops every few minutes on the Wi-Fi", "intent": "paste", "text": "The websocket drops every few minutes on the Wi-Fi.", "cat": "tech", "split": "in"}
+{"say": "reconnect the websocket and replay the missed events", "intent": "paste", "text": "Reconnect the websocket and replay the missed events.", "cat": "tech", "split": "out"}
+{"say": "rotate the API key and update the environment file", "intent": "paste", "text": "Rotate the API key and update the environment file.", "cat": "tech", "split": "in"}
+{"say": "the API key expired so every request returns unauthorised", "intent": "paste", "text": "The API key expired so every request returns unauthorised.", "cat": "tech", "split": "out"}
+{"say": "the sherpa model runs entirely on the CPU", "intent": "paste", "text": "The sherpa model runs entirely on the CPU.", "cat": "tech", "split": "in"}
+{"say": "Parakeet is fast enough to feel instant", "intent": "paste", "text": "Parakeet is fast enough to feel instant.", "cat": "tech", "split": "out"}
+{"say": "merge the hotfix into main and tag a release", "intent": "paste", "text": "Merge the hotfix into main and tag a release.", "cat": "tech", "split": "in"}
+{"say": "tag the release and publish the changelog", "intent": "paste", "text": "Tag the release and publish the changelog.", "cat": "tech", "split": "out"}
+{"say": "enable two factor authentication on the admin account", "intent": "paste", "text": "Enable two factor authentication on the admin account.", "cat": "tech", "split": "in"}
+{"say": "the staging server is running an older build", "intent": "paste", "text": "The staging server is running an older build.", "cat": "tech", "split": "out"}
+{"say": "set up a cron job to back up the database nightly", "intent": "paste", "text": "Set up a cron job to back up the database nightly.", "cat": "tech", "split": "in"}
+{"say": "the nightly backup finished without any errors", "intent": "paste", "text": "The nightly backup finished without any errors.", "cat": "tech", "split": "out"}
+{"say": "the Piblo Flow microphone level is too low", "intent": "paste", "text": "The Piblo Flow microphone level is too low.", "cat": "tech", "split": "in"}
+{"say": "Piblo Flow pasted the text into the wrong window", "intent": "paste", "text": "Piblo Flow pasted the text into the wrong window.", "cat": "tech", "split": "out"}
+{"say": "check the logs for the failed deployment", "intent": "paste", "text": "Check the logs for the failed deployment.", "cat": "tech", "split": "in"}
+{"say": "the logs show a timeout in the speech service", "intent": "paste", "text": "The logs show a timeout in the speech service.", "cat": "tech", "split": "out"}
+{"say": "install the Python dependencies in a virtual environment", "intent": "paste", "text": "Install the Python dependencies in a virtual environment.", "cat": "tech", "split": "in"}
+{"say": "the virtual environment is missing the audio library", "intent": "paste", "text": "The virtual environment is missing the audio library.", "cat": "tech", "split": "out"}
+{"say": "note buy a USB cable for the Cardputer", "intent": "note", "text": "Buy a USB cable for the Cardputer.", "cat": "tech", "split": "in"}
+{"say": "note renew the Tailscale subscription next week", "intent": "note", "text": "Renew the Tailscale subscription next week.", "cat": "tech", "split": "out"}
+{"say": "remind me to update the Kubernetes manifests tonight", "intent": "remind", "text": "Update the Kubernetes manifests tonight.", "cat": "tech", "split": "in"}
+{"say": "remind me to rotate the Groq key on Friday", "intent": "remind", "text": "Rotate the Groq key on Friday.", "cat": "tech", "split": "out"}
+{"say": "claude write a pytest for the Vercel webhook", "intent": "claude", "text": "Write a pytest for the Vercel webhook.", "cat": "tech", "split": "in"}
+{"say": "claude summarise the PostgreSQL migration plan", "intent": "claude", "text": "Summarise the PostgreSQL migration plan.", "cat": "tech", "split": "out"}
+{"say": "can you send me the notes from this morning", "intent": "paste", "text": "Can you send me the notes from this morning.", "cat": "everyday", "split": "in"}
+{"say": "I will send the notes over after lunch", "intent": "paste", "text": "I will send the notes over after lunch.", "cat": "everyday", "split": "out"}
+{"say": "let us move the meeting to Thursday afternoon", "intent": "paste", "text": "Let us move the meeting to Thursday afternoon.", "cat": "everyday", "split": "in"}
+{"say": "the meeting on Thursday has been moved to the afternoon", "intent": "paste", "text": "The meeting on Thursday has been moved to the afternoon.", "cat": "everyday", "split": "out"}
+{"say": "thanks for getting back to me so quickly", "intent": "paste", "text": "Thanks for getting back to me so quickly.", "cat": "everyday", "split": "in"}
+{"say": "thank you for the quick reply and the helpful feedback", "intent": "paste", "text": "Thank you for the quick reply and the helpful feedback.", "cat": "everyday", "split": "out"}
+{"say": "I am running about ten minutes late", "intent": "paste", "text": "I am running about ten minutes late.", "cat": "everyday", "split": "in"}
+{"say": "sorry I am running late the train was delayed", "intent": "paste", "text": "Sorry I am running late the train was delayed.", "cat": "everyday", "split": "out"}
+{"say": "please find the invoice attached to this email", "intent": "paste", "text": "Please find the invoice attached to this email.", "cat": "everyday", "split": "in"}
+{"say": "the invoice is attached and payment is due in thirty days", "intent": "paste", "text": "The invoice is attached and payment is due in thirty days.", "cat": "everyday", "split": "out"}
+{"say": "could you take a look at the draft when you get a chance", "intent": "paste", "text": "Could you take a look at the draft when you get a chance.", "cat": "everyday", "split": "in"}
+{"say": "I have finished the draft and it is ready for review", "intent": "paste", "text": "I have finished the draft and it is ready for review.", "cat": "everyday", "split": "out"}
+{"say": "let me know if you have any questions", "intent": "paste", "text": "Let me know if you have any questions.", "cat": "everyday", "split": "in"}
+{"say": "if you have questions just reply to this message", "intent": "paste", "text": "If you have questions just reply to this message.", "cat": "everyday", "split": "out"}
+{"say": "we need to talk about the budget for next quarter", "intent": "paste", "text": "We need to talk about the budget for next quarter.", "cat": "everyday", "split": "in"}
+{"say": "the budget for next quarter is tight but workable", "intent": "paste", "text": "The budget for next quarter is tight but workable.", "cat": "everyday", "split": "out"}
+{"say": "I think we should ship it on Monday", "intent": "paste", "text": "I think we should ship it on Monday.", "cat": "everyday", "split": "in"}
+{"say": "shipping on Monday gives us the weekend to fix problems", "intent": "paste", "text": "Shipping on Monday gives us the weekend to fix problems.", "cat": "everyday", "split": "out"}
+{"say": "just checking in to see how the project is going", "intent": "paste", "text": "Just checking in to see how the project is going.", "cat": "everyday", "split": "in"}
+{"say": "the project is going well and we are on schedule", "intent": "paste", "text": "The project is going well and we are on schedule.", "cat": "everyday", "split": "out"}
+{"say": "can we have a quick call tomorrow morning", "intent": "paste", "text": "Can we have a quick call tomorrow morning.", "cat": "everyday", "split": "in"}
+{"say": "a quick call tomorrow morning would be perfect", "intent": "paste", "text": "A quick call tomorrow morning would be perfect.", "cat": "everyday", "split": "out"}
+{"say": "the customer wants a refund for the broken unit", "intent": "paste", "text": "The customer wants a refund for the broken unit.", "cat": "everyday", "split": "in"}
+{"say": "we agreed to send a replacement instead of a refund", "intent": "paste", "text": "We agreed to send a replacement instead of a refund.", "cat": "everyday", "split": "out"}
+{"say": "please remember to lock the door when you leave", "intent": "paste", "text": "Please remember to lock the door when you leave.", "cat": "everyday", "split": "in"}
+{"say": "the door was left unlocked again last night", "intent": "paste", "text": "The door was left unlocked again last night.", "cat": "everyday", "split": "out"}
+{"say": "I would like to book a table for four people", "intent": "paste", "text": "I would like to book a table for four people.", "cat": "everyday", "split": "in"}
+{"say": "a table for four on Saturday evening please", "intent": "paste", "text": "A table for four on Saturday evening please.", "cat": "everyday", "split": "out"}
+{"say": "do you want to grab coffee after the standup", "intent": "paste", "text": "Do you want to grab coffee after the standup.", "cat": "everyday", "split": "in"}
+{"say": "coffee after the standup sounds great", "intent": "paste", "text": "Coffee after the standup sounds great.", "cat": "everyday", "split": "out"}
+{"say": "the printer on the second floor is jammed again", "intent": "paste", "text": "The printer on the second floor is jammed again.", "cat": "everyday", "split": "in"}
+{"say": "someone needs to fix the printer on the second floor", "intent": "paste", "text": "Someone needs to fix the printer on the second floor.", "cat": "everyday", "split": "out"}
+{"say": "happy birthday I hope you have a wonderful day", "intent": "paste", "text": "Happy birthday I hope you have a wonderful day.", "cat": "everyday", "split": "in"}
+{"say": "I hope you have a wonderful birthday this weekend", "intent": "paste", "text": "I hope you have a wonderful birthday this weekend.", "cat": "everyday", "split": "out"}
+{"say": "I will be out of the office until next Tuesday", "intent": "paste", "text": "I will be out of the office until next Tuesday.", "cat": "everyday", "split": "in"}
+{"say": "I am out of the office until Tuesday with limited email access", "intent": "paste", "text": "I am out of the office until Tuesday with limited email access.", "cat": "everyday", "split": "out"}
+{"say": "the quarterly report is due at the end of the month", "intent": "paste", "text": "The quarterly report is due at the end of the month.", "cat": "everyday", "split": "in"}
+{"say": "have you finished the quarterly report yet", "intent": "paste", "text": "Have you finished the quarterly report yet.", "cat": "everyday", "split": "out"}
+{"say": "we should organise a team lunch before the holidays", "intent": "paste", "text": "We should organise a team lunch before the holidays.", "cat": "everyday", "split": "in"}
+{"say": "the team lunch is organised for the Friday before the holidays", "intent": "paste", "text": "The team lunch is organised for the Friday before the holidays.", "cat": "everyday", "split": "out"}
+{"say": "I need to analyse the results before the review", "intent": "paste", "text": "I need to analyse the results before the review.", "cat": "everyday", "split": "in"}
+{"say": "the analysis shows that most users prefer the shorter version", "intent": "paste", "text": "The analysis shows that most users prefer the shorter version.", "cat": "everyday", "split": "out"}
+{"say": "let us prioritise the bugs that block the release", "intent": "paste", "text": "Let us prioritise the bugs that block the release.", "cat": "everyday", "split": "in"}
+{"say": "the bugs that block the release are the top priority", "intent": "paste", "text": "The bugs that block the release are the top priority.", "cat": "everyday", "split": "out"}
+{"say": "the flight leaves at half past seven in the morning", "intent": "paste", "text": "The flight leaves at half past seven in the morning.", "cat": "everyday", "split": "in"}
+{"say": "I booked a flight that leaves early in the morning", "intent": "paste", "text": "I booked a flight that leaves early in the morning.", "cat": "everyday", "split": "out"}
+{"say": "remind me that the bins go out on Wednesday", "intent": "paste", "text": "Remind me that the bins go out on Wednesday.", "cat": "everyday", "split": "in"}
+{"say": "the bins go out on Wednesday night", "intent": "paste", "text": "The bins go out on Wednesday night.", "cat": "everyday", "split": "out"}
+{"say": "note pick up the dry cleaning on the way home", "intent": "note", "text": "Pick up the dry cleaning on the way home.", "cat": "everyday", "split": "in"}
+{"say": "note the landlord is coming round on Saturday", "intent": "note", "text": "The landlord is coming round on Saturday.", "cat": "everyday", "split": "out"}
+{"say": "remind me to book the dentist appointment", "intent": "remind", "text": "Book the dentist appointment.", "cat": "everyday", "split": "in"}
+{"say": "remind me to ring the plumber about the boiler", "intent": "remind", "text": "Ring the plumber about the boiler.", "cat": "everyday", "split": "out"}
+{"say": "claude draft a polite reply declining the invitation", "intent": "claude", "text": "Draft a polite reply declining the invitation.", "cat": "everyday", "split": "in"}
+{"say": "claude rewrite this paragraph so it sounds friendlier", "intent": "claude", "text": "Rewrite this paragraph so it sounds friendlier.", "cat": "everyday", "split": "out"}
+{"say": "the meeting is in Manchester on Tuesday", "intent": "paste", "text": "The meeting is in Manchester on Tuesday.", "cat": "uk", "split": "in"}
+{"say": "I am catching the train to Manchester on Tuesday morning", "intent": "paste", "text": "I am catching the train to Manchester on Tuesday morning.", "cat": "uk", "split": "out"}
+{"say": "we are opening a new office in Birmingham", "intent": "paste", "text": "We are opening a new office in Birmingham.", "cat": "uk", "split": "in"}
+{"say": "the Birmingham office opens in the spring", "intent": "paste", "text": "The Birmingham office opens in the spring.", "cat": "uk", "split": "out"}
+{"say": "the festival in Edinburgh sold out in an hour", "intent": "paste", "text": "The festival in Edinburgh sold out in an hour.", "cat": "uk", "split": "in"}
+{"say": "book the hotel in Edinburgh for the festival weekend", "intent": "paste", "text": "Book the hotel in Edinburgh for the festival weekend.", "cat": "uk", "split": "out"}
+{"say": "the match in Cardiff starts at three o'clock", "intent": "paste", "text": "The match in Cardiff starts at three o'clock.", "cat": "uk", "split": "in"}
+{"say": "the train to Cardiff has been cancelled", "intent": "paste", "text": "The train to Cardiff has been cancelled.", "cat": "uk", "split": "out"}
+{"say": "the client is based in Leeds and works nine to five", "intent": "paste", "text": "The client is based in Leeds and works nine to five.", "cat": "uk", "split": "in"}
+{"say": "I will drive up to Leeds for the workshop", "intent": "paste", "text": "I will drive up to Leeds for the workshop.", "cat": "uk", "split": "out"}
+{"say": "there is a delay on the line at Waterloo station", "intent": "paste", "text": "There is a delay on the line at Waterloo station.", "cat": "uk", "split": "in"}
+{"say": "meet me outside Waterloo station at noon", "intent": "paste", "text": "Meet me outside Waterloo station at noon.", "cat": "uk", "split": "out"}
+{"say": "Siobhan will join the call after lunch", "intent": "paste", "text": "Siobhan will join the call after lunch.", "cat": "uk", "split": "in"}
+{"say": "ask Siobhan to share the slides before the call", "intent": "paste", "text": "Ask Siobhan to share the slides before the call.", "cat": "uk", "split": "out"}
+{"say": "Aoife is leading the design review on Wednesday", "intent": "paste", "text": "Aoife is leading the design review on Wednesday.", "cat": "uk", "split": "in"}
+{"say": "the design review that Aoife is leading was moved to Wednesday", "intent": "paste", "text": "The design review that Aoife is leading was moved to Wednesday.", "cat": "uk", "split": "out"}
+{"say": "Niamh has the keys to the studio", "intent": "paste", "text": "Niamh has the keys to the studio.", "cat": "uk", "split": "in"}
+{"say": "Niamh will lock up the studio tonight", "intent": "paste", "text": "Niamh will lock up the studio tonight.", "cat": "uk", "split": "out"}
+{"say": "send the parcel with Royal Mail first class", "intent": "paste", "text": "Send the parcel with Royal Mail first class.", "cat": "uk", "split": "in"}
+{"say": "Royal Mail says the parcel was delivered on Monday", "intent": "paste", "text": "Royal Mail says the parcel was delivered on Monday.", "cat": "uk", "split": "out"}
+{"say": "we are waiting on HMRC to confirm the VAT return", "intent": "paste", "text": "We are waiting on HMRC to confirm the VAT return.", "cat": "uk", "split": "in"}
+{"say": "the VAT return is due before the end of the month", "intent": "paste", "text": "The VAT return is due before the end of the month.", "cat": "uk", "split": "out"}
+{"say": "pick up some milk from Tesco on the way back", "intent": "paste", "text": "Pick up some milk from Tesco on the way back.", "cat": "uk", "split": "in"}
+{"say": "Tesco was out of oat milk again", "intent": "paste", "text": "Tesco was out of oat milk again.", "cat": "uk", "split": "out"}
+{"say": "get a sausage roll from Greggs for the team", "intent": "paste", "text": "Get a sausage roll from Greggs for the team.", "cat": "uk", "split": "in"}
+{"say": "Greggs is open until six", "intent": "paste", "text": "Greggs is open until six.", "cat": "uk", "split": "out"}
+{"say": "the NHS appointment is at ten fifteen on Friday", "intent": "paste", "text": "The NHS appointment is at ten fifteen on Friday.", "cat": "uk", "split": "in"}
+{"say": "I rescheduled my NHS appointment for next week", "intent": "paste", "text": "I rescheduled my NHS appointment for next week.", "cat": "uk", "split": "out"}
+{"say": "the A one is closed near Newcastle because of an accident", "intent": "paste", "text": "The A one is closed near Newcastle because of an accident.", "cat": "uk", "split": "in"}
+{"say": "traffic near Newcastle is awful after the accident", "intent": "paste", "text": "Traffic near Newcastle is awful after the accident.", "cat": "uk", "split": "out"}
+{"say": "Heathrow is the busiest airport in the country", "intent": "paste", "text": "Heathrow is the busiest airport in the country.", "cat": "uk", "split": "in"}
+{"say": "the taxi to Heathrow is booked for five in the morning", "intent": "paste", "text": "The taxi to Heathrow is booked for five in the morning.", "cat": "uk", "split": "out"}
+{"say": "the conference in Glasgow runs for three days", "intent": "paste", "text": "The conference in Glasgow runs for three days.", "cat": "uk", "split": "in"}
+{"say": "reserve a room in Glasgow for the conference", "intent": "paste", "text": "Reserve a room in Glasgow for the conference.", "cat": "uk", "split": "out"}
+{"say": "the Bristol team is working on the Piblo onboarding", "intent": "paste", "text": "The Bristol team is working on the Piblo onboarding.", "cat": "uk", "split": "in"}
+{"say": "the Bristol team shipped the Piblo onboarding last week", "intent": "paste", "text": "The Bristol team shipped the Piblo onboarding last week.", "cat": "uk", "split": "out"}
+{"say": "Sainsbury's delivers between eight and ten", "intent": "paste", "text": "Sainsbury's delivers between eight and ten.", "cat": "uk", "split": "in"}
+{"say": "Sainsbury's has a slot on Thursday evening", "intent": "paste", "text": "Sainsbury's has a slot on Thursday evening.", "cat": "uk", "split": "out"}
+{"say": "Hermione is organising the leaving party", "intent": "paste", "text": "Hermione is organising the leaving party.", "cat": "uk", "split": "in"}
+{"say": "the leaving party that Hermione is organising is on Friday", "intent": "paste", "text": "The leaving party that Hermione is organising is on Friday.", "cat": "uk", "split": "out"}
+{"say": "Fergus has the spare charger for the laptop", "intent": "paste", "text": "Fergus has the spare charger for the laptop.", "cat": "uk", "split": "in"}
+{"say": "borrow the spare charger from Fergus", "intent": "paste", "text": "Borrow the spare charger from Fergus.", "cat": "uk", "split": "out"}
+{"say": "meet at the pub near Sheffield station", "intent": "paste", "text": "Meet at the pub near Sheffield station.", "cat": "uk", "split": "in"}
+{"say": "the pub near Sheffield station does a decent lunch", "intent": "paste", "text": "The pub near Sheffield station does a decent lunch.", "cat": "uk", "split": "out"}
+{"say": "Gareth will cover the support rota on Saturday", "intent": "paste", "text": "Gareth will cover the support rota on Saturday.", "cat": "uk", "split": "in"}
+{"say": "the support rota says Gareth is on call this Saturday", "intent": "paste", "text": "The support rota says Gareth is on call this Saturday.", "cat": "uk", "split": "out"}
+{"say": "note ring Siobhan about the Glasgow trip", "intent": "note", "text": "Ring Siobhan about the Glasgow trip.", "cat": "uk", "split": "in"}
+{"say": "remind me to collect the parcel from Royal Mail", "intent": "remind", "text": "Collect the parcel from Royal Mail.", "cat": "uk", "split": "out"}
+{"say": "claude plan a day trip to Edinburgh for the team", "intent": "claude", "text": "Plan a day trip to Edinburgh for the team.", "cat": "uk", "split": "in"}
+{"say": "claude check when the Cardiff train leaves", "intent": "claude", "text": "Check when the Cardiff train leaves.", "cat": "uk", "split": "out"}
+{"say": "open the pull request on github dot com slash piblo slash flow", "intent": "paste", "text": "Open the pull request on github.com/piblo/flow.", "cat": "code", "split": "in"}
+{"say": "the repo lives at github dot com slash piblo slash flow", "intent": "paste", "text": "The repo lives at github.com/piblo/flow.", "cat": "code", "split": "out"}
+{"say": "email me at maz at example dot com", "intent": "paste", "text": "Email me at maz@example.com.", "cat": "code", "split": "in"}
+{"say": "send it to team at example dot co dot uk", "intent": "paste", "text": "Send it to team@example.co.uk.", "cat": "code", "split": "out"}
+{"say": "the docs are at docs dot example dot com slash flow", "intent": "paste", "text": "The docs are at docs.example.com/flow.", "cat": "code", "split": "in"}
+{"say": "visit example dot com slash pricing for the plans", "intent": "paste", "text": "Visit example.com/pricing for the plans.", "cat": "code", "split": "out"}
+{"say": "upgrade to version two point one point zero", "intent": "paste", "text": "Upgrade to version 2.1.0.", "cat": "code", "split": "in"}
+{"say": "the bug was fixed in version one point five point nine", "intent": "paste", "text": "The bug was fixed in version 1.5.9.", "cat": "code", "split": "out"}
+{"say": "pin the package at version three point twelve", "intent": "paste", "text": "Pin the package at version 3.12.", "cat": "code", "split": "in"}
+{"say": "Python three point twelve is required", "intent": "paste", "text": "Python 3.12 is required.", "cat": "code", "split": "out"}
+{"say": "call the function get underscore user underscore name", "intent": "paste", "text": "Call the function get_user_name.", "cat": "code", "split": "in"}
+{"say": "rename the variable to user underscore name", "intent": "paste", "text": "Rename the variable to user_name.", "cat": "code", "split": "out"}
+{"say": "the class is called Flow Learner and it lives in flow underscore learn dot py", "intent": "paste", "text": "The class is called FlowLearner and it lives in flow_learn.py.", "cat": "code", "split": "in"}
+{"say": "import numpy as np at the top of the file", "intent": "paste", "text": "Import numpy as np at the top of the file.", "cat": "code", "split": "out"}
+{"say": "run pip install dash r requirements dot txt", "intent": "paste", "text": "Run pip install -r requirements.txt.", "cat": "code", "split": "in"}
+{"say": "the endpoint is slash api slash dictate", "intent": "paste", "text": "The endpoint is /api/dictate.", "cat": "code", "split": "out"}
+{"say": "set the port to eight seven nine seven", "intent": "paste", "text": "Set the port to 8797.", "cat": "code", "split": "in"}
+{"say": "the server listens on port eight zero eight zero", "intent": "paste", "text": "The server listens on port 8080.", "cat": "code", "split": "out"}
+{"say": "the timeout is thirty seconds", "intent": "paste", "text": "The timeout is 30 seconds.", "cat": "code", "split": "in"}
+{"say": "set the retry count to five", "intent": "paste", "text": "Set the retry count to 5.", "cat": "code", "split": "out"}
+{"say": "the build number is one thousand two hundred and four", "intent": "paste", "text": "The build number is 1204.", "cat": "code", "split": "in"}
+{"say": "the standup is at nine thirty", "intent": "paste", "text": "The standup is at 09:30.", "cat": "code", "split": "out"}
+{"say": "the call starts at quarter past two", "intent": "paste", "text": "The call starts at quarter past two.", "cat": "code", "split": "in"}
+{"say": "the deadline is the twenty third of December", "intent": "paste", "text": "The deadline is the 23rd of December.", "cat": "code", "split": "out"}
+{"say": "the invoice total is two hundred and fifty pounds", "intent": "paste", "text": "The invoice total is 250 pounds.", "cat": "code", "split": "in"}
+{"say": "it costs nine ninety nine a month", "intent": "paste", "text": "It costs 9.99 a month.", "cat": "code", "split": "out"}
+{"say": "the API returns a four oh four for missing routes", "intent": "paste", "text": "The API returns a 404 for missing routes.", "cat": "code", "split": "in"}
+{"say": "the hash starts with a b three f nine", "intent": "paste", "text": "The hash starts with ab3f9.", "cat": "code", "split": "out"}
+{"say": "use the dash dash verbose flag", "intent": "paste", "text": "Use the --verbose flag.", "cat": "code", "split": "in"}
+{"say": "the codec is not supported on this device", "intent": "paste", "text": "The codec is not supported on this device.", "cat": "code", "split": "out"}
+{"say": "Grok is a different product from Groq", "intent": "paste", "text": "Grok is a different product from Groq.", "cat": "code", "split": "in"}
