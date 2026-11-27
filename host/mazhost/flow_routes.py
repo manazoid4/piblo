@@ -418,7 +418,10 @@ def build_flow_router(flow) -> APIRouter:
 
     @api.post("/flow/learned/observe")
     def observe_learned(body: ObserveIn):
-        return {"events": flow.learner.observe(body.pasted, body.final, body.app)}
+        with _SETTINGS_LOCK:
+            if not flow.s.flow_learn:
+                return {"events": []}
+            return {"events": flow.learner.observe(body.pasted, body.final, body.app)}
 
     @api.get("/flow/target")
     def target():

@@ -1,0 +1,38 @@
+{
+  "_note": "Data for scripts/flow_loop.py. Synthetic speech only. VCTK accents are the corpus's published speaker labels (approximate); sid = index in sherpa-onnx vits-vctk (sorted speaker ids, 109 speakers).",
+  "vctk_model": "vits-vctk",
+  "vctk_url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/tts-models/vits-vctk.tar.bz2",
+  "vctk_speakers": [
+    {"id": "vctk-p226", "sid": 1, "accent": "English", "sex": "M"},
+    {"id": "vctk-p234", "sid": 9, "accent": "Scottish", "sex": "F"},
+    {"id": "vctk-p238", "sid": 12, "accent": "Northern Irish", "sex": "F"},
+    {"id": "vctk-p245", "sid": 18, "accent": "Irish", "sex": "M"},
+    {"id": "vctk-p248", "sid": 21, "accent": "Indian", "sex": "F"},
+    {"id": "vctk-p253", "sid": 26, "accent": "Welsh", "sex": "F"},
+    {"id": "vctk-p314", "sid": 82, "accent": "South African", "sex": "F"},
+    {"id": "vctk-p326", "sid": 87, "accent": "Australian", "sex": "M"}
+  ],
+  "sapi_accents": {"hazel": "en-GB", "zira": "en-US"},
+  "sapi_rates": [-1, 0, 1],
+  "_respell": "VCTK's lexicon has no entry for these words (sherpa drops OOV words), so the TTS is told how to say them. The expected text is unchanged. How a brand name is pronounced is my guess, so misses on these words are partly a pronunciation artefact.",
+  "respell": {
+    "piblo": "pib low", "piblocraft": "pib low craft", "vercel": "ver sell", "tailscale": "tail scale",
+    "groq": "grok", "cardputer": "card pewter", "mazos": "mazz oss", "flowlens": "flow lens",
+    "fastapi": "fast a p i", "kubernetes": "koo ber net ease", "postgresql": "post gress q l",
+    "npm": "n p m", "pytest": "pie test", "github": "git hub", "codex": "code ex", "parakeet": "parrot keet",
+    "sherpa": "sher pa", "docker": "dock er", "websocket": "web socket", "tailnet": "tail net",
+    "wi-fi": "why fy", "siobhan": "shi vorn", "aoife": "ee fa", "niamh": "neev", "hermione": "her my oh nee",
+    "gareth": "garreth", "fergus": "fur gus", "greggs": "greg's", "tesco": "tess co", "hmrc": "h m r c",
+    "nhs": "n h s", "vat": "v a t", "api": "a p i", "usb": "u s b", "cron": "kron", "uk": "u k",
+    "numpy": "num pie", "np": "n p", "py": "pie", "txt": "t x t", "pip": "pip", "sainsbury's": "sains berries",
+    "waterloo": "water loo", "heathrow": "heath row", "newcastle": "new castle", "dns": "d n s",
+    "cpu": "c p u", "ci": "c i", "ssl": "s s l", "tls": "t l s", "hotfix": "hot fix", "frontend": "front end"
+  },
+  "_decoys": "Purely stylistic edits a user might make after pasting. The learner must NOT turn these into dictionary rules.",
+  "synonyms": {
+    "big": "large", "quick": "fast", "check": "verify", "send": "share", "start": "begin", "finish": "complete",
+    "fix": "repair", "help": "assist", "wonderful": "great", "buy": "purchase", "ask": "request", "tight": "limited",
+    "moved": "rescheduled", "top": "main", "need": "require", "think": "reckon", "great": "excellent", "meeting": "session",
+    "old": "previous", "faster": "quicker", "problems": "issues", "ready": "prepared", "looks": "seems", "slow": "sluggish"
+  }
+}

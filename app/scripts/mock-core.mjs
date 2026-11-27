@@ -80,10 +80,15 @@ function drawScreen() {
 
 export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline = true, pairing = true, craftTranscript = '' } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'piblo-mock-'));
-  fs.writeFileSync(path.join(dir, '.env'), `MAZ_TOKEN=${token}\nMAZ_PORT=${port}\nMAZ_DEFAULT_ROUTE=local\nMAZ_GROQ_API_KEY=x\n`);
   const now = () => Math.floor(Date.now() / 1000);
   const frame = drawScreen();
-  const flow = { settings: { input_mode: 'paste', press_enter: false, cleanup: 'auto', stt: 'auto', effective_cleanup: 'rules', has_groq_key: false }, lines: ['Piblo', 'Cardputer', 'Piblo Flow', 'Groq', 'Rampage: ram page, ram payge'], get words() { return this.lines.map((l) => l.split(':')[0].trim()); } };
+  let supportsFlowLearning = true;
+  const flow = { settings: { learn: true, input_mode: 'paste', press_enter: false, cleanup: 'auto', stt: 'auto', effective_cleanup: 'rules', has_groq_key: false }, lines: ['Piblo', 'Cardputer', 'Piblo Flow', 'Groq', 'Rampage: ram page, ram payge'], learned: [
+    { id: 'l1', term: 'Piblo', misheard: 'pibble', app: null, confidence: 0.92, seen: 5, status: 'active', created: '2026-11-24T10:00:00Z' },
+    { id: 'l2', term: 'Kickstarter', misheard: 'kick starter', app: 'Chrome', confidence: 0.88, seen: 3, status: 'active', created: '2026-11-24T11:00:00Z' },
+    { id: 'l3', term: 'Parakeet', misheard: 'para keet', app: 'Code', confidence: 0.8, seen: 2, status: 'active', created: '2026-11-25T09:00:00Z' },
+    { id: 'l4', term: 'Sonarr', misheard: 'sonar', app: null, confidence: 0.6, seen: 1, status: 'candidate', created: '2026-11-26T08:00:00Z' },
+  ], get words() { return this.lines.map((l) => l.split(':')[0].trim()); } };
   const db = {
     beam: [{ id: 'b1', text: 'https://example.com/read-later', direction: 'to_pocket', created: now() - 4000, kind: 'link' }],
     dumps: [
@@ -330,6 +335,16 @@ export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline
         return json(res, 200, dictView());
       }
     }
+    if (p === '/flow/learned' || p.startsWith('/flow/learned/')) {
+      if (!supportsFlowLearning) return json(res, 404, { detail: 'not found' });
+      if (req.method === 'GET') return json(res, 200, flow.learned.filter((x) => x.status !== 'undone'));
+      if (req.method === 'DELETE') {
+        const e = flow.learned.find((x) => x.id === decodeURIComponent(p.split('/')[3] || ''));
+        if (!e) return json(res, 404, { detail: 'not_found' });
+        e.status = 'undone';
+        return json(res, 200, { ok: true });
+      }
+    }
     if (p === '/flow/status') return json(res, 200, { recent: [{ at: new Date().toISOString(), chars: 84, intent: 'paste', cleanup: 'rules', total_ms: 640 }], count: 1, avg_total_ms: 640, p95_total_ms: 640, errors: [], effective_cleanup: flow.settings.effective_cleanup });
     if (p === '/flow/test') return json(res, 200, { ms: 420, word_count: 5, cleanup: flow.settings.cleanup, effective_cleanup: flow.settings.effective_cleanup, text: 'This is a test of dictation.' });
     if (p === '/voices') return json(res, 200, { ok: true, current: 'v1', current_name: 'Adrian', voices: [{ name: 'Adrian', reference_id: 'v1', description: 'Warm, steady', current: true }, { name: 'Maya', reference_id: 'v2', description: 'Bright and quick' }, { name: 'Theo', reference_id: 'v3', description: 'Low and calm' }] });
@@ -473,7 +488,11 @@ export function startMock({ port = 18787, token = 'mock-token-123', deviceOnline
 
     json(res, 404, { detail: 'not_found' });
   });
-  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => resolve({ dir, port: server.address().port, token, close: () => server.close() })));
+  return new Promise((resolve) => server.listen(port, '127.0.0.1', () => {
+    const actualPort = server.address().port;
+    fs.writeFileSync(path.join(dir, '.env'), `MAZ_TOKEN=${token}\nMAZ_PORT=${actualPort}\nMAZ_DEFAULT_ROUTE=local\nMAZ_GROQ_API_KEY=x\n`);
+    resolve({ oldFlowCore: () => { supportsFlowLearning = false; }, dir, port: actualPort, token, close: () => server.close() });
+  }));
 }
 
 if (process.argv[1] && process.argv[1].endsWith('mock-core.mjs')) {

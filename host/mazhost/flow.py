@@ -101,14 +101,14 @@ def load_dictionary(path: Path) -> list[str]:
 @functools.lru_cache(maxsize=8)
 def _compiled(words: tuple[str, ...]):
     """One alternation over every term and alias, built once per dictionary (not per dictation)."""
-    entries: dict[str, list[str]] = {k: list(v) for k, v in BUILTIN_ALIASES.items()}
+    lookup = {alias.lower(): term for term, aliases in BUILTIN_ALIASES.items()
+              for alias in (term, *aliases)}
     for line in words:
         term, _, aliases = line.partition(":")
-        entries.setdefault(term.strip(), []).extend(a.strip() for a in aliases.split(",") if a.strip())
-    lookup: dict[str, str] = {}
-    for term, alts in entries.items():  # later entries win a shared alias
-        for a in [term, *alts]:
-            lookup[a.lower()] = term
+        term = term.strip()
+        if term:
+            for alias in [term, *(a.strip() for a in aliases.split(",") if a.strip())]:
+                lookup[alias.lower()] = term
     # Longest first so "Piblo Flow" wins over "Piblo".
     keys = sorted(lookup, key=len, reverse=True)
     return re.compile(r"\b(?:" + "|".join(re.escape(k) for k in keys) + r")\b", re.IGNORECASE), lookup
@@ -116,7 +116,7 @@ def _compiled(words: tuple[str, ...]):
 
 def apply_dictionary(text: str, words: list[str]) -> str:
     pattern, lookup = _compiled(tuple(words))
-    return pattern.sub(lambda m: lookup[m.group(0).lower()], text)
+    return pattern.sub(lambda m: lookup.get(m.group(0).lower(), m.group(0)), text)
 
 
 def rule_cleanup(text: str) -> str:
@@ -201,16 +201,18 @@ class Flow:
 
     def _lines_with_learned(self) -> tuple[str, ...]:
         """Dictionary plus promoted learned rules; rebuilt only when either changes."""
-        app = focused_app() if getattr(self.s, "flow_learn", True) else ""
+        app = focused_app()
         key = (self.lines, self.learner.version, app)
-        if self._merged is None or self._merged[:3] != key:
-            self._merged = (*key, tuple(self.lines) + tuple(self.learner.rules(app)))
-        return self._merged[3]
+        merged = self._merged
+        if merged is None or merged[:3] != key:
+            merged = self._merged = (*key, tuple(self.learner.rules(app)) + tuple(self.lines))
+        return merged[3]
 
-    def after_paste(self, text: str, status: str, app: str = "") -> None:
+    def after_paste(self, text: str, status: str, target) -> None:
         """Learn from the user's fixes to what was just pasted (background; off by the `learn` setting)."""
-        if status == "pasted" and text and getattr(self.s, "flow_learn", True):
-            watch_paste(self.learner, text, app or focused_app(), self.learn_delay)
+        if status == "pasted" and text and target and self.s.flow_learn:
+            watch_paste(self.learner.observe, text, target, self.learn_delay,
+                        enabled=lambda: self.s.flow_learn)
 
     def dictate(self, wav: Path, log: bool = True) -> dict:
         """wav -> {text, intent, raw, ms, via, stt_via}. With log=False the caller finishes

@@ -69,6 +69,16 @@ def looks_secret(text: str) -> bool:
     return False
 
 
+def _inflection(a: str, b: str) -> bool:
+    short, long = sorted((a.lower(), b.lower()), key=len)
+    if " " in short or " " in long:
+        return False
+    for suffix in ("s", "es", "'s", "\u2019s", "d", "ed", "ing", "er", "est", "ly"):
+        if long in (short + suffix, short.removesuffix("e") + suffix, short + short[-1:] + suffix):
+            return True
+    return short.endswith("y") and long in {short[:-1] + suffix for suffix in ("ies", "ied", "ier", "iest")}
+
+
 def _technical(word: str) -> bool:
     return word[:1].isupper() or bool(re.search(r"\d", word)) or bool(re.search(r"[a-z][A-Z]", word))
 
@@ -85,8 +95,10 @@ def corrections(pasted: str, final: str) -> list[tuple[str, str, bool, bool]]:
         if op != "replace" or not (1 <= i2 - i1 <= 3 and 1 <= j2 - j1 <= 3):
             continue
         old, new = " ".join(p[i1:i2]), " ".join(f[j1:j2])
+        if not any(c.isalpha() for c in old) or not any(c.isalpha() for c in new):
+            continue
         ok, strong = alike(old, new)
-        if not ok or len(old.replace(" ", "")) < 3 or old.lower() in _COMMON:
+        if not ok or _inflection(old, new) or len(old.replace(" ", "")) < 3 or old.lower() in _COMMON:
             continue
         out.append((old.lower(), new, strong, _technical(new) and i1 > 0))
     return out
@@ -142,44 +154,49 @@ class Learner:
 
     def _view(self, e: dict) -> dict:
         return {"id": e["id"], "term": e["term"], "misheard": e["misheard"], "app": e["app"],
-                "confidence": self._conf(e), "seen": e["seen"], "status": e["status"], "created": e["created"]}
+                "confidence": self._conf(e), "seen": e["seen"], "status": e["status"], "created": e["created"],
+                "needed": max(0, 2 + 2 * e["conflicts"] - e["seen"] - int(e["strong"]))}
 
     def _settle(self, e: dict, evs: list[dict]) -> None:
         c = self._conf(e)
         if e["status"] == "candidate" and c >= 1:
             e["status"] = "active"
             evs.append({"event": "promoted", **self._view(e)})
-        elif e["status"] == "active" and c <= 0:
+        elif e["status"] == "active" and c < 1:
             e["status"] = "candidate"
 
     def observe(self, pasted: str, final: str, app: str = "") -> list[dict]:
         if looks_secret(pasted) or looks_secret(final):
             return []
-        app, evs = app.lower(), []
+        app, evs, changed = app.lower(), [], False
         with self._lock:
             for old, term, strong, technical in corrections(pasted, final):
                 if any(e["misheard"] == old and e["term"] == term and e["status"] in ("undone", "rejected") for e in self._e):
                     continue  # the user undid it (or the guard rejected it): do not learn it again
                 same = [e for e in self._e if e["misheard"] == old and e["status"] not in ("undone", "rejected")]
                 hit = next((e for e in same if e["term"] == term and e["app"] in ("", app)), None)
-                if hit is None:
+                is_new = hit is None
+                if is_new:
                     clash = next((e for e in same if e["app"] == "" and e["term"] != term), None)
                     scope = app if clash and app and app not in clash["apps"] else ""
                     hit = {"id": uuid.uuid4().hex[:8], "term": term, "misheard": old, "app": scope, "seen": 0,
                            "conflicts": 0, "strong": False, "apps": [], "status": "candidate", "created": int(time.time())}
                     self._e.append(hit)
                     evs.append({"event": "candidate", **self._view(hit)})
+                conflicts = [e for e in same if e is not hit and e["term"] != term and e["app"] == hit["app"]]
+                if is_new and conflicts:
+                    hit["conflicts"] += 1
                 hit["seen"] += 1
                 hit["strong"] = hit["strong"] or (strong and technical)
                 if app and app not in hit["apps"]:
                     hit["apps"] = (hit["apps"] + [app])[-8:]
-                for e in same:  # a different answer for the same word contradicts the others in this scope
-                    if e is not hit and e["term"] != term and e["app"] == hit["app"]:
-                        e["conflicts"] += 1
-                        evs.append({"event": "conflict", **self._view(e)})
-                        self._settle(e, evs)
+                for e in conflicts:
+                    e["conflicts"] += 1
+                    evs.append({"event": "conflict", **self._view(e)})
+                    self._settle(e, evs)
                 self._settle(hit, evs)
-            if evs:
+                changed = True
+            if changed:
                 self._save()
         return evs
 
@@ -214,8 +231,10 @@ class Learner:
             for e in self._e:
                 if e["status"] != "active":
                     continue
-                others = base + [f"{x['term']}: {x['misheard']}" for x in self._e if x["status"] == "active" and x is not e]
-                mine = others + [f"{e['term']}: {e['misheard']}"]
+                others = [f"{x['term']}: {x['misheard']}" for x in self._e
+                          if x["status"] == "active" and x is not e and x["app"] in ("", e["app"])]
+                mine = others + [f"{e['term']}: {e['misheard']}"] + base
+                others += base
                 if any(_wer(apply_dictionary(h, mine), x) > _wer(apply_dictionary(h, others), x) for h, x in corpus):
                     e["status"] = "rejected"
                     demoted.append(e["id"])
@@ -236,25 +255,40 @@ def _wer(a: str, b: str) -> int:
 
 
 # ---------------------------------------------------------------- Windows readback (UI Automation)
-def read_focused() -> tuple[str, bool, str] | None:
-    """(field text, is_password, process name) of the focused control, or None on any failure."""
+def read_focused() -> tuple[str, str, tuple[int, ...]] | None:
+    """(field text, process name, UIA identity), only for readable non-password controls."""
     try:
+        import comtypes
         import comtypes.client
 
-        comtypes.client.GetModule("UIAutomationCore.dll")
-        from comtypes.gen import UIAutomationClient as ua
-
-        uia = comtypes.client.CreateObject("{ff48dba4-60ef-4201-aa87-54103eef594e}", interface=ua.IUIAutomation)
-        el = uia.GetFocusedElement()
-        if el.CurrentIsPassword:
-            return "", True, ""
-        try:  # ValuePattern (edits), then TextPattern (documents, rich text)
-            text = el.GetCurrentPattern(10002).QueryInterface(ua.IUIAutomationValuePattern).CurrentValue or ""
-        except Exception:  # noqa: BLE001
-            text = el.GetCurrentPattern(10014).QueryInterface(ua.IUIAutomationTextPattern).DocumentRange.GetText(20000) or ""
-        return text, False, process_name(el.CurrentProcessId)
+        comtypes.CoInitialize()
+        try:
+            return _read_control(comtypes.client)
+        finally:
+            comtypes.CoUninitialize()
     except Exception:  # noqa: BLE001 - readback is best effort
         return None
+
+
+def _read_control(client) -> tuple[str, str, tuple[int, ...]] | None:
+    client.GetModule("UIAutomationCore.dll")
+    from comtypes.gen import UIAutomationClient as ua
+
+    uia = client.CreateObject("{ff48dba4-60ef-4201-aa87-54103eef594e}", interface=ua.IUIAutomation)
+    el = uia.GetFocusedElement()
+    if el.CurrentIsPassword:
+        return None
+    runtime_id = tuple(el.GetRuntimeId() or ())
+    app = process_name(el.CurrentProcessId)
+    if not runtime_id or not app:
+        return None
+    try:
+        text = el.GetCurrentPattern(10002).QueryInterface(ua.IUIAutomationValuePattern).CurrentValue or ""
+    except Exception:  # noqa: BLE001 - rich text controls expose TextPattern
+        text = el.GetCurrentPattern(10014).QueryInterface(ua.IUIAutomationTextPattern).DocumentRange.GetText(20001) or ""
+    if len(text) > 20000:
+        return None
+    return text, app, (el.CurrentProcessId, *runtime_id)
 
 
 def process_name(pid: int) -> str:
@@ -288,18 +322,31 @@ def focused_app() -> str:
         return ""
 
 
-def watch_paste(learner: Learner, pasted: str, app: str, delay: float = 8.0, reader=read_focused) -> threading.Thread:
-    """After ``delay`` s read the focused field back and learn from any fix. Never raises."""
+def watch_paste(observe, pasted: str, target: tuple[str, str, tuple[int, ...]], delay: float = 8.0, reader=read_focused,
+                enabled=lambda: True) -> threading.Thread:
+    """Learn only when the pasted text was present exactly once in the same field."""
     def run() -> None:
         try:
-            time.sleep(delay)
-            got = reader()
-            if not got or got[1] or (app and got[2] and got[2] != app):
+            original, app, identity = target
+            if not enabled() or looks_secret(pasted) or pasted in original:
                 return
-            span = find_span(pasted, got[0])
-            if span:
-                learner.observe(pasted, span, app)
-        except Exception:  # noqa: BLE001
+            before = reader()
+            if not before or before[1:] != (app, identity) or before[0].count(pasted) != 1:
+                return
+            prefix, suffix = before[0].split(pasted, 1)
+            time.sleep(delay)
+            if not enabled():
+                return
+            after = reader()
+            if not after or after[1:] != before[1:]:
+                return
+            text = after[0]
+            if len(text) < len(prefix) + len(suffix) or not text.startswith(prefix) or not text.endswith(suffix):
+                return
+            final = text[len(prefix):len(text) - len(suffix)]
+            if final != pasted and not looks_secret(final) and enabled():
+                observe(pasted, final, app)
+        except Exception:  # noqa: BLE001 - readback must not interrupt dictation
             pass
 
     t = threading.Thread(target=run, daemon=True, name="flow-learn")

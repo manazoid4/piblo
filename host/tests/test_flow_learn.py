@@ -39,6 +39,9 @@ def test_genuine_fix_is_learned_and_strong_match_promotes_at_once(L, old, new, l
     ("send it to the client now please", "send it to the client"),         # deletion only
     ("send it to the client", "send it to the new client"),                # insertion only
     ("meet me at the station", "meet at the station"),
+    ("I brought a large coat today", "I brought a larger coat today"),
+    ("use a small screen today", "use a smaller screen today"),
+    ("use account number 12345678 now", "use account number 12345679 now"),
 ])
 def test_style_edits_are_ignored(L, old, new):
     assert L.observe(old, new) == []
@@ -52,11 +55,11 @@ def test_common_words_are_never_learned(L):
 
 
 def test_promotion_threshold_two_sightings_for_plain_words(L):
-    a, b = "the flange was broken today", "the flanged was broken today"
+    a, b = "the scrib is over there", "the scribe is over there"
     L.observe(a, b)
     assert active(L) == set() and L.learned()[0]["status"] == "candidate"
     L.observe(a, b)
-    assert active(L) == {("flange", "flanged")}
+    assert active(L) == {("scrib", "scribe")}
 
 
 def test_conflict_blocks_promotion(L):
@@ -72,7 +75,32 @@ def test_app_specific_rules(L):
     L.observe("deploy to versal now", "deploy to Versel now", app="code")
     assert L.rules("chrome") == ["Vercel: versal"]
     assert L.rules("code")[-1] == "Versel: versal"  # app-specific wins over global
+    assert apply_dictionary("versal", L.rules("code")) == "Versel"
+    assert apply_dictionary("versal", ["Versel: versal", "Vercel: versal"]) == "Vercel"
     assert {e["app"] for e in L.learned()} == {"", "code"}
+
+
+def test_dictionary_leaves_unmapped_unicode_lookalikes_intact():
+    assert apply_dictionary("\u0131stanbul and \u017fend", ["Istanbul", "send"]) == "\u0131stanbul and \u017fend"
+
+
+def test_conflict_does_not_immediately_replace_active_rule(L):
+    L.observe("deploy to versal now", "deploy to Vercel now", app="chrome")
+    assert active(L)
+    L.observe("deploy to versal now", "deploy to Versel now", app="chrome")
+    assert not active(L)
+    L.observe("deploy to versal now", "deploy to Vercel now", app="chrome")
+    assert not active(L)
+    L.observe("deploy to versal now", "deploy to Vercel now", app="chrome")
+    assert active(L) == {("versal", "Vercel")}
+
+
+def test_additional_sightings_persist(tmp_path):
+    learner = Learner(tmp_path)
+    for _ in range(3):
+        learner.observe("deploy to versal now", "deploy to Vercel now")
+    assert Learner(tmp_path).learned()[0]["seen"] == 3
+
 
 
 def test_undo_is_reversible_and_not_relearned(L):
@@ -127,19 +155,30 @@ def test_find_span_in_a_larger_field():
 
 
 def test_watch_paste_reads_back_and_learns(L):
-    reader = lambda: ("note: open it in the Codex app now ok", False, "notepad")
-    watch_paste(L, "open it in the codec app now", "notepad", 0, reader).join(2)
+    pasted = "open it in the codec app now"
+    samples = iter([(f"note: {pasted} ok", "notepad", (7, 1)),
+                    ("note: open it in the Codex app now ok", "notepad", (7, 1))])
+    watch_paste(L.observe, pasted, ("note:  ok", "notepad", (7, 1)), 0, lambda: next(samples)).join(2)
     assert ("codec", "Codex") in active(L)
 
 
-def test_watch_paste_ignores_password_and_failed_readback(L):
-    def boom():
-        raise OSError
+@pytest.mark.parametrize("after", [None,
+    ("note: open it in the Codex app now ok", "notepad", (7, 2)),
+    ("note: open it in the Codex app now ok", "other", (7, 1)),
+    ("different prefix: open it in the Codex app now ok", "notepad", (7, 1)),
+])
+def test_watch_paste_ignores_password_wrong_field_and_other_edits(L, after):
+    pasted = "open it in the codec app now"
+    samples = iter([(f"note: {pasted} ok", "notepad", (7, 1)), after])
+    watch_paste(L.observe, pasted, ("note:  ok", "notepad", (7, 1)), 0, lambda: next(samples)).join(2)
+    assert L.learned() == []
 
-    watch_paste(L, "open it in the codec app now", "x", 0, lambda: ("open it in the Codex app now", True, "x")).join(2)
-    watch_paste(L, "open it in the codec app now", "x", 0, lambda: None).join(2)
-    watch_paste(L, "open it in the codec app now", "x", 0, boom).join(2)
-    watch_paste(L, "open it in the codec app now", "x", 0, lambda: ("open it in the Codex app now", False, "other")).join(2)
+
+def test_watch_paste_skips_if_focus_changed_before_initial_readback(L):
+    pasted = "open it in the codec app now"
+    samples = iter([(pasted, "notepad", (7, 2)),
+                    ("open it in the Codex app now", "notepad", (7, 2))])
+    watch_paste(L.observe, pasted, ("", "notepad", (7, 1)), 0, lambda: next(samples)).join(2)
     assert L.learned() == []
 
 
@@ -180,6 +219,8 @@ def test_routes(tmp_path):
     assert api.delete("/flow/learned/zzz").status_code == 404
     assert api.patch("/flow/settings", json={"learn": False}).json()["learn"] is False
     assert flow.s.flow_learn is False
+    disabled = api.post("/flow/learned/observe", json={"pasted": "open codec now please", "final": "open Codex now please"})
+    assert disabled.json() == {"events": []}
 
 
 def test_after_paste_respects_learn_setting(tmp_path):
@@ -188,6 +229,34 @@ def test_after_paste_respects_learn_setting(tmp_path):
     s = SimpleNamespace(flow_dir=str(tmp_path), groq_api_key="", flow_learn=False)
     f = Flow(s, None)
     f.learn_delay = 0
-    f.after_paste("open it in the codec app now", "pasted", "x")
+    f.after_paste("open it in the codec app now", "pasted", ("", "notepad", (7, 1)))
     time.sleep(0.1)
     assert f.learner.learned() == []
+
+
+def test_batch_push_to_talk_submits_learning_to_local_core(monkeypatch):
+    import httpx
+    import nodflow
+    from mazhost import flow_learn
+
+    observations = []
+
+    def request(req):
+        if req.url.path == "/dictate":
+            return httpx.Response(200, json={"text": "open codec now please", "intent": "paste", "ms": {}, "learn": True})
+        if req.url.path == "/flow/settings":
+            return httpx.Response(200, json={"learn": True})
+        observations.append(json.loads(req.content))
+        return httpx.Response(200)
+
+    def watch(observe, pasted, target, *, enabled):
+        assert enabled()
+        observe(pasted, "open Codex now please", target[1])
+
+    monkeypatch.setattr(flow_learn, "read_focused", lambda: ("", "notepad", (7, 1)))
+    monkeypatch.setattr(flow_learn, "watch_paste", watch)
+    monkeypatch.setattr(nodflow, "log", lambda _: None)
+    for url in ("http://127.0.0.1:8787", "http://other-pc"):
+        with httpx.Client(base_url=url, transport=httpx.MockTransport(request)) as client:
+            nodflow.send(client, b"audio", time.perf_counter(), paste_fn=lambda text, enter: "pasted")
+    assert observations == [{"pasted": "open codec now please", "final": "open Codex now please", "app": "notepad"}]

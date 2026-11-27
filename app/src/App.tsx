@@ -204,6 +204,8 @@ function Shell() {
           <button
             key={n.id}
             className="rail-item"
+            aria-label={n.label}
+            title={n.label}
             aria-current={!welcome && section === n.id ? 'page' : undefined}
             onClick={() => {
               setSection(n.id);
@@ -211,7 +213,7 @@ function Shell() {
             }}
           >
             <Icon name={n.icon} />
-            {n.label}
+            <span className="rail-label">{n.label}</span>
             {n.id === 'actions' && badge > 0 ? <span className="rail-badge" aria-label={`${badge} waiting`}>{badge}</span> : i < 9 && <kbd>Ctrl+{i + 1}</kbd>}
           </button>
         ))}
