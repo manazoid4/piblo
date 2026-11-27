@@ -62,6 +62,15 @@ _UK = {
 _UK_RE = re.compile(r"(?<![\w.])(" + "|".join(sorted(_UK, key=len, reverse=True)) + r")\b(?!\(|\.\w)", re.IGNORECASE)
 
 
+def same_spelling_variant(a: str, b: str) -> bool:
+    """Treat known UK/US spelling pairs as style, including their -ing forms."""
+    a, b = a.lower(), b.lower()
+    if a.endswith("ing") and b.endswith("ing"):
+        a, b = a[:-3] + "e", b[:-3] + "e"
+    short, long = sorted((a, b), key=len)
+    return _UK.get(a) == b or _UK.get(b) == a or (short.endswith("or") and long == short[:-2] + "our")
+
+
 def tidy(text: str, spelling: str = "uk") -> str:
     """Deterministic fixes STT gets wrong: clock times and (optionally) UK spelling."""
     text = _CLOCK.sub(r"\1 \2:\3", text)

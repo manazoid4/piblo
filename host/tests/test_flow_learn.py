@@ -42,6 +42,9 @@ def test_genuine_fix_is_learned_and_strong_match_promotes_at_once(L, old, new, l
     ("I brought a large coat today", "I brought a larger coat today"),
     ("use a small screen today", "use a smaller screen today"),
     ("use account number 12345678 now", "use account number 12345679 now"),
+    ("we are organizing the files today", "we are organising the files today"),
+    ("pick another color for the logo", "pick another colour for the logo"),
+    ("please run the test from the terminal", "please run Pytest from the terminal"),
 ])
 def test_style_edits_are_ignored(L, old, new):
     assert L.observe(old, new) == []

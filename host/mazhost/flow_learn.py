@@ -85,6 +85,8 @@ def _technical(word: str) -> bool:
 
 def corrections(pasted: str, final: str) -> list[tuple[str, str, bool, bool]]:
     """(misheard, term, strong, technical) for each genuine transcription fix, else []."""
+    from .flow import same_spelling_variant
+
     p, f = tokens(pasted), tokens(final)
     pl, fl = [t.lower() for t in p], [t.lower() for t in f]
     sm = difflib.SequenceMatcher(None, pl, fl, autojunk=False)
@@ -95,6 +97,10 @@ def corrections(pasted: str, final: str) -> list[tuple[str, str, bool, bool]]:
         if op != "replace" or not (1 <= i2 - i1 <= 3 and 1 <= j2 - j1 <= 3):
             continue
         old, new = " ".join(p[i1:i2]), " ".join(f[j1:j2])
+        # Broad article changes can turn ordinary phrases into technical aliases.
+        articles = {"a", "an", "the"}
+        if (pl[i1] in articles) != (fl[j1] in articles) or same_spelling_variant(old, new):
+            continue
         if not any(c.isalpha() for c in old) or not any(c.isalpha() for c in new):
             continue
         ok, strong = alike(old, new)
