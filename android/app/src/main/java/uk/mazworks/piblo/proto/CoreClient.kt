@@ -25,6 +25,9 @@ class CoreClient(baseUrl: String, private val token: String, private val clientV
     fun postAlert(json: String): String = Proto.parsePostedId(call("POST", "/buddy/alert", json))
     fun share(json: String) { call("POST", "/share", json) }
 
+    /** Piblo Key tap: forwards the full URL the card produced. Throws CoreHttpException(unknown_key | bad_mac | replay). */
+    fun keyTap(url: String): String = call("POST", "/auth/key/tap", KeyTap.json(url))
+
     /** Phone keyboard mode: send literal text to the focused Piblo field. Returns the record id. */
     fun postText(id: String, text: String, mode: String): String = Proto.parseTextId(call("POST", "/buddy/text", Proto.textJson(id, text, mode)))
 

@@ -256,6 +256,19 @@ struct BuddyItem { std::string id, tool, summary, project, session; int left = 0
 struct BuddyPoll { bool ok = false; std::string agent; int count = 0; std::vector<BuddyItem> items; };
 BuddyPoll buddyPoll();                                              // GET /buddy/summary (tiny)
 bool buddyDecide(const std::string& id, const std::string& decision, std::string& applied);  // allow|deny|allow_all
+// Piblo Keys (docs/protocol/AUTH.md). Lists carry no secrets and no codes, ever.
+constexpr int AUTH_MAX_ACCOUNTS = 24;  // fixed cap: no-PSRAM safety
+struct AuthAccount { std::string id, issuer, label; };
+struct AuthCodes { bool ok = false; int status = 0; std::vector<AuthAccount> accounts; std::string error; };
+AuthCodes authCodes();                                                      // GET /auth/codes
+struct AuthSuggestion { bool ok = false; int status = 0; std::string id, issuer; };  // id empty = nothing to suggest
+AuthSuggestion authSuggest();                                               // GET /auth/codes/suggest
+// POST /auth/codes/{id}/fill|show: raises the normal approval; returns false with `error` (Core's error code) on failure.
+bool authCodeAction(const std::string& id, const char* action, std::string& error);
+// A code from the allowing /buddy/decide response. RAM only, wiped when taken or when it runs out.
+struct AuthReveal { char code[13] = {0}; int remaining = 0; int period = 0; };
+bool takeAuthReveal(AuthReveal& out);  // moves it out (the internal copy is wiped)
+void wipeAuthReveal();
 const CoreInfo& coreInfo();          // last poll result (cached)
 void setCoreInfo(const CoreInfo& info);
 bool updateReady();

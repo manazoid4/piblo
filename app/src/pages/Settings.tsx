@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { FlowSection } from '../components/FlowSection';
 import { BuddySection } from '../components/BuddySection';
+import { CodesKeysSection } from '../components/CodesKeysSection';
 import type { AppSettings, CoreEnvView, EnvKey } from '../../shared/types';
 import { PageHead, Setting, Switch } from '../components/ui';
 import { useAct, usePoll, useStore } from '../lib/store';
@@ -129,6 +130,8 @@ export function Settings() {
       </section>
 
       <FlowSection />
+
+      <CodesKeysSection />
 
       <BuddySection />
 

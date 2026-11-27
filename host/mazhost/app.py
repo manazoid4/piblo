@@ -28,6 +28,7 @@ from .catchup import Catchup, build_catchup_router
 from .promises import Promises, build_promises_router
 from .share_in import build_share_router
 from .home_pulse import build_home_pulse_app, install_home_pulse_routes
+from .auth_routes import install_auth
 from .buddy_forms import build_buddy_forms_router
 from .onboarding import Onboarding, build_onboarding_router
 from .library_routes import build_library_router
@@ -1411,6 +1412,7 @@ def create_app(
     api.include_router(build_share_router(cfg, model_router))
     api.include_router(build_onboarding_router(onboarding))
     api.include_router(build_buddy_forms_router(onboarding=onboarding))
+    api.state.auth_service = install_auth(api, buddy, cfg.control_dir)
     async def feature_voice_command(text):
         return await run_in_threadpool(feature_commands.handle, text)
 

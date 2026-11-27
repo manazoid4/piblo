@@ -48,6 +48,22 @@
             </intent-filter>
         </activity>
 
+        <!-- Piblo Key taps: the card's URL opens here instead of the browser once the link is verified. -->
+        <activity
+            android:name=".KeyTapActivity"
+            android:exported="true"
+            android:label="Piblo"
+            android:launchMode="singleTop"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="https" android:host="piblo.co.uk" android:path="/k" />
+            </intent-filter>
+        </activity>
+
         <receiver android:name=".system.ReminderReceiver" android:exported="false" />
         <receiver android:name=".system.StopFindReceiver" android:exported="false" />
         <receiver android:name=".system.BootReceiver" android:exported="true">

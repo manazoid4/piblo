@@ -79,8 +79,10 @@ object Proto {
 
     /** FastAPI errors look like {"detail":"authentication_required"}; 422 has a list, so flatten defensively. */
     fun parseError(body: String): String = try {
-        val d = JSONObject(body).opt("detail")
-        if (d is String) d else "bad_request"
+        val o = JSONObject(body)
+        val d = o.opt("detail")
+        // The /auth routes answer {"error": "...", "message": "..."} without a `detail`.
+        if (d is String) d else if (d == null && o.opt("error") is String) o.getString("error") else "bad_request"
     } catch (_: Exception) { "" }
 
     fun parseToken(json: String): String = guard { JSONObject(json).getString("token") }
