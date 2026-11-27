@@ -34,7 +34,7 @@ def env(tmp_path):
     svc.can_type = True
     svc.clock = lambda: clock["t"]
     svc.sleep = lambda s: clock.__setitem__("t", clock["t"] + s)
-    svc.foreground = lambda: None
+    svc.foreground = lambda: "Notepad"  # a focused window that matches no issuer, on any OS
     c = TestClient(app)
     c.typed, c.clock, c.svc = typed, clock, svc
     return c
