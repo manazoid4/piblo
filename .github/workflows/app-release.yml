@@ -53,7 +53,7 @@ jobs:
           npm run pack
           if ($LASTEXITCODE -ne 0) { throw 'App packaging failed' }
           $v = (Get-Content package.json | ConvertFrom-Json).version
-          vpk pack --runtime win-x64 --packId Piblo --packVersion $v --packDir release/win-unpacked --mainExe Piblo.exe --packTitle Piblo --icon build/icon.ico --splashImage build/splash.gif --outputDir release/velopack
+          vpk pack --runtime win-x64 --packId PibloApp --packVersion $v --packDir release/win-unpacked --mainExe Piblo.exe --packTitle Piblo --icon build/icon.ico --splashImage build/splash.gif --outputDir release/velopack
           if ($LASTEXITCODE -ne 0) { throw 'Velopack packaging failed' }
           # shortcut: placeholder icon animation, replace with a branded animation before launch
         env:
@@ -68,7 +68,7 @@ jobs:
           $v = (Get-Content package.json | ConvertFrom-Json).version
           $beta = $v -match '-'
           $files = @(Get-ChildItem release/velopack -File | Where-Object { $_.Name -match '(\.exe|\.zip|\.nupkg|\.json)$' } | ForEach-Object FullName)
-          foreach ($required in @('Piblo-win-Setup.exe', 'Piblo-win-Portable.zip', 'releases.win.json')) {
+          foreach ($required in @('PibloApp-win-Setup.exe', 'PibloApp-win-Portable.zip', 'releases.win.json')) {
             if (-not (Test-Path "release/velopack/$required")) { throw "Missing $required" }
           }
           if (-not ($files | Where-Object { $_ -match '-full\.nupkg$' })) { throw 'Full update package missing' }
