@@ -1,5 +1,5 @@
 # Piblo one-line installer.   irm https://<piblo site>/install.ps1 | iex
-# Downloads Piblo-win-Setup.exe from the GitHub release, checks its SHA-256
+# Downloads PibloApp-win-Setup.exe from the GitHub release, checks its SHA-256
 # against SHA256SUMS.txt, then runs it silently. No admin needed. Re-run to update.
 # Runs in its own scope so `irm | iex` leaves the user's PowerShell settings untouched.
 & {
@@ -15,7 +15,7 @@
         throw "Refusing to download over an insecure address: $Base"
     }
 
-    $Name = 'Piblo-win-Setup.exe'
+    $Name = 'PibloApp-win-Setup.exe'
     $Tmp = Join-Path ([IO.Path]::GetTempPath()) ('piblo-install-' + [guid]::NewGuid().ToString('N'))
     New-Item -ItemType Directory -Path $Tmp | Out-Null
     try {
@@ -41,12 +41,12 @@
         $Run = Start-Process -FilePath $File -ArgumentList '--silent' -Wait -PassThru
         if ($Run.ExitCode -ne 0) { throw "Setup exited with code $($Run.ExitCode)." }
 
-        $Update = Join-Path $env:LOCALAPPDATA 'Piblo\Update.exe'
+        $Update = Join-Path $env:LOCALAPPDATA 'PibloApp\Update.exe'
         if (Test-Path $Update) {
             Write-Host 'Piblo: installed. Starting it now.'
             Start-Process -FilePath $Update -ArgumentList 'start'
         } else {
-            Write-Host 'Piblo: setup finished, but Piblo was not found in %LocalAppData%\Piblo.'
+            Write-Host 'Piblo: setup finished, but Piblo was not found in %LocalAppData%\PibloApp.'
         }
     } finally {
         Remove-Item $Tmp -Recurse -Force -ErrorAction SilentlyContinue

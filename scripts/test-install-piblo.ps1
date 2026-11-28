@@ -7,11 +7,11 @@ $Rel = Join-Path $Work 'release'; $Marker = Join-Path $Work 'ran.txt'
 New-Item -ItemType Directory -Path $Rel | Out-Null
 
 # Dummy Setup.exe: writes args to the marker file named by PIBLO_TEST_MARKER.
-Add-Type -OutputType ConsoleApplication -OutputAssembly (Join-Path $Rel 'Piblo-win-Setup.exe') -TypeDefinition @'
+Add-Type -OutputType ConsoleApplication -OutputAssembly (Join-Path $Rel 'PibloApp-win-Setup.exe') -TypeDefinition @'
 public static class P { public static void Main(string[] a) {
   System.IO.File.WriteAllText(System.Environment.GetEnvironmentVariable("PIBLO_TEST_MARKER"), string.Join(" ", a)); } }
 '@
-$Hash = (Get-FileHash -Algorithm SHA256 (Join-Path $Rel 'Piblo-win-Setup.exe')).Hash.ToLower()
+$Hash = (Get-FileHash -Algorithm SHA256 (Join-Path $Rel 'PibloApp-win-Setup.exe')).Hash.ToLower()
 
 $Port = 18000 + (Get-Random -Maximum 1000)
 $Srv = Start-Process python -ArgumentList "-m http.server $Port --bind 127.0.0.1 --directory `"$Rel`"" -PassThru -WindowStyle Hidden
@@ -32,13 +32,13 @@ function Check($Label, $Ok, $Detail) {
 }
 try {
     $Local = "http://127.0.0.1:$Port"
-    $r = Invoke-Case $Local "$Hash  Piblo-win-Setup.exe"
+    $r = Invoke-Case $Local "$Hash  PibloApp-win-Setup.exe"
     Check '(a) good checksum -> installer runs silently' ($r.Exit -eq 0 -and $r.Ran -and (Get-Content $Marker) -eq '--silent') $r.Out
 
-    $r = Invoke-Case $Local ('0' * 64 + '  Piblo-win-Setup.exe')
+    $r = Invoke-Case $Local ('0' * 64 + '  PibloApp-win-Setup.exe')
     Check '(b) bad checksum -> stops, nothing runs' ($r.Exit -ne 0 -and -not $r.Ran -and $r.Out -match 'Checksum mismatch') $r.Out
 
-    $r = Invoke-Case $Local "$Hash  Piblo-win-Portable.zip"
+    $r = Invoke-Case $Local "$Hash  PibloApp-win-Portable.zip"
     Check '(c) missing line -> stops, nothing runs' ($r.Exit -ne 0 -and -not $r.Ran -and $r.Out -match 'no entry') $r.Out
 
     $r = Invoke-Case 'http://example.com/piblo' $null
