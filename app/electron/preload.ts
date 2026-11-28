@@ -1,9 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 import type { CoreState, CraftDraft, CraftTaskRecord, PairRequest, PibloBridge, ThemeMode, UpdateStatus } from '../shared/types';
+import type { MissionData } from '../src/lib/mission';
 
 const invoke = <T>(channel: string, ...args: unknown[]) => ipcRenderer.invoke(channel, ...args) as Promise<T>;
 
 const bridge: PibloBridge = {
+  ...(process.isMainFrame && process.argv.includes('--craft-mission') ? {
+    craftMission: { get: () => invoke<MissionData>('craft-mission:get') },
+  } : {}),
   ...(process.isMainFrame && process.argv.includes('--craft-terminal-pilot') ? { craftTask: {
     load: () => invoke<CraftTaskRecord>('craft-task:load'),
     save: (draft: CraftDraft) => invoke<void>('craft-task:save', draft),
@@ -14,8 +18,6 @@ const bridge: PibloBridge = {
     arm: () => invoke('craft-voice:arm'),
     read: () => invoke('craft-voice:read'),
     cancel: () => invoke('craft-voice:cancel'),
-  }, craftMission: {
-    get: () => invoke<never>('craft-mission:get'),
   }, craftTerminal: {
     open: (cols: number, rows: number) => invoke<{ id: number; data: string; end: number }>('craft:open', cols, rows),
     read: (id: number, offset: number) => invoke<{ data: string; end: number; exited: boolean; truncated: boolean }>('craft:read', id, offset),

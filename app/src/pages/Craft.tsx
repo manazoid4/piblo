@@ -7,6 +7,17 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 
 export function Craft() {
+  const pilot = Boolean(window.piblo.craftTerminal);
+  return <>
+    <PageHead title="Craft" sub={pilot ? 'Draft a task, dictate it from Piblo, and run it in a real terminal.' : 'See what your agents are working on and review their results.'} />
+    <div className="stack">
+      {window.piblo.craftMission && <CraftMission />}
+      {pilot && <CraftPilot />}
+    </div>
+  </>;
+}
+
+function CraftPilot() {
   const api = window.piblo.craftTerminal!;
   const host = useRef<HTMLDivElement>(null);
   const [opened, setOpened] = useState(false);
@@ -94,10 +105,7 @@ export function Craft() {
   }
 
   return <>
-    <PageHead title="Craft" sub="Draft a task, dictate it from Piblo, and run it in a real terminal." />
-    <div className="stack">
-      {window.piblo.craftMission && <CraftMission />}
-      <CraftTask />
+    <CraftTask />
       <section className="card stack" aria-labelledby="craft-terminal">
         <div className="row">
           <h2 id="craft-terminal" className="grow">Terminal</h2>
@@ -109,6 +117,5 @@ export function Craft() {
         {status && <p role="status" className="meta">{status}</p>}
         {opened && <div ref={host} aria-label="PowerShell terminal" style={{ height: 'clamp(260px, 60vh, 720px)', background: '#1d1b19', padding: 8, borderRadius: 'var(--r-sm)' }} />}
       </section>
-    </div>
   </>;
 }
