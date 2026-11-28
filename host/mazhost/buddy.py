@@ -6,6 +6,7 @@ import hashlib
 import hmac
 import logging
 import os
+import re
 import secrets
 import sqlite3
 import threading
@@ -16,6 +17,7 @@ from datetime import datetime, timezone
 from collections import deque
 from datetime import date
 from typing import Callable, Literal
+from urllib.parse import urlsplit
 
 from fastapi import FastAPI, Header, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
@@ -150,6 +152,25 @@ class TaskIn(BaseModel):
     progress: int | None = Field(default=None, ge=0, le=100)
     detail: str = Field(default="", max_length=200)
     agent: str = Field(default="", max_length=60)
+    proof: str = Field(default="", max_length=300)   # https URL or relative evidence path (screenshot / test log)
+
+    @field_validator("proof")
+    @classmethod
+    def _safe_proof(cls, v: str) -> str:
+        """Boards render proof as a link: only https (no credentials) or a plain relative path, never javascript:/file:/C:\\."""
+        v = v.strip()
+        if not v:
+            return v
+        if any(ord(c) < 32 or ord(c) == 127 for c in v):
+            raise ValueError("proof has control characters")
+        if v.lower().startswith("https://"):
+            u = urlsplit(v)
+            if not u.hostname or u.username or u.password:
+                raise ValueError("proof URL needs a host and no credentials")
+            return v
+        if v[0] in "/\\" or re.match(r"^[\w+.-]+:", v) or ".." in re.split(r"[\\/]", v):
+            raise ValueError("proof must be an https URL or a relative path")
+        return v
 
 
 class DeviceStateIn(BaseModel):
@@ -733,7 +754,7 @@ class Buddy:
         """Upsert a task. The first done/failed also raises ONE alert so the device needs no new firmware."""
         agent = t.agent or "agent"
         prev = self._db("get_task", t.id)
-        row = self._db("upsert_task", t.id, agent, t.title, t.status, t.progress, t.detail)
+        row = self._db("upsert_task", t.id, agent, t.title, t.status, t.progress, t.detail, t.proof)
         if row is None:    # no store, or the disk failed: still tell the device
             row = {"id": t.id, "status": t.status, "progress": t.progress, "title": t.title}
         self._db("touch_agent", agent)

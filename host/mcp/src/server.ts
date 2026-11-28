@@ -113,6 +113,7 @@ export function createServer(core: CoreClient, defaultAgent: string): McpServer 
         status: z.enum(["waiting", "running", "done", "failed"]),
         progress: z.number().int().min(0).max(100).optional(),
         detail: z.string().max(200).optional(),
+        proof: z.string().max(300).optional().describe("URL or file path to a screenshot or test log"),
       }),
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     },
@@ -124,6 +125,7 @@ export function createServer(core: CoreClient, defaultAgent: string): McpServer 
           status: a.status,
           progress: a.progress ?? null,
           detail: a.detail ?? "",
+          proof: a.proof ?? "",
           agent: agent(),
         });
         return text({ ok: true, task_id: a.task_id, status: a.status });
