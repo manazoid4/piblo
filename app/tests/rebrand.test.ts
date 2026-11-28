@@ -52,8 +52,10 @@ describe('rebrand', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(appRoot, 'package.json'), 'utf8'));
     expect(pkg.productName).toBe('Piblo');
     expect(pkg.build.productName).toBe('Piblo');
-    expect(pkg.build.nsis.shortcutName).toBe('Piblo');
-    expect(pkg.build.nsis.artifactName).toBe('Piblo-Setup-${version}.${ext}');
+    const workflow = fs.readFileSync(path.join(appRoot, '../.github/workflows/app-release.yml'), 'utf8');
+    expect(workflow).toContain('--packId Piblo');
+    expect(workflow).toContain('--packTitle Piblo');
+    expect(workflow).toContain('Piblo-win-Setup.exe');
     expect(pkg.description).not.toMatch(BANNED);
     const html = fs.readFileSync(path.join(appRoot, 'index.html'), 'utf8');
     expect(html).toContain('<title>Piblo</title>');

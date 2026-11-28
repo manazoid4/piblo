@@ -12,7 +12,7 @@
     "dev:mock": "node scripts/dev.mjs --mock",
     "build:main": "node scripts/build-main.mjs",
     "build:renderer": "vite build",
-    "build": "npm run typecheck && npm run build:main && npm run build:renderer && electron-builder --win nsis",
+    "build": "npm run typecheck && npm run pack",
     "pack": "npm run build:main && npm run build:renderer && electron-builder --win --dir",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
@@ -38,10 +38,10 @@
   "dependencies": {
     "@xterm/addon-fit": "0.11.0",
     "@xterm/xterm": "6.0.0",
-    "electron-updater": "6.3.9",
     "node-pty": "1.1.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "velopack": "1.2.161"
   },
   "build": {
     "appId": "uk.piblo.app",
@@ -77,30 +77,8 @@
       }
     ],
     "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "build/icon.ico"
-    },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Piblo",
-      "artifactName": "Piblo-Setup-${version}.${ext}"
-    },
-    "publish": [
-      {
-        "provider": "generic",
-        "url": "https://github.com/manazoid4/piblo/releases/download/app-latest"
-      }
-    ]
+      "icon": "build/icon.ico",
+      "signAndEditExecutable": false
+    }
   }
 }

@@ -13,9 +13,11 @@ import { discoverPort, discoverToken, locateCore, type FsLike } from './core-loc
 import { applyEnvEdit, validateEnvEdit, viewEnv } from './env-file';
 import { isSafeTaskName, planInstall } from './install-plan';
 import { CoreSidecar } from './sidecar';
-import { autoUpdater } from 'electron-updater';
-import { createAppUpdater, type UpdaterLike } from './updater';
+import { VelopackApp, UpdateManager, HttpSource } from 'velopack';
+import { createAppUpdater } from './updater';
 import { WindowReveal } from './window-reveal';
+
+VelopackApp.build().run();
 
 const realFs: FsLike = {
   exists: (p) => fs.existsSync(p),
@@ -211,7 +213,7 @@ function applyLoginItem() {
 }
 
 // ---- updates ----
-const appUpdater = createAppUpdater(autoUpdater as unknown as UpdaterLike, (s) => win?.webContents.send('update:changed', s), !isDev);
+const appUpdater = createAppUpdater(() => new UpdateManager(new HttpSource('https://github.com/manazoid4/piblo/releases/download/app-latest')), (s) => win?.webContents.send('update:changed', s), !isDev, () => app.quit());
 
 // ---- IPC ----
 function setupIpc() {

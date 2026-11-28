@@ -44,8 +44,18 @@ jobs:
       - name: Electron UI checks
         run: npm run build:main && npm run build:renderer && npm run verify:ui
 
+      - name: Install Velopack CLI
+        run: dotnet tool install --global vpk --version 1.2.161
+
       - name: Build installer and update files
-        run: npm run build:main && npm run build:renderer && npx electron-builder --win nsis --publish never
+        shell: pwsh
+        run: |
+          npm run pack
+          if ($LASTEXITCODE -ne 0) { throw 'App packaging failed' }
+          $v = (Get-Content package.json | ConvertFrom-Json).version
+          vpk pack --runtime win-x64 --packId Piblo --packVersion $v --packDir release/win-unpacked --mainExe Piblo.exe --packTitle Piblo --icon build/icon.ico --splashImage build/splash.gif --outputDir release/velopack
+          if ($LASTEXITCODE -ne 0) { throw 'Velopack packaging failed' }
+          # shortcut: placeholder icon animation, replace with a branded animation before launch
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
 
@@ -57,12 +67,13 @@ jobs:
         run: |
           $v = (Get-Content package.json | ConvertFrom-Json).version
           $beta = $v -match '-'
-          $files = @(Get-ChildItem release -File | Where-Object { $_.Name -match '(\.exe|\.blockmap|\.yml)$' -and $_.Name -ne 'builder-debug.yml' } | ForEach-Object FullName)
-          if (-not ($files | Where-Object { $_ -match '\.exe$' })) { throw 'Installer missing' }
-          $channel = if ($beta) { ($v -split '-')[1] -replace '\..*$', '' } else { 'latest' }
-          if (-not (Test-Path "release/$channel.yml")) { throw 'Update metadata missing' }
-          $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower(), (Split-Path $_ -Leaf) } | Set-Content release/SHA256SUMS.txt -Encoding utf8
-          $files += (Resolve-Path release/SHA256SUMS.txt).Path
+          $files = @(Get-ChildItem release/velopack -File | Where-Object { $_.Name -match '(\.exe|\.zip|\.nupkg|\.json)$' } | ForEach-Object FullName)
+          foreach ($required in @('Piblo-win-Setup.exe', 'Piblo-win-Portable.zip', 'releases.win.json')) {
+            if (-not (Test-Path "release/velopack/$required")) { throw "Missing $required" }
+          }
+          if (-not ($files | Where-Object { $_ -match '-full\.nupkg$' })) { throw 'Full update package missing' }
+          $files | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_ -Algorithm SHA256).Hash.ToLower(), (Split-Path $_ -Leaf) } | Set-Content release/velopack/SHA256SUMS.txt -Encoding utf8
+          $files += (Resolve-Path release/velopack/SHA256SUMS.txt).Path
           $warning = if ($beta) { 'Unsigned beta: Windows SmartScreen will warn; click More info, Run anyway' } else { 'Unsigned: Windows SmartScreen will warn; click More info, Run anyway' }
           $notes = "$warning`n`nWindows 10/11 x64. Physical device pairing, install/rollback and update installation are pending. See https://github.com/manazoid4/piblo/blob/${{ github.ref_name }}/releases/README.md for requirements and rollback."
           $notes | Set-Content release/NOTES.md -Encoding utf8
