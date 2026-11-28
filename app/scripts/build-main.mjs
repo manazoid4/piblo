@@ -6,7 +6,7 @@ await build({
   platform: 'node',
   target: 'node20',
   format: 'cjs',
-  external: ['electron', 'node-pty'],
+  external: ['electron', 'node-pty', 'velopack'],
   sourcemap: true,
   logLevel: 'info',
 });

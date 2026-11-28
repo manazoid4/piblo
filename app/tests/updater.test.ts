@@ -1,49 +1,35 @@
-import { EventEmitter } from 'node:events';
 import { describe, expect, it, vi } from 'vitest';
-import { createAppUpdater, type UpdaterLike } from '../electron/updater';
+import type { UpdateInfo, UpdateManager } from 'velopack';
+import { createAppUpdater } from '../electron/updater';
 
+const info = { TargetFullRelease: { Version: '0.2.1' } } as UpdateInfo;
 function fake() {
-  const u = new EventEmitter() as UpdaterLike;
-  u.autoDownload = false;
-  u.autoInstallOnAppQuit = false;
-  u.checkForUpdates = vi.fn(async () => undefined);
-  u.quitAndInstall = vi.fn();
-  return u;
+  return {
+    checkForUpdatesAsync: vi.fn(async (): Promise<UpdateInfo | null> => info),
+    downloadUpdateAsync: vi.fn(async (_info: UpdateInfo, progress?: (n: number) => void) => { progress?.(42); }),
+    waitExitThenApplyUpdate: vi.fn(),
+  };
 }
-
 describe('app updater', () => {
-  it('downloads quietly then waits for one click to restart', async () => {
-    const u = fake();
-    const seen: string[] = [];
-    const up = createAppUpdater(u, (s) => seen.push(s.state), true);
-    expect(u.autoDownload).toBe(true);
+  it('downloads in the background and applies only on restart', async () => {
+    const u = fake(); const quit = vi.fn(); const seen: string[] = [];
+    const up = createAppUpdater(() => u as unknown as UpdateManager, s => seen.push(s.state), true, quit);
     expect(up.install()).toBe(false);
     await up.check();
-    u.emit('checking-for-update');
-    u.emit('update-available', { version: '0.2.0' });
-    u.emit('download-progress', { percent: 41.6 });
-    expect(up.status()).toMatchObject({ state: 'downloading', progress: 42, version: '0.2.0' });
-    u.emit('update-downloaded', { version: '0.2.0' });
-    expect(up.status().state).toBe('ready');
+    expect(up.status()).toMatchObject({ state: 'ready', progress: 100, version: '0.2.1' });
     await up.check();
-    expect(u.checkForUpdates).toHaveBeenCalledTimes(1); // no re-check once ready
+    expect(u.checkForUpdatesAsync).toHaveBeenCalledTimes(1);
     expect(up.install()).toBe(true);
-    expect(u.quitAndInstall).toHaveBeenCalledWith(true, true);
+    expect(u.waitExitThenApplyUpdate).toHaveBeenCalledWith(info, true, true);
+    expect(quit).toHaveBeenCalledOnce();
     expect(seen).toEqual(['checking', 'downloading', 'downloading', 'ready']);
   });
-
-  it('stays calm offline and is off in dev builds', async () => {
-    const u = fake();
-    u.checkForUpdates = vi.fn(async () => { throw new Error('offline'); });
-    const up = createAppUpdater(u, () => {}, true);
-    await up.check();
-    expect(up.status().state).toBe('error');
-    u.emit('update-not-available');
-    expect(up.status().state).toBe('idle');
-
-    const dev = createAppUpdater(fake(), () => {}, false);
-    expect(dev.status().state).toBe('disabled');
-    await dev.check();
-    expect(dev.install()).toBe(false);
+  it('handles offline, no updates and disabled mode', async () => {
+    const u = fake(); u.checkForUpdatesAsync.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce(null);
+    const up = createAppUpdater(() => u as unknown as UpdateManager, () => {}, true, () => {});
+    await up.check(); expect(up.status().state).toBe('error');
+    await up.check(); expect(up.status().state).toBe('idle');
+    const dev = createAppUpdater(() => u as unknown as UpdateManager, () => {}, false, () => {});
+    await dev.check(); expect(dev.status().state).toBe('disabled'); expect(dev.install()).toBe(false);
   });
 });
