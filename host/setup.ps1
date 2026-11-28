@@ -5,18 +5,58 @@ $VersionPath = Join-Path $HostRoot "VERSION"
 if (-not (Test-Path $VersionPath)) { $VersionPath = Join-Path (Split-Path -Parent $HostRoot) "VERSION" }
 $Version = if (Test-Path $VersionPath) { (Get-Content $VersionPath -Raw).Trim() } else { "dev" }
 
+# Core runs on uv, which downloads its own Python: nothing to install by hand.
+# uv comes from PATH, else %LocalAppData%\Piblo\tools\uv.exe (fetched once, sha256-checked, no admin).
+$UvVersion = "0.11.24"
+$UvZipSha256 = "af9573a2e36f7020b18ec5fdde20117aae74bbad3f4acb3dc3fc03319f1aa083"
+function Get-Uv {
+    $Found = Get-Command uv -ErrorAction SilentlyContinue
+    if ($Found) { return $Found.Source }
+    $Tools = Join-Path $env:LOCALAPPDATA "Piblo\tools"
+    $Exe = Join-Path $Tools "uv.exe"
+    if (Test-Path $Exe) { return $Exe }
+    New-Item -ItemType Directory -Force -Path $Tools | Out-Null
+    $Zip = Join-Path $Tools "uv.zip"
+    $Old = $ProgressPreference; $ProgressPreference = "SilentlyContinue"
+    try {
+        Invoke-WebRequest -UseBasicParsing -Uri "https://github.com/astral-sh/uv/releases/download/$UvVersion/uv-x86_64-pc-windows-msvc.zip" -OutFile $Zip
+    } finally { $ProgressPreference = $Old }
+    if ((Get-FileHash -Algorithm SHA256 $Zip).Hash.ToLowerInvariant() -ne $UvZipSha256) {
+        Remove-Item $Zip -Force
+        throw "uv download failed its SHA-256 check; nothing was installed."
+    }
+    Expand-Archive -Path $Zip -DestinationPath $Tools -Force
+    Remove-Item $Zip -Force
+    if (-not (Test-Path $Exe)) { throw "uv.exe missing after unpacking." }
+    return $Exe
+}
+
 if (-not (Test-Path $Python)) {
-    $Py = Get-Command py -ErrorAction SilentlyContinue
-    $PythonCmd = Get-Command python -ErrorAction SilentlyContinue
-    if ($Py) {
-        & py -3 -m venv (Join-Path $HostRoot ".venv")
-    } elseif ($PythonCmd) {
-        & python -m venv (Join-Path $HostRoot ".venv")
-    } else {
-        throw "Python 3 is required for MAZ Core. Install Python 3.11+ once, then double-click START-HERE.cmd again."
+    $Venv = Join-Path $HostRoot ".venv"
+    try {
+        $Uv = Get-Uv
+        & $Uv venv --seed --python 3.12 $Venv
+        if ($LASTEXITCODE -ne 0) { throw "uv venv failed" }
+        & $Uv pip install --python $Python -r (Join-Path $HostRoot "requirements.txt")
+        if ($LASTEXITCODE -ne 0) { throw "uv pip install failed" }
+        $Installed = $true
+    } catch {
+        Write-Host "uv route failed ($($_.Exception.Message)); trying system Python."
+        if (Test-Path $Venv) { Remove-Item $Venv -Recurse -Force }
+        $Py = Get-Command py -ErrorAction SilentlyContinue
+        $PythonCmd = Get-Command python -ErrorAction SilentlyContinue
+        if ($Py) {
+            & py -3 -m venv $Venv
+        } elseif ($PythonCmd) {
+            & python -m venv $Venv
+        } else {
+            throw "Could not set up Python for Piblo Core (uv failed, and no system Python 3.11+ was found)."
+        }
     }
 }
-& $Python -m pip install --disable-pip-version-check -r (Join-Path $HostRoot "requirements.txt")
+if (-not (Get-Variable Installed -ErrorAction SilentlyContinue)) {
+    & $Python -m pip install --disable-pip-version-check -r (Join-Path $HostRoot "requirements.txt")
+}
 
 $EnvPath = Join-Path $HostRoot ".env"
 if (-not (Test-Path $EnvPath)) {
