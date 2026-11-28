@@ -80,7 +80,7 @@ try {
   console.log('PASS: real terminal input and output, reconnect, resize and close');
 
   if (exerciseTask) {
-    await page.getByLabel('Task draft').fill(taskPrompt);
+    await page.getByLabel('What should be built?').fill(taskPrompt);
     await page.getByLabel('Local model').selectOption('test-model');
     await page.getByRole('button', { name: 'Run locally' }).click();
     await page.getByText('Result ready to review.').waitFor();
@@ -99,13 +99,13 @@ try {
       throw error;
     }
     await reopened.getByText(taskResult, { exact: true }).waitFor();
-    assert.equal(await reopened.getByLabel('Task draft').inputValue(), taskPrompt);
+    assert.equal(await reopened.getByLabel('What should be built?').inputValue(), taskPrompt);
     assert.equal(generations, 1);
     console.log('PASS: local task, encrypted result, restart and Continue without replay (fixture model)');
   }
   if (exerciseVoice) {
     const current = await app.firstWindow();
-    const draft = current.getByLabel('Task draft');
+    const draft = current.getByLabel('What should be built?');
     await draft.fill('Already typed.');
     await current.getByRole('button', { name: 'Dictate with Piblo' }).click();
     await current.waitForFunction(expected => document.querySelector('#craft-prompt')?.value === expected, 'Already typed.\n' + voiceText);
