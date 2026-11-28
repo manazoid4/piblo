@@ -1,43 +1,56 @@
 import { useEffect, useState } from 'react';
-import { agentTone, groupByAgent, nextAction, STATUS_LABEL, type MissionData, type MissionTask } from '../lib/mission';
+import { agentTone, groupByAgent, missionProof, nextAction, STATUS_LABEL, type MissionData, type MissionTask } from '../lib/mission';
+import './CraftMission.css';
 
-const isUrl = (s: string) => /^https?:\/\//.test(s);
 const tone = { done: 'ok', running: 'warn', failed: 'bad', waiting: '' } as const;
 
-function Proof({ proof }: { proof: string }) {
-  return isUrl(proof)
-    ? <a href={proof} onClick={(e) => { e.preventDefault(); void window.piblo.openExternal(proof); }}>Proof</a>
-    : <span className="meta" title={proof} style={{ overflowWrap: 'anywhere' }}>Proof: {proof}</span>;
-}
-
 function TaskRow({ t }: { t: MissionTask }) {
-  return <li className="row" style={{ alignItems: 'baseline', flexWrap: 'wrap' }}>
-    <span className={`pill ${tone[t.status]}`}>{STATUS_LABEL[t.status]}</span>
-    <span className="grow" style={{ minWidth: 0, overflowWrap: 'anywhere' }}>{t.title}{t.detail && <span className="meta"> · {t.detail}</span>}</span>
-    {t.proof && <Proof proof={t.proof} />}
+  const proof = missionProof(t.proof);
+  const href = proof?.href;
+  const proved = t.status === 'done' && proof !== null;
+  const progress = t.progress;
+  return <li className="craft-mission-task">
+    <div className="row craft-mission-task-head">
+      <span className={`pill ${proved ? 'craft-mission-proved' : tone[t.status]}`}>{proved ? 'Proved' : STATUS_LABEL[t.status]}</span>
+      <strong className="grow">{t.title}</strong>
+      {typeof progress === 'number' && progress >= 0 && progress <= 100 && <span className="meta" aria-label={`Progress ${progress}%`}>{progress}%</span>}
+    </div>
+    {t.detail && <p className="meta">{t.detail}</p>}
+    {proof && <p className="meta">Proof: {href
+      ? <a href={href} onClick={(e) => { e.preventDefault(); void window.piblo.openExternal(href); }}>{proof.text}</a>
+      : proof.text}</p>}
   </li>;
 }
 
 export function CraftMission() {
-  const [data, setData] = useState<MissionData | null>(null);
+  const [data, setData] = useState<MissionData | null>();
   useEffect(() => {
     let live = true;
-    const load = () => void window.piblo.craftMission!.get().then((d) => live && setData(d)).catch(() => live && setData(null));
-    load();
-    const timer = setInterval(load, 10_000);
-    return () => { live = false; clearInterval(timer); };
+    let timer: ReturnType<typeof setTimeout>;
+    async function load() {
+      try {
+        const snapshot = await window.piblo.craftMission!.get();
+        if (live) setData(snapshot);
+      } catch {
+        if (live) setData(null);
+      } finally {
+        if (live) timer = setTimeout(load, 10_000);
+      }
+    }
+    void load();
+    return () => { live = false; clearTimeout(timer); };
   }, []);
 
   return <section className="card stack" aria-labelledby="craft-mission">
     <h2 id="craft-mission">Mission control</h2>
-    {!data ? <p className="meta">Core is not reachable right now.</p> : <>
+    {!data ? <p className="meta">{data === undefined ? 'Loading tasks…' : 'Core is not reachable right now.'}</p> : <>
       <p><strong>Next:</strong> {nextAction(data.tasks)}</p>
-      {data.error === 'cswap_unavailable' && <p className="meta">Agent usage is unavailable (cswap not found).</p>}
+      {data.error === 'cswap_unavailable' && <p className="meta">Claude usage is unavailable.</p>}
       <div className="row" style={{ flexWrap: 'wrap' }} aria-label="Agents">
         {data.agents.map((a) => {
           const k = agentTone(a);
           return <span key={a.id} className={`pill ${k === 'ok' || k === 'warn' ? k : ''}`} style={a.installed ? undefined : { opacity: 0.55 }}>
-            <span className="dot" />{a.label} · {a.installed ? (a.pct_left === null ? '—' : `${a.pct_left}%`) : 'not installed'}
+            <span className="dot" />{a.label} · {a.installed ? (a.pct_left === null ? 'Usage unavailable' : `${a.pct_left}% left`) : 'not installed'}
           </span>;
         })}
       </div>

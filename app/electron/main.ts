@@ -4,7 +4,7 @@ import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { registerCraftTerminal } from './craft-terminal';
+import { registerCraftMission, registerCraftTerminal } from './craft-terminal';
 import { craftVoice } from './craft-voice';
 import type { AppSettings, EnvKey, PairRequest, ThemeMode } from '../shared/types';
 import { CARD, PAIR } from '../shared/types';
@@ -121,6 +121,8 @@ nativeTheme.on('updated', () => {
 function createWindow(): BrowserWindow {
   const t = theme();
   const rendererFile = path.join(__dirname, '..', 'renderer', 'index.html');
+  const rendererUrl = pathToFileURL(rendererFile).href;
+  const showCraftMission = process.platform === 'win32' && !process.env.NOD_DEV_URL;
   const w = new BrowserWindow({
     width: 1180,
     height: 760,
@@ -137,10 +139,11 @@ function createWindow(): BrowserWindow {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      additionalArguments: [`--piblo-version=${app.getVersion()}`, ...(craftPilot ? ['--craft-terminal-pilot'] : [])],
+      additionalArguments: [`--piblo-version=${app.getVersion()}`, ...(showCraftMission ? ['--craft-mission'] : []), ...(craftPilot ? ['--craft-terminal-pilot'] : [])],
     },
   });
-  if (craftPilot) registerCraftTerminal(w, pathToFileURL(rendererFile).href, craftVoice(() => `http://127.0.0.1:${port()}`, token), craftMission);
+  if (showCraftMission) registerCraftMission(w, rendererUrl, craftMission);
+  if (craftPilot) registerCraftTerminal(w, rendererUrl, craftVoice(() => `http://127.0.0.1:${port()}`, token));
   w.setMenuBarVisibility(false);
   // First paint is not guaranteed: if the renderer never becomes ready the window would stay
   // invisible, so the gate also reveals on did-finish-load and after a failsafe timeout.

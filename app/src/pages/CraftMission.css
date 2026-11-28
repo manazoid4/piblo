@@ -1,0 +1,50 @@
+.craft-mission-task {
+  min-width: 0;
+  padding: var(--s-3) 0;
+  border-top: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+
+.craft-mission-task-head {
+  flex-wrap: wrap;
+}
+
+.craft-mission-task-head .grow {
+  min-width: 0;
+}
+
+.craft-mission-task .meta {
+  margin-block: var(--s-1) 0;
+}
+
+.pill.craft-mission-proved {
+  background: var(--sun);
+  color: var(--ink);
+  border-color: transparent;
+}
+
+@media (max-width: 620px) {
+  .shell[data-section='craft'] {
+    grid-template-columns: 48px minmax(0, 1fr);
+  }
+
+  .shell[data-section='craft'] .rail {
+    padding-inline: var(--s-1);
+  }
+
+  .shell[data-section='craft'] .rail-item {
+    justify-content: center;
+    padding-inline: 0;
+    font-size: 0;
+  }
+
+  .shell[data-section='craft'] .rail-item kbd,
+  .shell[data-section='craft'] .rail-badge,
+  .shell[data-section='craft'] .rail-foot {
+    display: none;
+  }
+
+  .shell[data-section='craft'] .content {
+    padding-inline: var(--s-3);
+  }
+}

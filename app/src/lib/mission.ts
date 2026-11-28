@@ -1,8 +1,26 @@
 export interface MissionAgent { id: string; label: string; kind?: string; installed: boolean; active: boolean; pct_left: number | null; resets_at?: string | null }
-export interface MissionTask { id: string; agent: string; title: string; status: 'waiting' | 'running' | 'done' | 'failed'; progress?: number | null; detail?: string; proof?: string; updated?: string }
+export interface MissionTask { id: string; agent: string; title: string; status: 'waiting' | 'running' | 'done' | 'failed'; progress?: number | null; detail?: string; proof?: string | null; created?: number; updated?: number }
 export interface MissionData { agents: MissionAgent[]; tasks: MissionTask[]; error?: string }
 
 export const STATUS_LABEL: Record<MissionTask['status'], string> = { waiting: 'Blocked', running: 'Working', done: 'Done', failed: 'Failed' };
+
+export function missionProof(value: unknown): { text: string; href?: string } | null {
+  if (typeof value !== 'string' || value.length > 300 || /[\u0000-\u001f\u007f]/.test(value)) return null;
+  const text = value.trim();
+  if (!text) return null;
+
+  if (/^https:\/\//i.test(text)) {
+    try {
+      const url = new URL(text);
+      return url.hostname && !url.username && !url.password ? { text, href: url.href } : null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (/^(?:[\\/]|[\w+.-]+:)/.test(text) || text.split(/[\\/]/).some((part) => part === '..')) return null;
+  return { text };
+}
 
 /** One line for the top of the card: failed first, then waiting, then running. */
 export function nextAction(tasks: MissionTask[]): string {

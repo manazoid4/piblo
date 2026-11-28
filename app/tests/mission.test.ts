@@ -1,10 +1,22 @@
 import { describe, it, expect } from 'vitest';
-import { agentTone, groupByAgent, nextAction, type MissionAgent, type MissionTask } from '../src/lib/mission';
+import { agentTone, groupByAgent, missionProof, nextAction, type MissionAgent, type MissionTask } from '../src/lib/mission';
 
 const t = (id: string, agent: string, status: MissionTask['status']): MissionTask => ({ id, agent, title: id, status });
 const a = (id: string, o: Partial<MissionAgent> = {}): MissionAgent => ({ id, label: id, installed: true, active: false, pct_left: 50, ...o });
 
 describe('mission', () => {
+  it('only makes HTTPS proof clickable and keeps relative proof as text', () => {
+    expect(missionProof('https://github.com/manazoid4/piblo/pull/208')).toEqual({
+      text: 'https://github.com/manazoid4/piblo/pull/208',
+      href: 'https://github.com/manazoid4/piblo/pull/208',
+    });
+    expect(missionProof('screenshots/01-real.png')).toEqual({ text: 'screenshots/01-real.png' });
+    for (const value of [null, undefined, '', '   ', 'http://host/proof', 'https://', 'https://user@host/proof',
+      'javascript:alert(1)', 'file:///etc/passwd', '//host/proof', 'C:\\proof.png', '../proof.png', 'x'.repeat(301)]) {
+      expect(missionProof(value)).toBeNull();
+    }
+  });
+
   it('nextAction: failed beats waiting beats running; else all clear', () => {
     expect(nextAction([t('a', 'x', 'running'), t('b', 'x', 'waiting'), t('c', 'x', 'failed')])).toBe('Fix: c');
     expect(nextAction([t('a', 'x', 'running'), t('b', 'x', 'waiting')])).toBe('Unblock: b');

@@ -88,7 +88,7 @@ const NAV: { id: Section; label: string; icon: string }[] = [
   { id: 'usage', label: 'Usage', icon: 'actions' },
   ...(isDev ? [{ id: 'dev' as const, label: 'Piblo Dev', icon: 'dev' }] : []),
   { id: 'teach', label: 'Show me once', icon: 'screen' },
-  ...(window.piblo?.craftTerminal ? [{ id: 'craft' as const, label: 'Craft', icon: 'dev' }] : []),
+  ...(window.piblo?.craftMission ? [{ id: 'craft' as const, label: 'Craft', icon: 'dev' }] : []),
 ];
 
 function DevicePillView() {
@@ -179,7 +179,7 @@ function Shell() {
   const Page = { home: Home, live: LiveView, ask: Ask, memory: Memory, actions: Actions, settings: Settings, usage: Usage, teach: Teach }[section === 'dev' || section === 'craft' ? 'home' : section];
 
   return (
-    <div className="shell">
+    <div className="shell" data-section={section}>
       <header className="titlebar">
         <button
           type="button"
