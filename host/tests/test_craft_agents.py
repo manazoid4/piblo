@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import subprocess
+import time
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -28,8 +30,9 @@ CSWAP = {"accounts": [
 
 
 @pytest.fixture(autouse=True)
-def fresh_cache(monkeypatch):
+def fresh_cache(monkeypatch, tmp_path):
     ca._cache.update(at=0.0, value=None)
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / "codex"))   # never read this machine's real Codex logs
     monkeypatch.setattr(ca.shutil, "which", lambda name: "C:/bin/codex.exe" if name == "codex" else None)
 
 
@@ -57,7 +60,7 @@ def test_agents_from_cswap_no_email(monkeypatch, tmp_path):
     assert (agents["claude-1"]["pct_left"], agents["claude-1"]["active"], agents["claude-1"]["resets_at"]) == (11, True, FUTURE)
     assert agents["claude-2"]["pct_left"] == 80          # expired 5h window counts as unused
     assert agents["codex"] == {"id": "codex", "label": "Codex", "kind": "codex", "installed": True,
-                               "active": False, "pct_left": None, "resets_at": None}
+                               "active": False, "pct_left": None, "resets_at": None, "as_of": None}
     assert "example.com" not in r.text and "SecretOrg" not in r.text
     c.get("/craft/agents", headers=H)
     assert len(calls) == 1 and calls[0][0] == ["cswap", "list", "--json"] and calls[0][1] == 8   # cached, argv list
@@ -101,3 +104,48 @@ def test_task_proof_round_trip_and_old_db_migration(tmp_path):
     assert rows["t1"]["proof"] == "https://x.test/shot.png" and rows["t1"]["status"] == "done"
     assert c.post("/buddy/task", json={**t, "proof": "x" * 301}, headers=H).status_code == 422
     assert c.post("/buddy/task", json={"id": "t2", "title": "N", "status": "done"}, headers=H).json()["task"]["proof"] == ""
+
+
+def _codex_log(home, lines, age_s=0):
+    day = home / "sessions" / "2026" / "11" / "28"
+    day.mkdir(parents=True)
+    log = day / "rollout-x.jsonl"
+    log.write_text("\n".join(json.dumps(x) for x in lines) + "\n", encoding="utf-8")
+    t = time.time() - age_s
+    os.utime(log, (t, t))
+    return log
+
+
+def test_codex_usage_from_newest_session_log(tmp_path, monkeypatch):
+    now = time.time()
+    old = {"payload": {"type": "token_count", "rate_limits": {"primary": {"used_percent": 99.0, "resets_at": now + 60}}}}
+    new = {"type": "event_msg", "payload": {"type": "token_count", "info": {"prompt": "never read"}, "rate_limits": {
+        "primary": {"used_percent": 95.0, "window_minutes": 300, "resets_at": now - 10},       # expired: counts as unused
+        "secondary": {"used_percent": 30.0, "window_minutes": 10080, "resets_at": now + 3600}}}}
+    _codex_log(tmp_path, [old, {"type": "noise"}, new, {"type": "turn_end"}])
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    left, resets, as_of = ca._codex_usage(now)
+    assert left == 70 and resets.endswith("Z") and as_of.endswith("Z")
+
+
+@pytest.mark.parametrize("case", ["stale", "no_limits", "garbage", "missing"])
+def test_codex_usage_unknown_is_none(tmp_path, monkeypatch, case):
+    if case == "stale":
+        _codex_log(tmp_path, [{"rate_limits": {"primary": {"used_percent": 10.0, "resets_at": time.time() + 60}}}], age_s=8 * 24 * 3600)
+    elif case == "no_limits":
+        _codex_log(tmp_path, [{"type": "token_count"}])
+    elif case == "garbage":
+        log = _codex_log(tmp_path, [])
+        log.write_text('{"rate_limits": not json\n', encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path))
+    assert ca._codex_usage() == (None, None, None)
+
+
+@pytest.mark.parametrize("proof,ok", [
+    ("https://github.com/manazoid4/piblo/pull/207", True), ("screenshots/01-real.png", True), ("  ", True),
+    ("http://host/proof", False), ("https://user:pw@host/x", False), ("https://", False), ("javascript:alert(1)", False),
+    ("file:///etc/passwd", False), ("C:\\proof.png", False), ("/etc/passwd", False), ("\\\\server\\share", False),
+    ("../secret.png", False), ("shots/../../x.png", False), ("a\nb", False)])
+def test_task_proof_only_https_or_relative(tmp_path, proof, ok):
+    r = client(tmp_path).post("/buddy/task", json={"id": "p1", "title": "T", "status": "done", "proof": proof}, headers=H)
+    assert (r.status_code == 200) is ok, (proof, r.status_code)
