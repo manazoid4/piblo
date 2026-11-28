@@ -1,4 +1,4 @@
-﻿import type { CraftDraft, CraftTaskRecord } from '../shared/types';
+import type { CraftDraft, CraftTaskRecord } from '../shared/types';
 
 export const emptyTask: CraftTaskRecord = { prompt: '', model: '', last: null };
 const modelName = /^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,199}$/;
@@ -75,7 +75,8 @@ export function localTasks(request: typeof fetch, load: () => CraftTaskRecord, s
         throw new Error('This model has no verified local weights.');
       }
       const result = await json('generate', signal, {
-        model: draft.model, prompt: draft.prompt, stream: false, options: { num_predict: 1024 },
+        model: draft.model, prompt: draft.prompt, stream: false, think: false, keep_alive: '5m',
+        options: { num_predict: 1024, num_ctx: 8192 },
       });
       signal.throwIfAborted();
       if (result.done !== true || typeof result.response !== 'string' || !result.response.trim() || result.response.length > 48000) {

@@ -1,4 +1,4 @@
-﻿import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { emptyTask, localTasks, parseTask } from '../electron/craft-local';
 
 const draft = { prompt: 'Draft one sentence.', model: 'sample:latest' };
@@ -21,7 +21,7 @@ describe('Craft local tasks', () => {
     const request = ollama((path, body) => {
       if (path === '/api/tags') return { models: [row, { ...row, name: 'remote', remote_host: 'https://example.com' }] };
       if (path === '/api/show') return { model_info: { architecture: 'sample' } };
-      expect(body).toMatchObject({ ...draft, stream: false, options: { num_predict: 1024 } });
+      expect(body).toMatchObject({ ...draft, stream: false, think: false, keep_alive: '5m', options: { num_predict: 1024, num_ctx: 8192 } });
       return { done: true, response: 'Local result.' };
     });
     const tasks = fixture(request);
